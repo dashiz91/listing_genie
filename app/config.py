@@ -1,0 +1,55 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List
+from functools import lru_cache
+
+
+class Settings(BaseSettings):
+    # Application
+    app_name: str = "listing-genie"
+    app_env: str = "development"
+    debug: bool = False
+    secret_key: str = "dev-secret-key-change-in-production"
+
+    # API
+    api_prefix: str = "/api"
+
+    # CORS
+    cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+
+    # Gemini (Story 2.1)
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3-pro-image-preview"  # For image GENERATION
+    gemini_vision_model: str = "gemini-3-flash-preview"  # For vision ANALYSIS (Principal Designer)
+
+    # Vision Provider Selection: "gemini" (recommended - 10x cheaper) or "openai"
+    vision_provider: str = "gemini"
+
+    # OpenAI (Fallback for Vision Analysis)
+    openai_api_key: str = ""
+    openai_vision_model: str = "gpt-4o"  # Latest vision model
+
+    # Storage (Story 1.3)
+    storage_type: str = "local"
+    storage_path: str = "./storage"
+
+    # Database (Story 1.2)
+    database_url: str = "sqlite:///./listing_genie.db"
+
+    # Feature Flags
+    enable_payment: bool = False  # Deferred to Phase 2
+
+    # Logging
+    log_level: str = "INFO"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False
+    )
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
+
+
+settings = get_settings()
