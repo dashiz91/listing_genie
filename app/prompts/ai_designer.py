@@ -154,9 +154,7 @@ Every hex code must be valid. Every font must be real. Every headline must be co
 STYLE_REFERENCE_FRAMEWORK_PROMPT = '''You are a Principal Designer with 20+ years experience at top agencies (Apple, Nike, Pentagram).
 You're known for creating cohesive, compelling Amazon listing image sets that convert browsers into buyers.
 
-I'm showing you TWO images:
-1. A PRODUCT IMAGE - the product you're creating listing images for
-2. A STYLE REFERENCE IMAGE - the EXACT visual style the user wants to follow
+{image_inventory}
 
 PRODUCT CONTEXT:
 Product Name: {product_name}
@@ -169,13 +167,16 @@ Primary Color Preference: {primary_color}
                     YOUR TASK: EXTRACT & CREATE
 =====================================================================
 
-STEP 1: ANALYZE THE PRODUCT IMAGE
+STEP 1: ANALYZE THE PRODUCT IMAGE(S)
+Look at Image 1 (and any additional product images listed above).
 - What is the product? Describe what you see.
 - What are its visual characteristics (shape, color, texture, size)?
 - What category does it belong to?
 - What type of customer would buy this?
+- If multiple product images provided, note different angles/features visible.
 
 STEP 2: ANALYZE THE STYLE REFERENCE IMAGE (CRITICAL)
+Find the image marked as "STYLE REFERENCE" in the inventory above.
 Study this image CAREFULLY. Extract:
 - COLOR PALETTE: What are the dominant colors? Extract 5 hex codes.
 - TYPOGRAPHY FEEL: What font style would match? (serif, sans-serif, modern, classic, playful, etc.)

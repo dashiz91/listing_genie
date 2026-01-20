@@ -159,6 +159,24 @@ EXTRACT COLORS: Study the style reference image and extract:
 Use the ACTUAL colors you see in the style reference. Do NOT invent colors.
 """
 
+            # Build image inventory for style reference mode
+            # This tells the AI exactly what each image is
+            image_inventory = f"=== IMAGE INVENTORY ===\nI'm showing you {len(all_image_paths)} image(s):\n"
+            for i, img_path in enumerate(all_image_paths):
+                img_num = i + 1
+                if i == 0:
+                    label = "PRIMARY PRODUCT IMAGE - the product you're creating listing images for"
+                elif img_num == style_ref_index:
+                    label = "STYLE REFERENCE IMAGE - the EXACT visual style the user wants to follow"
+                else:
+                    label = f"ADDITIONAL PRODUCT IMAGE - another angle/view of the product"
+                image_inventory += f"- Image {img_num}: {label}\n"
+
+            image_inventory += f"\nIMPORTANT: Image {style_ref_index} is the STYLE REFERENCE. Extract colors, mood, lighting, and typography feel from it."
+            image_inventory += "\nAnalyze ALL product images to understand the product from multiple angles."
+
+            logger.info(f"[GEMINI] Image inventory for style ref mode:\n{image_inventory}")
+
             # Use the single-framework prompt
             prompt = STYLE_REFERENCE_FRAMEWORK_PROMPT.format(
                 product_name=product_name,
@@ -167,6 +185,7 @@ Use the ACTUAL colors you see in the style reference. Do NOT invent colors.
                 target_audience=target_audience or "General consumers",
                 primary_color=primary_color or "Extract from style reference",
                 color_mode_instructions=color_mode_instructions,
+                image_inventory=image_inventory,
             )
 
             logger.info(f"[GEMINI] Using STYLE_REFERENCE_FRAMEWORK_PROMPT (1 framework)")
