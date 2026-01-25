@@ -216,13 +216,13 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       {uploads.length > 0 && (
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">
+            <span className="text-sm font-medium text-white">
               Product Images ({uploads.length}/{maxImages})
             </span>
             <button
               onClick={clearAll}
               disabled={disabled}
-              className="text-xs text-red-600 hover:text-red-700 disabled:opacity-50"
+              className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50 transition-colors"
             >
               Clear All
             </button>
@@ -231,7 +231,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             {uploads.map((upload, index) => (
               <div
                 key={upload.upload_id}
-                className="relative group rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-100"
+                className="relative group rounded-lg overflow-hidden border-2 border-slate-600 bg-slate-700/50"
               >
                 <img
                   src={upload.preview_url}
@@ -240,7 +240,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 />
                 {/* Primary badge for first image */}
                 {index === 0 && (
-                  <div className="absolute top-1 left-1 bg-primary-600 text-white text-[10px] px-1.5 py-0.5 rounded">
+                  <div className="absolute top-1 left-1 bg-redd-500 text-white text-[10px] px-1.5 py-0.5 rounded">
                     Primary
                   </div>
                 )}
@@ -248,8 +248,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 <button
                   onClick={() => handleRemoveUpload(upload.upload_id)}
                   disabled={disabled}
-                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1
-                             opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600
+                  className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1
+                             opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500
                              disabled:opacity-50"
                 >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,7 +265,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <label
               className={`
                 mt-4 flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed
-                border-blue-300 hover:border-blue-500 bg-blue-50 hover:bg-blue-100
+                border-redd-500/30 hover:border-redd-500/50 bg-redd-500/10 hover:bg-redd-500/20
                 cursor-pointer transition-colors
                 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
               `}
@@ -278,17 +278,17 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 disabled={disabled || isUploading}
                 className="hidden"
               />
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-redd-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span className="text-sm font-medium text-blue-700">
+              <span className="text-sm font-medium text-redd-400">
                 Add More Product Photos ({maxImages - uploads.length} remaining)
               </span>
             </label>
           )}
 
-          <p className="text-xs text-gray-500 mt-3">
-            <strong>Tip:</strong> Upload multiple angles of your product! For example: front view, back view, close-up of details, product in use. The AI uses all images to better understand your product.
+          <p className="text-xs text-slate-400 mt-3">
+            <strong className="text-slate-300">Tip:</strong> Upload multiple angles of your product! For example: front view, back view, close-up of details, product in use. The AI uses all images to better understand your product.
           </p>
         </div>
       )}
@@ -300,11 +300,11 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           className={`
-            relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-            transition-colors duration-200
+            relative border-2 border-dashed rounded-xl p-12 text-center cursor-pointer
+            transition-colors duration-200 bg-slate-800/30
             ${isDragging
-              ? 'border-primary-500 bg-primary-50'
-              : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'
+              ? 'border-redd-500 bg-redd-500/10'
+              : 'border-slate-600 hover:border-slate-500'
             }
             ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
           `}
@@ -317,39 +317,36 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             disabled={disabled || isUploading}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />
-          <div className="space-y-3">
-            <div className="text-4xl">
-              {isUploading ? (
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-              ) : (
-                '📷'
+          <div className="flex flex-col items-center">
+            {isUploading ? (
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-redd-500 mb-4"></div>
+            ) : (
+              <svg className="w-12 h-12 text-slate-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            )}
+            <p className="text-slate-400">
+              {isUploading ? 'Uploading...' : (
+                <>Drag and drop or <span className="text-redd-400 hover:text-redd-300">browse files</span></>
               )}
-            </div>
-            <p className="text-gray-700 font-medium">
-              {isUploading
-                ? 'Uploading...'
-                : 'Upload Your Product Photos'}
             </p>
-            <p className="text-sm text-gray-500">
-              Drag & drop or click to browse (PNG, JPG)
+            <p className="text-xs text-slate-500 mt-2">
+              PNG, JPG up to {maxImages} images
             </p>
-            <div className="bg-blue-50 text-blue-700 text-xs rounded-lg p-2 mx-4">
-              <strong>Pro tip:</strong> Upload up to {maxImages} images showing different angles, close-ups, or your product in use. More images = better AI understanding!
-            </div>
           </div>
         </div>
       )}
 
       {/* Uploading overlay */}
       {isUploading && uploads.length > 0 && (
-        <div className="mt-2 flex items-center text-sm text-gray-600">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600 mr-2"></div>
+        <div className="mt-2 flex items-center text-sm text-slate-300">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-redd-500 mr-2"></div>
           Uploading...
         </div>
       )}
 
       {error && (
-        <div className="mt-2 text-red-600 text-sm">
+        <div className="mt-2 text-red-400 text-sm">
           {error}
         </div>
       )}
@@ -357,7 +354,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       {/* Recent Uploads - Quick Reuse */}
       {cachedUploads.length > 0 && (
         <div className="mt-6">
-          <h3 className="text-sm font-medium text-gray-700 mb-3">
+          <h3 className="text-sm font-medium text-white mb-3">
             Recent Uploads (click to add)
           </h3>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -370,8 +367,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   className={`
                     relative group rounded-lg overflow-hidden border-2 transition-all
                     ${isAlreadyAdded
-                      ? 'border-green-400 opacity-50 cursor-not-allowed'
-                      : 'border-gray-200 hover:border-primary-400 cursor-pointer'}
+                      ? 'border-green-500 opacity-50 cursor-not-allowed'
+                      : 'border-slate-600 hover:border-redd-500/50 cursor-pointer'}
                     ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
                   `}
                 >
@@ -382,7 +379,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   />
                   {isAlreadyAdded && (
                     <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
@@ -391,8 +388,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                   {!isAlreadyAdded && (
                     <button
                       onClick={(e) => handleRemoveCached(e, cached.upload_id)}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5
-                                 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5
+                                 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
                       title="Remove from recent"
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,7 +398,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     </button>
                   )}
                   {/* Filename tooltip */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px]
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-[10px]
                                   px-1 py-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity">
                     {cached.filename}
                   </div>

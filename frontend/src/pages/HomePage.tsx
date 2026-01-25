@@ -71,8 +71,9 @@ export const HomePage: React.FC = () => {
   const [productAnalysis, setProductAnalysis] = useState<string>('');
   const [productAnalysisRaw, setProductAnalysisRaw] = useState<Record<string, unknown> | null>(null);  // Full analysis for regeneration
   const [selectedFramework, setSelectedFramework] = useState<DesignFramework | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [, setIsAnalyzing] = useState(false);
   const [logoPath, setLogoPath] = useState<string | null>(null);
+  const [, setStyleRefPath] = useState<string | null>(null);
   const [globalNote, setGlobalNote] = useState<string>('');
 
   // Health check on mount
@@ -434,330 +435,210 @@ export const HomePage: React.FC = () => {
 
   const isGeminiConfigured = health?.dependencies?.gemini === 'configured';
 
-  const stepLabels = ['Upload', 'Details', 'Design AI', 'Generate', 'Download'];
-  const stepMap: Step[] = ['upload', 'form', 'frameworks', 'generating', 'results'];
-
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl">
       {/* Header */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Principal Designer AI for Amazon Listings
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white">
+          Amazon Listing Images
         </h1>
-        <p className="text-xl text-gray-600 mb-2">
-          GPT-4o Vision analyzes your product and creates 4 unique design frameworks
-        </p>
-        <p className="text-sm text-gray-500">
-          Each framework includes exact colors, typography, headlines, and story arc — tailored specifically to YOUR product
-        </p>
       </div>
 
       {/* Health Status Warning */}
       {!healthLoading && (healthError || !isGeminiConfigured) && (
-        <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="mb-6 bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4">
           {healthError ? (
-            <p className="text-yellow-800">
+            <p className="text-yellow-300 text-sm">
               <strong>Backend not connected.</strong> Make sure the server is running on port 8000.
             </p>
           ) : !isGeminiConfigured ? (
-            <p className="text-yellow-800">
+            <p className="text-yellow-300 text-sm">
               <strong>Gemini API not configured.</strong> Set GEMINI_API_KEY in .env to enable image generation.
             </p>
           ) : null}
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="bg-white rounded-xl shadow-lg p-8">
-        {/* Progress Steps */}
-        <div className="flex items-center justify-center space-x-3 mb-8">
-          {stepLabels.map((label, index) => {
-            const isActive = stepMap.indexOf(step) >= index;
-            const isCurrent = stepMap[index] === step;
-
-            return (
-              <React.Fragment key={label}>
-                <div className="flex items-center">
-                  <div
-                    className={`
-                      w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm
-                      ${isActive ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}
-                      ${isCurrent ? 'ring-4 ring-primary-200' : ''}
-                    `}
-                  >
-                    {index + 1}
-                  </div>
-                  <span
-                    className={`ml-2 text-sm ${isActive ? 'text-gray-900' : 'text-gray-400'}`}
-                  >
-                    {label}
-                  </span>
-                </div>
-                {index < stepLabels.length - 1 && (
-                  <div
-                    className={`w-8 h-0.5 ${isActive ? 'bg-primary-600' : 'bg-gray-200'}`}
-                  />
-                )}
-              </React.Fragment>
-            );
-          })}
+      {/* Error Display */}
+      {error && (
+        <div className="mb-6 bg-red-900/20 border border-red-700/50 rounded-lg p-4 text-red-300 text-sm">
+          {error}
         </div>
+      )}
 
-        {/* Error Display */}
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-            {error}
-          </div>
-        )}
+      {/* Upload Zone - Mockup Style */}
+      {step === 'upload' && (
+        <div className="mb-8">
+          <ImageUploader
+            onUploadsChange={handleUploadsChange}
+            disabled={!health || !isGeminiConfigured}
+            maxImages={5}
+          />
 
-        {/* Step Content */}
-        {step === 'upload' && (
-          <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Step 1: Upload Your Product Photos
-            </h2>
-            <ImageUploader
-              onUploadsChange={handleUploadsChange}
-              disabled={!health || !isGeminiConfigured}
-              maxImages={5}
-            />
-
-            {/* Continue button - only show when at least one image uploaded */}
-            {uploads.length > 0 && (
-              <div className="flex justify-end pt-4 border-t">
-                <button
-                  onClick={handleContinueToForm}
-                  className="px-6 py-3 bg-primary-600 text-white font-medium rounded-lg
-                           hover:bg-primary-700 transition-colors flex items-center gap-2"
-                >
-                  Continue to Product Details
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {step === 'form' && uploads.length > 0 && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-start">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Step 2: Enter Product Details
-              </h2>
+          {/* Continue button */}
+          {uploads.length > 0 && (
+            <div className="flex justify-end mt-6">
               <button
-                onClick={handleStartOver}
-                className="text-sm text-gray-500 hover:text-gray-700"
+                onClick={handleContinueToForm}
+                className="px-6 py-3 bg-redd-500 text-white font-medium rounded-lg
+                         hover:bg-redd-600 transition-colors flex items-center gap-2"
               >
-                Change photo
-              </button>
-            </div>
-
-            {/* Upload Preview */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center space-x-3 overflow-x-auto">
-                {uploads.map((upload, index) => (
-                  <div key={upload.upload_id} className="flex-shrink-0 relative">
-                    <img
-                      src={upload.preview_url}
-                      alt={`Product ${index + 1}`}
-                      className="w-16 h-16 object-contain rounded border-2 border-gray-200"
-                    />
-                    {index === 0 && (
-                      <span className="absolute -top-1 -left-1 bg-primary-600 text-white text-[8px] px-1 rounded">
-                        Primary
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <p className="text-sm text-gray-500 mt-2">
-                {uploads.length} image{uploads.length > 1 ? 's' : ''} uploaded
-              </p>
-            </div>
-
-            <ProductForm onSubmit={handleFormSubmit} />
-          </div>
-        )}
-
-        {step === 'analyzing' && (
-          <div className="text-center py-16">
-            <div className="relative w-24 h-24 mx-auto mb-8">
-              {/* Outer ring */}
-              <div className="absolute inset-0 rounded-full border-4 border-primary-100"></div>
-              {/* Spinning ring */}
-              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary-600 animate-spin"></div>
-              {/* Eye icon in center */}
-              <div className="absolute inset-4 flex items-center justify-center bg-gradient-to-br from-primary-500 to-blue-600 rounded-full">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                Continue to Product Details
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
-              Principal Designer AI Working...
-            </h2>
-            <div className="space-y-2 max-w-md mx-auto">
-              <p className="text-gray-600">
-                1. GPT-4o Vision analyzing your product
-              </p>
-              <p className="text-gray-600">
-                2. Creating 4 unique design frameworks
-              </p>
-              <p className="text-gray-600">
-                3. Generating preview images for each style
-              </p>
-            </div>
-            <p className="text-sm text-gray-500 mt-4">
-              This takes 2-3 minutes (4 images are being generated)
-            </p>
-          </div>
-        )}
-
-        {step === 'frameworks' && uploads.length > 0 && frameworks.length > 0 && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-start">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Step 3: Choose Your Design Framework
-              </h2>
-              <button
-                onClick={() => setStep('form')}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Back to details
               </button>
             </div>
+          )}
+        </div>
+      )}
 
-            <FrameworkSelector
-              frameworks={frameworks}
-              productAnalysis={productAnalysis}
-              selectedFramework={selectedFramework}
-              onSelect={handleFrameworkSelect}
-              onConfirm={handleFrameworkConfirm}
-              isLoading={false}
-            />
-          </div>
-        )}
-
-        {step === 'generating' && (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary-600 mx-auto mb-6"></div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-              Generating Your Images
+      {step === 'form' && uploads.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-start">
+            <h2 className="text-xl font-semibold text-white">
+              Product Details
             </h2>
-            {selectedFramework && (
-              <p className="text-primary-600 font-medium mb-2">
-                Using "{selectedFramework.framework_name}" Framework
-              </p>
-            )}
-            <p className="text-gray-600 mb-2">
-              Creating 5 cohesive listing images with exact specifications
-            </p>
-            <p className="text-sm text-gray-500 mb-8">
-              This may take a few minutes. Please don't close this page.
-            </p>
+            <button
+              onClick={handleStartOver}
+              className="text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Change photo
+            </button>
+          </div>
 
-            {/* Progress Grid */}
-            <div className="grid grid-cols-5 gap-4 max-w-2xl mx-auto">
-              {images.map((img) => (
-                <div
-                  key={img.type}
-                  className={`p-4 rounded-lg ${
-                    img.status === 'complete'
-                      ? 'bg-green-100'
-                      : img.status === 'processing'
-                      ? 'bg-blue-100'
-                      : img.status === 'failed'
-                      ? 'bg-red-100'
-                      : 'bg-gray-100'
-                  }`}
-                >
-                  <div className="text-2xl mb-1">
-                    {img.status === 'complete' && '\u2713'}
-                    {img.status === 'processing' && '\u21BB'}
-                    {img.status === 'failed' && '\u2717'}
-                    {img.status === 'pending' && '\u25F7'}
-                  </div>
-                  <div className="text-xs font-medium truncate">{img.label}</div>
+          {/* Upload Preview */}
+          <div className="flex items-center space-x-3 overflow-x-auto py-2">
+            {uploads.map((upload, index) => (
+              <div key={upload.upload_id} className="flex-shrink-0 relative">
+                <img
+                  src={upload.preview_url}
+                  alt={`Product ${index + 1}`}
+                  className="w-16 h-16 object-contain rounded-lg border-2 border-slate-700 bg-slate-800"
+                />
+                {index === 0 && (
+                  <span className="absolute -top-1 -left-1 bg-redd-500 text-white text-[8px] px-1 rounded">
+                    Primary
+                  </span>
+                )}
+              </div>
+            ))}
+            <span className="text-sm text-slate-500">
+              {uploads.length} image{uploads.length > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <ProductForm onSubmit={handleFormSubmit} />
+        </div>
+      )}
+
+      {step === 'analyzing' && (
+        <div className="text-center py-16">
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-4 border-redd-500/20"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-redd-500 animate-spin"></div>
+            <div className="absolute inset-3 flex items-center justify-center bg-redd-500 rounded-full">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold text-white mb-2">
+            Analyzing Your Product...
+          </h2>
+          <p className="text-slate-400 text-sm">
+            Creating design frameworks tailored to your product
+          </p>
+        </div>
+      )}
+
+      {step === 'frameworks' && uploads.length > 0 && frameworks.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-start">
+            <h2 className="text-xl font-semibold text-white">
+              Choose Design Style
+            </h2>
+            <button
+              onClick={() => setStep('form')}
+              className="text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Back
+            </button>
+          </div>
+
+          <FrameworkSelector
+            frameworks={frameworks}
+            productAnalysis={productAnalysis}
+            selectedFramework={selectedFramework}
+            onSelect={handleFrameworkSelect}
+            onConfirm={handleFrameworkConfirm}
+            isLoading={false}
+          />
+        </div>
+      )}
+
+      {step === 'generating' && (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-redd-500 mx-auto mb-6"></div>
+          <h2 className="text-xl font-semibold text-white mb-2">
+            Generating Images
+          </h2>
+          <p className="text-slate-400 text-sm mb-8">
+            Creating your listing images...
+          </p>
+
+          {/* Progress Grid */}
+          <div className="grid grid-cols-5 gap-3 max-w-xl mx-auto">
+            {images.map((img) => (
+              <div
+                key={img.type}
+                className={`p-3 rounded-lg ${
+                  img.status === 'complete'
+                    ? 'bg-green-900/20 border border-green-700/50'
+                    : img.status === 'processing'
+                    ? 'bg-redd-500/10 border border-redd-500/30'
+                    : img.status === 'failed'
+                    ? 'bg-red-900/20 border border-red-700/50'
+                    : 'bg-slate-800/50 border border-slate-700'
+                }`}
+              >
+                <div className="text-xl mb-1">
+                  {img.status === 'complete' && <span className="text-green-400">{'\u2713'}</span>}
+                  {img.status === 'processing' && <span className="text-redd-400 animate-spin inline-block">{'\u21BB'}</span>}
+                  {img.status === 'failed' && <span className="text-red-400">{'\u2717'}</span>}
+                  {img.status === 'pending' && <span className="text-slate-500">{'\u25CB'}</span>}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {step === 'results' && sessionId && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <div />
-              <button
-                onClick={handleStartOver}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Generate New Images
-              </button>
-            </div>
-
-            <ImageGallery
-              sessionId={sessionId}
-              images={images}
-              status={generationStatus}
-              onRetry={handleRetry}
-              onRegenerateSingle={handleRegenerateSingle}
-              onEditSingle={handleEditImage}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* System Status (Collapsible) */}
-      {health && (
-        <details className="mt-8">
-          <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
-            System Status
-          </summary>
-          <div className="mt-2 bg-white rounded-lg shadow p-4 text-sm">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <span className="text-gray-500">Database:</span>
-                <span
-                  className={`ml-2 ${
-                    health.dependencies.database === 'connected'
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  }`}
-                >
-                  {health.dependencies.database}
-                </span>
+                <div className="text-xs font-medium truncate text-slate-400">{img.label}</div>
               </div>
-              <div>
-                <span className="text-gray-500">Storage:</span>
-                <span
-                  className={`ml-2 ${
-                    health.dependencies.storage === 'accessible'
-                      ? 'text-green-600'
-                      : 'text-red-600'
-                  }`}
-                >
-                  {health.dependencies.storage}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">Gemini:</span>
-                <span
-                  className={`ml-2 ${
-                    health.dependencies.gemini === 'configured'
-                      ? 'text-green-600'
-                      : 'text-yellow-600'
-                  }`}
-                >
-                  {health.dependencies.gemini}
-                </span>
-              </div>
-            </div>
+            ))}
           </div>
-        </details>
+        </div>
+      )}
+
+      {step === 'results' && sessionId && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-white">
+              Your Listing Images
+            </h2>
+            <button
+              onClick={handleStartOver}
+              className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-700 transition-colors border border-slate-700"
+            >
+              New Project
+            </button>
+          </div>
+
+          <ImageGallery
+            sessionId={sessionId}
+            images={images}
+            status={generationStatus}
+            onRetry={handleRetry}
+            onRegenerateSingle={handleRegenerateSingle}
+            onEditSingle={handleEditImage}
+          />
+        </div>
       )}
     </div>
   );

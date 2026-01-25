@@ -29,8 +29,12 @@ class Settings(BaseSettings):
     openai_vision_model: str = "gpt-4o"  # Latest vision model
 
     # Storage (Story 1.3)
-    storage_type: str = "local"
-    storage_path: str = "./storage"
+    storage_type: str = "local"  # "local" or "supabase"
+    storage_path: str = "./storage"  # For local storage
+
+    # Supabase Storage buckets
+    supabase_uploads_bucket: str = "uploads"
+    supabase_generated_bucket: str = "generated"
 
     # Database (Story 1.2)
     database_url: str = "sqlite:///./listing_genie.db"
@@ -40,6 +44,12 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
+
+    # Supabase Auth
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""  # For server-side operations
+    supabase_jwt_secret: str = ""  # For JWT verification
 
     model_config = SettingsConfigDict(
         env_file=".env",

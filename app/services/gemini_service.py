@@ -6,13 +6,46 @@ from google import genai
 from google.genai import types
 from PIL import Image as PILImage
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from io import BytesIO
 import asyncio
 import logging
 from app.config import settings
 
+if TYPE_CHECKING:
+    from app.services.supabase_storage_service import SupabaseStorageService
+
 logger = logging.getLogger(__name__)
+
+# Storage service singleton for loading images
+_storage_service: Optional["SupabaseStorageService"] = None
+
+
+def _get_storage_service() -> "SupabaseStorageService":
+    """Get or create the storage service singleton"""
+    global _storage_service
+    if _storage_service is None:
+        from app.services.supabase_storage_service import SupabaseStorageService
+        _storage_service = SupabaseStorageService()
+    return _storage_service
+
+
+def _load_image_from_path(path: str) -> PILImage.Image:
+    """
+    Load an image from a path (either local or Supabase).
+
+    Args:
+        path: File path - either local or supabase:// URL
+
+    Returns:
+        PIL Image object
+    """
+    if path.startswith("supabase://"):
+        storage = _get_storage_service()
+        return storage.load_image(path)
+    else:
+        # Local file path (for backwards compatibility during transition)
+        return PILImage.open(path)
 
 
 class GeminiService:
@@ -69,7 +102,7 @@ class GeminiService:
         if reference_image_paths:
             for ref_path in reference_image_paths:
                 try:
-                    reference_image = PILImage.open(ref_path)
+                    reference_image = _load_image_from_path(ref_path)
                     contents.append(reference_image)
                 except Exception as e:
                     logger.error(f"Error loading reference image '{ref_path}': {e}")
@@ -224,7 +257,7 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
 
         # Load the source image as the ONLY reference
         try:
-            source_image = PILImage.open(source_image_path)
+            source_image = _load_image_from_path(source_image_path)
             logger.info(f"Loaded source image for editing: {source_image.size}")
         except Exception as e:
             logger.error(f"Error loading source image '{source_image_path}': {e}")

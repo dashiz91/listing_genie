@@ -20,7 +20,7 @@ from app.models.database import (
 )
 from app.prompts import PromptEngine, ProductContext, get_prompt_engine, get_all_styles
 from app.services.gemini_service import GeminiService
-from app.services.storage_service import StorageService
+from app.services.supabase_storage_service import SupabaseStorageService
 from app.schemas.generation import (
     GenerationRequest,
     StylePreviewRequest,
@@ -65,7 +65,7 @@ class GenerationService:
         self,
         db: Session,
         gemini: GeminiService,
-        storage: StorageService,
+        storage: SupabaseStorageService,
         prompt_engine: PromptEngine = None,
     ):
         self.db = db
@@ -75,12 +75,13 @@ class GenerationService:
         # Store framework for current session (set during create_session)
         self._current_framework: Optional[DesignFramework] = None
 
-    def create_session(self, request: GenerationRequest) -> GenerationSession:
+    def create_session(self, request: GenerationRequest, user_id: Optional[str] = None) -> GenerationSession:
         """
         Create a new generation session with all image records.
 
         Args:
             request: Generation request with product details
+            user_id: Optional Supabase user ID (from authenticated request)
 
         Returns:
             Created GenerationSession object
@@ -92,6 +93,7 @@ class GenerationService:
 
         # Create session
         session = GenerationSession(
+            user_id=user_id,  # Associate with authenticated user
             upload_path=request.upload_path,
             additional_upload_paths=request.additional_upload_paths or [],
             product_title=request.product_title,
@@ -1694,17 +1696,19 @@ Make it count.
             }
         }
 
-    def create_preview_session(self, request: StylePreviewRequest) -> GenerationSession:
+    def create_preview_session(self, request: StylePreviewRequest, user_id: Optional[str] = None) -> GenerationSession:
         """
         Create a session for style preview generation.
 
         Args:
             request: Style preview request with product details
+            user_id: Optional Supabase user ID (from authenticated request)
 
         Returns:
             Created GenerationSession object
         """
         session = GenerationSession(
+            user_id=user_id,  # Associate with authenticated user
             upload_path=request.upload_path,
             product_title=request.product_title,
             feature_1=request.feature_1,

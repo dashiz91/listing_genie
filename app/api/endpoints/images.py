@@ -2,8 +2,8 @@
 Image Serving Endpoints
 """
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import FileResponse
-from app.services.storage_service import StorageService
+from fastapi.responses import FileResponse, RedirectResponse, Response
+from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.generation_service import GenerationService
 from app.services.gemini_service import GeminiService, get_gemini_service
 from app.dependencies import get_storage_service
@@ -16,7 +16,7 @@ router = APIRouter()
 def get_generation_service(
     db: Session = Depends(get_db),
     gemini: GeminiService = Depends(get_gemini_service),
-    storage: StorageService = Depends(get_storage_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
 ) -> GenerationService:
     """Dependency injection for GenerationService"""
     return GenerationService(db=db, gemini=gemini, storage=storage)
@@ -65,18 +65,15 @@ async def get_session_images(
 async def get_image_file(
     session_id: str,
     image_type: str,
-    storage: StorageService = Depends(get_storage_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Serve a generated image file.
+    Redirects to a signed Supabase URL.
     """
     try:
-        file_path = storage.get_generated_path(session_id, image_type)
-        return FileResponse(
-            file_path,
-            media_type="image/png",
-            filename=f"{image_type}.png"
-        )
+        signed_url = storage.get_generated_url(session_id, image_type, expires_in=3600)
+        return RedirectResponse(url=signed_url, status_code=302)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Image not found")
 
@@ -84,18 +81,15 @@ async def get_image_file(
 @router.get("/upload/{upload_id}")
 async def get_upload_file(
     upload_id: str,
-    storage: StorageService = Depends(get_storage_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Serve an uploaded image file.
+    Redirects to a signed Supabase URL.
     """
     try:
-        file_path = storage.get_upload_path(upload_id)
-        return FileResponse(
-            file_path,
-            media_type="image/png",
-            filename=f"{upload_id}.png"
-        )
+        signed_url = storage.get_upload_url(upload_id, expires_in=3600)
+        return RedirectResponse(url=signed_url, status_code=302)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Upload not found")
     except ValueError as e:
@@ -105,43 +99,32 @@ async def get_upload_file(
 @router.get("/file")
 async def get_file_by_path(
     path: str,
-    storage: StorageService = Depends(get_storage_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Serve a file by its storage path (for reference image previews).
-    Only serves files within the storage directory for security.
+    Handles Supabase paths (supabase://bucket/path format).
     """
-    import os
-    from pathlib import Path
-
-    # Security: Resolve to absolute path and verify it's within storage
     try:
-        requested_path = Path(path).resolve()
-        storage_root = Path(storage.base_path).resolve()
+        if path.startswith("supabase://"):
+            # Parse supabase:// URL and create signed URL
+            parts = path[len("supabase://"):].split("/", 1)
+            bucket = parts[0]
+            file_path = parts[1] if len(parts) > 1 else ""
 
-        # Check if file is within our storage directory
-        if not str(requested_path).startswith(str(storage_root)):
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        if not requested_path.exists():
-            raise HTTPException(status_code=404, detail="File not found")
-
-        # Determine media type from extension
-        ext = requested_path.suffix.lower()
-        media_types = {
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.gif': 'image/gif',
-            '.webp': 'image/webp',
-        }
-        media_type = media_types.get(ext, 'application/octet-stream')
-
-        return FileResponse(
-            str(requested_path),
-            media_type=media_type,
-            filename=requested_path.name
-        )
+            # Create signed URL
+            response = storage.client.storage.from_(bucket).create_signed_url(
+                path=file_path,
+                expires_in=3600
+            )
+            signed_url = response.get('signedURL', '')
+            if signed_url:
+                return RedirectResponse(url=signed_url, status_code=302)
+            else:
+                raise HTTPException(status_code=404, detail="File not found")
+        else:
+            # Legacy local file path - not supported anymore
+            raise HTTPException(status_code=400, detail="Local file paths not supported. Use Supabase storage.")
     except HTTPException:
         raise
     except Exception as e:

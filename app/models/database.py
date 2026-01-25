@@ -41,6 +41,7 @@ class GenerationSession(Base):
     __tablename__ = "generation_sessions"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=True, index=True)  # Supabase user UUID
     status = Column(Enum(GenerationStatusEnum), default=GenerationStatusEnum.PENDING)
 
     # Upload reference

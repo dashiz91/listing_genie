@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.config import settings
 from app.db.session import get_db
-from app.services.storage_service import StorageService
+from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.gemini_service import GeminiService, get_gemini_service
 from app.dependencies import get_storage_service
 
@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/health")
 async def api_health(
     db: Session = Depends(get_db),
-    storage: StorageService = Depends(get_storage_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
     gemini: GeminiService = Depends(get_gemini_service)
 ):
     """

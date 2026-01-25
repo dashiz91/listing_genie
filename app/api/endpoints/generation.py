@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
+from app.core.auth import User, get_optional_user
+
 logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.services.gemini_service import GeminiService, get_gemini_service
-from app.services.storage_service import StorageService
+from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.generation_service import GenerationService
 from app.services.vision_service import VisionService, get_vision_service as get_unified_vision_service
 from app.dependencies import get_storage_service
@@ -87,7 +89,7 @@ router = APIRouter()
 def get_generation_service(
     db: Session = Depends(get_db),
     gemini: GeminiService = Depends(get_gemini_service),
-    storage: StorageService = Depends(get_storage_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
 ) -> GenerationService:
     """Dependency injection for GenerationService"""
     return GenerationService(db=db, gemini=gemini, storage=storage)
@@ -107,6 +109,7 @@ def get_vision_service() -> VisionService:
 async def start_generation(
     request: GenerationRequest,
     service: GenerationService = Depends(get_generation_service),
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """
     Start a new image generation session.
@@ -122,7 +125,8 @@ async def start_generation(
     """
     try:
         # Create session
-        session = service.create_session(request)
+        user_id = user.id if user else None
+        session = service.create_session(request, user_id=user_id)
 
         # Generate all images
         results = await service.generate_all_images(session)
@@ -144,6 +148,7 @@ async def start_generation_async(
     request: GenerationRequest,
     background_tasks: BackgroundTasks,
     service: GenerationService = Depends(get_generation_service),
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """
     Start an async image generation session.
@@ -153,7 +158,8 @@ async def start_generation_async(
     """
     try:
         # Create session
-        session = service.create_session(request)
+        user_id = user.id if user else None
+        session = service.create_session(request, user_id=user_id)
 
         # Queue background generation
         background_tasks.add_task(
@@ -755,10 +761,10 @@ async def analyze_and_generate_frameworks(
         # === API ENDPOINT LOGGING ===
         logger.info("=" * 60)
         logger.info("[API ENDPOINT] /frameworks/analyze called")
+        logger.info(f"[API ENDPOINT] Request upload_path: {request.upload_path}")
+        logger.info(f"[API ENDPOINT] Request additional_upload_paths: {request.additional_upload_paths}")
         logger.info(f"[API ENDPOINT] Request color_mode: {request.color_mode}")
-        logger.info(f"[API ENDPOINT] Request color_mode.value: {request.color_mode.value}")
         logger.info(f"[API ENDPOINT] Request locked_colors: {request.locked_colors}")
-        logger.info(f"[API ENDPOINT] Request primary_color: {request.primary_color}")
         logger.info(f"[API ENDPOINT] Request style_reference_path: {request.style_reference_path}")
         logger.info("=" * 60)
 
@@ -889,6 +895,7 @@ async def generate_with_framework(
     request: GenerateWithFrameworkRequest,
     vision: VisionService = Depends(get_vision_service),
     service: GenerationService = Depends(get_generation_service),
+    user: Optional[User] = Depends(get_optional_user),
 ):
     """
     MASTER LEVEL - STEP 2: Generate all 5 listing images with the selected framework.
@@ -991,7 +998,8 @@ async def generate_with_framework(
 
         # STEP 3: Generate all 5 images
         logger.info("Starting generation of all 5 images...")
-        session = service.create_session(gen_request)
+        user_id = user.id if user else None
+        session = service.create_session(gen_request, user_id=user_id)
 
         # Create DesignContext with product_analysis for regeneration support
         if request.product_analysis:

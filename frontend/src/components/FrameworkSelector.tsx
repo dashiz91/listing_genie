@@ -67,10 +67,10 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-white mb-2">
           {isSingleFrameworkMode ? 'Style Reference Match' : 'Principal Designer AI Analysis'}
         </h2>
-        <p className="text-gray-600 max-w-2xl mx-auto">
+        <p className="text-slate-300 max-w-2xl mx-auto">
           {isSingleFrameworkMode
             ? 'AI has analyzed your product and style reference to create a framework that matches your desired aesthetic. Colors, typography, and mood have been extracted from your style reference.'
             : `AI has analyzed your product and created ${frameworks.length} unique design framework${frameworks.length !== 1 ? 's' : ''}. Each framework is tailored specifically to YOUR product.`}
@@ -78,15 +78,15 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
       </div>
 
       {/* Product Analysis Card */}
-      <div className="bg-gradient-to-r from-primary-50 to-blue-50 rounded-xl p-4 border border-primary-100">
-        <h3 className="font-semibold text-primary-900 mb-2 flex items-center gap-2">
+      <div className="bg-slate-800/70 rounded-xl p-4 border border-slate-700">
+        <h3 className="font-semibold text-redd-400 mb-2 flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
           </svg>
           What the AI Sees
         </h3>
-        <p className="text-gray-700 text-sm">{productAnalysis}</p>
+        <p className="text-slate-300 text-sm">{productAnalysis}</p>
       </div>
 
       {/* Framework Cards */}
@@ -102,8 +102,8 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
               className={`
                 relative rounded-xl border-2 overflow-hidden transition-all cursor-pointer
                 ${isSelected
-                  ? 'border-primary-500 ring-4 ring-primary-100 shadow-lg'
-                  : 'border-gray-200 hover:border-gray-300 hover:shadow-md'}
+                  ? 'border-redd-500 ring-4 ring-redd-500/20 shadow-lg shadow-redd-500/10'
+                  : 'border-slate-700 hover:border-slate-600 hover:shadow-md'}
               `}
               onClick={() => onSelect(framework)}
             >
@@ -117,7 +117,7 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
               </div>
 
               {/* Preview Image - THE KEY VISUAL */}
-              <div className="aspect-square bg-gray-100 relative">
+              <div className="aspect-square bg-slate-700 relative">
                 {framework.preview_url ? (
                   <img
                     src={`http://localhost:8000${framework.preview_url}`}
@@ -127,16 +127,16 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
-                      <span className="text-sm text-gray-500">Generating preview...</span>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-redd-500 mx-auto mb-2"></div>
+                      <span className="text-sm text-slate-400">Generating preview...</span>
                     </div>
                   </div>
                 )}
 
                 {/* Selected Checkmark */}
                 {isSelected && (
-                  <div className="absolute top-2 right-2 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg">
-                    <svg className="w-6 h-6 text-primary-500" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="absolute top-2 right-2 w-10 h-10 bg-slate-800 rounded-full flex items-center justify-center shadow-lg border border-redd-500">
+                    <svg className="w-6 h-6 text-redd-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </div>
@@ -144,20 +144,20 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
               </div>
 
               {/* Content */}
-              <div className="p-4 bg-white">
+              <div className="p-4 bg-slate-800">
                 {/* Design Philosophy */}
-                <p className="text-gray-700 text-sm mb-3 italic line-clamp-2">
+                <p className="text-slate-300 text-sm mb-3 italic line-clamp-2">
                   "{framework.design_philosophy}"
                 </p>
 
                 {/* Color Palette - Compact */}
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs text-gray-500">Colors:</span>
+                  <span className="text-xs text-slate-400">Colors:</span>
                   <div className="flex gap-1">
                     {framework.colors.slice(0, 5).map((color, i) => (
                       <div
                         key={i}
-                        className="w-6 h-6 rounded-full shadow-inner border border-gray-200"
+                        className="w-6 h-6 rounded-full shadow-inner border border-slate-600"
                         style={{ backgroundColor: color.hex }}
                         title={`${color.name} - ${color.role}`}
                       />
@@ -167,8 +167,8 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
 
                 {/* Typography - Compact */}
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs text-gray-500">Font:</span>
-                  <span className="text-xs font-medium">{framework.typography.headline_font}</span>
+                  <span className="text-xs text-slate-400">Font:</span>
+                  <span className="text-xs font-medium text-slate-200">{framework.typography.headline_font}</span>
                 </div>
 
                 {/* Expand/Collapse */}
@@ -177,7 +177,7 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
                     e.stopPropagation();
                     setExpandedFramework(isExpanded ? null : framework.framework_id);
                   }}
-                  className="text-primary-600 text-sm font-medium hover:text-primary-700 flex items-center gap-1"
+                  className="text-redd-400 text-sm font-medium hover:text-redd-300 flex items-center gap-1"
                 >
                   {isExpanded ? 'Show Less' : 'Show Full Details'}
                   <svg
@@ -192,17 +192,17 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
 
                 {/* Expanded Details */}
                 {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+                  <div className="mt-4 pt-4 border-t border-slate-700 space-y-4">
                     {/* Image Headlines */}
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Headlines for Each Image</h4>
+                      <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">Headlines for Each Image</h4>
                       <div className="space-y-2">
                         {framework.image_copy.map((copy, i) => (
                           <div key={i} className="text-sm">
-                            <span className="font-medium text-gray-700">
+                            <span className="font-medium text-slate-200">
                               {copy.image_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:
                             </span>{' '}
-                            <span className="text-gray-600">{copy.headline}</span>
+                            <span className="text-slate-300">{copy.headline}</span>
                           </div>
                         ))}
                       </div>
@@ -210,20 +210,20 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
 
                     {/* Visual Treatment */}
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Visual Treatment</h4>
+                      <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">Visual Treatment</h4>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
-                          <span className="font-medium text-gray-600">Lighting:</span>{' '}
-                          <span className="text-gray-500">{framework.visual_treatment.lighting_style}</span>
+                          <span className="font-medium text-slate-300">Lighting:</span>{' '}
+                          <span className="text-slate-400">{framework.visual_treatment.lighting_style}</span>
                         </div>
                         <div>
-                          <span className="font-medium text-gray-600">Background:</span>{' '}
-                          <span className="text-gray-500">{framework.visual_treatment.background_treatment}</span>
+                          <span className="font-medium text-slate-300">Background:</span>{' '}
+                          <span className="text-slate-400">{framework.visual_treatment.background_treatment}</span>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-1 mt-2">
                         {framework.visual_treatment.mood_keywords.map((keyword, i) => (
-                          <span key={i} className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">
+                          <span key={i} className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">
                             {keyword}
                           </span>
                         ))}
@@ -232,20 +232,20 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
 
                     {/* Layout */}
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Layout Philosophy</h4>
-                      <p className="text-xs text-gray-600">{framework.layout.whitespace_philosophy}</p>
+                      <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">Layout Philosophy</h4>
+                      <p className="text-xs text-slate-300">{framework.layout.whitespace_philosophy}</p>
                     </div>
 
                     {/* Rationale */}
-                    <div className="bg-gradient-to-r from-gray-50 to-white p-3 rounded-lg">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">Why This Works</h4>
-                      <p className="text-xs text-gray-600">{framework.rationale}</p>
+                    <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                      <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Why This Works</h4>
+                      <p className="text-xs text-slate-300">{framework.rationale}</p>
                     </div>
 
                     {/* Target Appeal */}
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-1">Target Appeal</h4>
-                      <p className="text-xs text-gray-600">{framework.target_appeal}</p>
+                      <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Target Appeal</h4>
+                      <p className="text-xs text-slate-300">{framework.target_appeal}</p>
                     </div>
                   </div>
                 )}
@@ -262,8 +262,8 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
         className={`
           w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all duration-200
           ${!selectedFramework || isLoading
-            ? 'bg-gray-400 cursor-not-allowed'
-            : 'bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-700 hover:to-primary-600 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+            ? 'bg-slate-600 cursor-not-allowed'
+            : 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20 hover:shadow-xl hover:shadow-redd-500/30 transform hover:-translate-y-0.5'
           }
         `}
       >
@@ -286,7 +286,7 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
 
       {/* Selection hint */}
       {selectedFramework && (
-        <p className="text-center text-sm text-gray-500">
+        <p className="text-center text-sm text-slate-400">
           Click "Show Full Details" on any framework to see complete specifications
         </p>
       )}

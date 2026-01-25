@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { supabase } from '../lib/supabase';
 import type {
   HealthResponse,
   UploadResponse,
@@ -29,10 +30,30 @@ class ApiClient {
       }
     });
 
+    // Request interceptor to add auth token
+    this.client.interceptors.request.use(
+      async (config) => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            config.headers.Authorization = `Bearer ${session.access_token}`;
+          }
+        } catch (error) {
+          console.warn('Failed to get auth session:', error);
+        }
+        return config;
+      },
+      (error) => Promise.reject(error)
+    );
+
     // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
+        if (error.response?.status === 401) {
+          console.error('Unauthorized - redirecting to login');
+          window.location.href = '/login';
+        }
         if (error.response?.status === 500) {
           console.error('Server error:', error.response.data);
         }

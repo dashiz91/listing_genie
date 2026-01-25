@@ -18,12 +18,27 @@ import base64
 import json
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 
 from google import genai
 from google.genai import types
 
 from app.config import settings
+
+if TYPE_CHECKING:
+    from app.services.supabase_storage_service import SupabaseStorageService
+
+# Storage service singleton for loading images
+_storage_service: Optional["SupabaseStorageService"] = None
+
+
+def _get_storage_service() -> "SupabaseStorageService":
+    """Get or create the storage service singleton"""
+    global _storage_service
+    if _storage_service is None:
+        from app.services.supabase_storage_service import SupabaseStorageService
+        _storage_service = SupabaseStorageService()
+    return _storage_service
 
 # Import the prompts from standalone prompts module (they're model-agnostic)
 from app.prompts.ai_designer import (
@@ -59,9 +74,14 @@ class GeminiVisionService:
             self.client = genai.Client(api_key=self.api_key)
 
     def _load_image_bytes(self, image_path: str) -> bytes:
-        """Load image file as bytes"""
-        with open(image_path, "rb") as f:
-            return f.read()
+        """Load image file as bytes (from local path or Supabase)"""
+        if image_path.startswith("supabase://"):
+            storage = _get_storage_service()
+            return storage.get_file_bytes(image_path)
+        else:
+            # Local file path (for backwards compatibility)
+            with open(image_path, "rb") as f:
+                return f.read()
 
     def _get_image_mime_type(self, image_path: str) -> str:
         """Get MIME type from file extension"""

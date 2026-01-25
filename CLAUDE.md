@@ -1,10 +1,190 @@
-# Listing Genie
+# REDDAI.CO
 
 AI-powered Amazon listing image generator that creates professional product images for e-commerce sellers.
 
-## Project Overview
+**Brand:** REDDAI.CO — Geometric fox logo, orange (#C85A35) + slate (#1A1D21) color palette.
 
-This application uses a **two-step AI generation flow** to create complete Amazon listing image sets:
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         REDDAI.CO                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ROUTES                                                        │
+│   /          → Landing Page (marketing site)                    │
+│   /auth      → Authentication (login/signup)                    │
+│   /app       → Listing Generator (protected, requires auth)     │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   FRONTEND (React + Vite + Tailwind + shadcn/ui)                │
+│   └── src/                                                      │
+│       ├── components/landing/   # Landing page sections         │
+│       ├── components/ui/        # shadcn/ui components          │
+│       ├── components/           # App components                │
+│       ├── contexts/             # Auth context (Supabase)       │
+│       ├── pages/LandingPage.tsx # Marketing landing             │
+│       ├── pages/AuthPage.tsx    # Login/Signup                  │
+│       └── pages/HomePage.tsx    # Generator tool (protected)    │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   BACKEND (Python + FastAPI)                                    │
+│   └── app/                                                      │
+│       ├── api/endpoints/        # REST endpoints                │
+│       ├── core/auth.py          # Supabase JWT verification     │
+│       ├── services/             # Business logic                │
+│       ├── prompts/              # AI prompts                    │
+│       └── models/               # SQLAlchemy models             │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   SUPABASE (Backend-as-a-Service)                               │
+│   ├── Auth        → Email/password authentication               │
+│   └── Storage     → Image storage (uploads, generated)          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Design System
+
+**IMPORTANT:** See `docs/design_MUSTREAD.md` for the complete design system including:
+- Color tokens (redd-400/500/600, slate-100/600/800/900)
+- Typography (Inter font)
+- Component patterns (buttons, cards, inputs)
+- Layout guidelines
+- Responsive breakpoints
+
+All new UI should follow the design system to maintain visual consistency.
+
+## Tech Stack
+
+### Backend (Python/FastAPI)
+- **Framework**: FastAPI with uvicorn
+- **Database**: SQLite with SQLAlchemy ORM
+- **AI Services**:
+  - `gemini-3-flash-preview` - Vision analysis & prompt generation
+  - `gemini-3-pro-image-preview` - Image generation
+- **Auth**: Supabase Auth with JWT verification
+- **Storage**: Supabase Storage (buckets: `uploads`, `generated`)
+
+### Frontend (React/TypeScript)
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite
+- **Styling**: TailwindCSS + shadcn/ui components
+- **Routing**: React Router DOM
+- **HTTP Client**: Axios
+- **Auth**: Supabase JS client
+
+### External Services
+- **Supabase**: Authentication + Cloud Storage
+- **Google AI (Gemini)**: Vision analysis + Image generation
+
+## Project Structure
+
+```
+listing_genie/
+├── app/                              # Backend Python application
+│   ├── api/endpoints/
+│   │   ├── generation.py             # Main generation endpoints
+│   │   ├── images.py                 # Image serving (Supabase signed URLs)
+│   │   ├── upload.py                 # File upload to Supabase
+│   │   └── health.py                 # Health check
+│   ├── core/
+│   │   ├── auth.py                   # Supabase JWT verification
+│   │   ├── exceptions.py             # Custom exceptions
+│   │   ├── logging_config.py         # Logging setup
+│   │   └── middleware.py             # Request logging middleware
+│   ├── models/
+│   │   └── database.py               # SQLAlchemy models (includes user_id)
+│   ├── prompts/
+│   │   ├── ai_designer.py            # AI Designer prompts
+│   │   ├── color_psychology.py       # Color theory prompts
+│   │   ├── creative_brief.py         # Creative brief system
+│   │   ├── design_framework.py       # Framework generation
+│   │   ├── engine.py                 # Prompt engine
+│   │   ├── intent_modifiers.py       # Keyword intent modifiers
+│   │   ├── styles.py                 # Style presets
+│   │   └── templates/                # Image-type specific templates
+│   │       ├── main_image.py
+│   │       ├── infographic.py
+│   │       ├── lifestyle.py
+│   │       └── comparison.py
+│   ├── services/
+│   │   ├── generation_service.py     # Main orchestration logic
+│   │   ├── gemini_service.py         # Gemini image generation
+│   │   ├── gemini_vision_service.py  # Gemini vision analysis
+│   │   ├── openai_vision_service.py  # OpenAI vision (backup)
+│   │   ├── vision_service.py         # Unified vision service
+│   │   ├── design_architect_service.py # Design framework service
+│   │   └── supabase_storage_service.py # Supabase Storage integration
+│   ├── config.py                     # App configuration
+│   ├── dependencies.py               # Dependency injection
+│   └── main.py                       # FastAPI app entry point
+│
+├── frontend/
+│   ├── public/
+│   │   ├── logo/
+│   │   │   └── fox-icon.png          # Transparent logo
+│   │   └── images/
+│   │       └── hero-mockup.png       # Landing page hero image
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── client.ts             # API client (includes auth token)
+│   │   │   └── types.ts              # TypeScript types
+│   │   ├── components/
+│   │   │   ├── landing/              # Landing page components
+│   │   │   │   ├── navbar.tsx
+│   │   │   │   ├── hero.tsx
+│   │   │   │   ├── social-proof.tsx
+│   │   │   │   ├── features.tsx
+│   │   │   │   ├── how-it-works.tsx
+│   │   │   │   ├── pricing.tsx
+│   │   │   │   └── cta-footer.tsx
+│   │   │   ├── ui/                   # shadcn/ui components (button, card, etc.)
+│   │   │   ├── ProtectedRoute.tsx    # Auth guard component
+│   │   │   ├── Layout.tsx            # App layout wrapper
+│   │   │   ├── ProductForm.tsx       # Product info form
+│   │   │   ├── ImageGallery.tsx      # Generated images display
+│   │   │   ├── ImageUploader.tsx     # Multi-image uploader
+│   │   │   ├── FrameworkSelector.tsx # Framework selection UI
+│   │   │   └── StyleSelector.tsx     # Style preset selector
+│   │   ├── contexts/
+│   │   │   └── AuthContext.tsx       # Supabase auth state
+│   │   ├── lib/
+│   │   │   ├── supabase.ts           # Supabase client
+│   │   │   └── utils.ts              # Utility functions (cn helper)
+│   │   ├── pages/
+│   │   │   ├── LandingPage.tsx       # Marketing landing (/)
+│   │   │   ├── AuthPage.tsx          # Login/Signup (/auth)
+│   │   │   └── HomePage.tsx          # Generator tool (/app)
+│   │   ├── styles/index.css          # Global styles + Tailwind
+│   │   ├── App.tsx                   # Router setup with auth
+│   │   └── main.tsx                  # Entry point
+│   ├── components.json               # shadcn/ui config
+│   ├── index.html                    # HTML with meta tags
+│   ├── tailwind.config.js            # Color tokens, fonts
+│   └── package.json
+│
+├── docs/
+│   └── design_MUSTREAD.md            # Design system documentation
+│
+├── .env                              # Backend environment variables
+├── frontend/.env                     # Frontend environment variables
+├── requirements.txt                  # Python dependencies
+└── package.json                      # Root (runs both servers)
+```
+
+## Core Features
+
+### Authentication (Supabase Auth)
+- Email/password signup and login
+- JWT tokens verified on backend
+- Protected routes on frontend
+- User sessions linked to generation sessions
+
+### Two-Step AI Generation Flow
 
 **Step 1: Framework Analysis** (Gemini Vision)
 - AI analyzes product photos
@@ -21,170 +201,74 @@ This application uses a **two-step AI generation flow** to create complete Amazo
   - **Lifestyle** - Product in use with real person
   - **Comparison** - Multiple uses or package contents
 
-## Tech Stack
+### Color Mode System
+- **`ai_decides`** - Full creative freedom
+- **`suggest_primary`** - AI extracts colors from style reference
+- **`locked_palette`** - User locks exact hex colors
 
-### Backend (Python/FastAPI)
-- **Framework**: FastAPI with uvicorn
-- **Database**: SQLite with SQLAlchemy ORM
-- **AI Services**:
-  - `gemini-3-flash-preview` - Vision analysis & prompt generation
-  - `gemini-3-pro-image-preview` - Image generation
-- **Storage**: Local file storage (`storage/uploads/`, `storage/generated/`)
+### Style Reference
+Upload a style reference image and AI matches that visual style across all generated images.
 
-### Frontend (React/TypeScript)
-- **Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: TailwindCSS
-- **HTTP Client**: Axios
+### Edit & Regenerate
+- **Edit**: Modify existing image while preserving layout
+- **Regenerate**: Generate completely new image with feedback
 
-## Key Features
-
-### 1. Color Mode System
-Three modes for how AI handles colors:
-- **`ai_decides`** - Full creative freedom, AI picks colors based on product
-- **`suggest_primary`** - AI extracts colors from style reference image
-- **`locked_palette`** - User locks exact hex colors, ALL 4 frameworks use them
-
-Colors can be provided via:
-- Brand Colors (Brand Identity section)
-- Color Palette (Style & Color Options section)
-- Either one triggers `locked_palette` mode
-
-### 2. Style Reference Image
-Upload a style reference and:
-- AI sees it during framework analysis (extracts colors/style)
-- All generated images follow that visual style
-- Style ref is sent as reference image to Gemini with explicit instructions
-
-### 3. Global Instructions
-Add custom notes/instructions that apply to ALL 5 images:
-- Processed by AI Designer (not appended raw to Gemini)
-- Interpreted differently for each image type
-- Example: "Make it feel premium" → different interpretation for Main vs Lifestyle
-
-### 4. Edit & Regenerate
-**Edit**: Modify an existing image while preserving layout
-- Uses Gemini's edit capability with mask
-- Good for: "Change headline", "Make background lighter"
-
-**Regenerate**: Generate completely new image
-- Can add notes/instructions for the regeneration
-- AI Designer enhances the prompt based on feedback
-- Tracks version history (v1, v2, etc.)
-
-### 5. Prompt Viewer
-View exactly what was sent to Gemini for any image:
-- Full prompt text
-- Designer context (framework, colors, typography)
-- Reference images used (with previews)
-- User feedback (for regenerations)
-
-## Project Structure
-
-```
-listing_genie/
-├── app/                              # Backend Python application
-│   ├── api/
-│   │   └── endpoints/
-│   │       ├── generation.py         # Main generation endpoints
-│   │       ├── images.py             # Image serving endpoints
-│   │       ├── upload.py             # File upload endpoint
-│   │       └── health.py             # Health check
-│   ├── models/
-│   │   └── database.py               # SQLAlchemy models
-│   ├── prompts/
-│   │   ├── ai_designer.py            # MAIN: All AI Designer prompts
-│   │   ├── templates/                # Image-type specific templates
-│   │   ├── styles.py                 # Style presets (legacy)
-│   │   └── color_psychology.py       # Color theory reference
-│   ├── services/
-│   │   ├── generation_service.py     # Main orchestration logic
-│   │   ├── gemini_service.py         # Gemini image generation
-│   │   ├── gemini_vision_service.py  # Gemini vision analysis
-│   │   ├── openai_vision_service.py  # OpenAI vision (backup)
-│   │   ├── vision_service.py         # Vision service wrapper
-│   │   └── storage_service.py        # File storage
-│   ├── config.py                     # App configuration
-│   └── main.py                       # FastAPI app entry point
-├── frontend/
-│   ├── src/
-│   │   ├── api/
-│   │   │   ├── client.ts             # API client methods
-│   │   │   └── types.ts              # TypeScript types
-│   │   ├── components/
-│   │   │   ├── ProductForm.tsx       # Product info form
-│   │   │   ├── ImageGallery.tsx      # Generated images display
-│   │   │   ├── ImageUploader.tsx     # Multi-image uploader
-│   │   │   └── FrameworkSelector.tsx # Framework selection UI
-│   │   └── pages/
-│   │       └── HomePage.tsx          # Main page (orchestrates flow)
-│   └── package.json
-├── storage/
-│   ├── uploads/                      # Uploaded product images
-│   └── generated/                    # AI-generated images
-└── package.json                      # Root (runs both servers)
-```
-
-## Key Files
-
-### Prompts (`app/prompts/ai_designer.py`)
-All AI Designer prompts in one file for easy iteration:
-- `PRINCIPAL_DESIGNER_VISION_PROMPT` - Framework analysis (Step 1)
-- `GENERATE_IMAGE_PROMPTS_PROMPT` - 5 detailed prompts (Step 2)
-- `ENHANCE_PROMPT_WITH_FEEDBACK_PROMPT` - Regeneration enhancement
-- `GLOBAL_NOTE_INSTRUCTIONS` - How to apply user instructions
-- `STYLE_REFERENCE_INSTRUCTIONS` - Style matching instructions
-- `STYLE_REFERENCE_PROMPT_PREFIX` - Prepended to each Gemini call
-
-### Services
-- **`generation_service.py`** - Main orchestration, retry logic, prompt building
-- **`gemini_vision_service.py`** - Framework generation, prompt generation
-- **`gemini_service.py`** - Actual image generation calls to Gemini
-
-### Database Models (`app/models/database.py`)
-- `GenerationSession` - Main session (product info, settings, framework)
-- `ImageRecord` - Individual generated images with status
-- `DesignContext` - AI Designer's knowledge about the project
-- `PromptHistory` - Version tracking for regenerations
+### Cloud Storage (Supabase)
+- Uploads stored in `supabase://uploads/{uuid}.png`
+- Generated images in `supabase://generated/{session_id}/{image_type}.png`
+- Images served via signed URLs (1-hour expiry)
 
 ## API Endpoints
 
 ### Upload
 ```
-POST /api/upload/              Upload image (PNG, JPEG, WebP, GIF)
+POST /api/upload/              Upload image to Supabase
 DELETE /api/upload/{id}        Delete uploaded image
 ```
 
 ### Generation
 ```
-POST /api/generate/frameworks/analyze    Step 1: Analyze product, generate 4 frameworks
-POST /api/generate/frameworks/generate   Step 2: Generate all 5 images with framework
-POST /api/generate/single                Regenerate single image with note
-POST /api/generate/edit                  Edit image (preserve layout, change details)
+POST /api/generate/frameworks/analyze    Step 1: Analyze + frameworks
+POST /api/generate/frameworks/generate   Step 2: Generate 5 images
+POST /api/generate/single                Regenerate single image
+POST /api/generate/edit                  Edit image
 GET  /api/generate/{session_id}          Get session status
-GET  /api/generate/{session_id}/prompts  Get all prompts for session
-GET  /api/generate/{session_id}/prompts/{image_type}  Get prompt for specific image
+GET  /api/generate/{session_id}/prompts  Get all prompts
 ```
 
 ### Images
 ```
-GET /api/images/{session_id}                    Get all session images
-GET /api/images/{session_id}/{image_type}       Get specific image
-GET /api/images/file?path=...                   Get image by storage path
+GET /api/images/{session_id}/{image_type}  Get image (redirects to signed URL)
+```
+
+### Health
+```
+GET /api/health                 Health check (DB, storage, AI services)
 ```
 
 ## Environment Variables
 
-Required in `.env`:
+### Backend `.env`
 ```bash
-GEMINI_API_KEY=your_gemini_api_key    # From Google AI Studio
+# Required
+GEMINI_API_KEY=your_gemini_api_key
+
+# Supabase (Required)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Optional
 DATABASE_URL=sqlite:///./listing_genie.db
+VISION_PROVIDER=gemini                # or "openai"
+OPENAI_API_KEY=your_openai_key        # For OpenAI vision (backup)
 ```
 
-Optional:
+### Frontend `frontend/.env`
 ```bash
-OPENAI_API_KEY=your_openai_key        # For OpenAI vision (backup)
-VISION_PROVIDER=gemini                # or "openai"
+VITE_API_URL=http://localhost:8000
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_anon_key
 ```
 
 ## Running the Application
@@ -198,76 +282,63 @@ npm run dev        # Runs both backend and frontend
 ### Manual Start
 ```bash
 # Backend (Terminal 1)
-venv\Scripts\activate
+pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 
 # Frontend (Terminal 2)
 cd frontend
+npm install
 npm run dev
 ```
 
 ### URLs
-- Frontend: http://localhost:5173
+- Landing Page: http://localhost:5173/
+- Auth Page: http://localhost:5173/auth
+- Generator App: http://localhost:5173/app (requires login)
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
-## Development Notes
+## Key Files for Development
 
-### Generation Flow
-1. User uploads product images → stored in `storage/uploads/`
-2. User fills form (title, features, colors, style ref)
-3. `POST /frameworks/analyze` → Gemini Vision analyzes, generates 4 frameworks + previews
-4. User selects framework
-5. `POST /frameworks/generate` → AI Designer generates 5 prompts, then 5 images
-6. Images stored in `storage/generated/{session_id}/`
+### Design
+- `docs/design_MUSTREAD.md` - Complete design system
+- `frontend/tailwind.config.js` - Color tokens, fonts
+- `frontend/src/styles/index.css` - Global styles
 
-### Color Mode Logic (Frontend)
-```typescript
-if (hasBrandColors || hasColorPalette) {
-  colorMode = 'locked_palette';  // Lock user's colors
-} else if (hasStyleReference) {
-  colorMode = 'suggest_primary'; // Extract from style ref
-} else {
-  colorMode = 'ai_decides';      // Full creative freedom
-}
-```
+### Authentication
+- `frontend/src/lib/supabase.ts` - Supabase client
+- `frontend/src/contexts/AuthContext.tsx` - Auth state provider
+- `frontend/src/components/ProtectedRoute.tsx` - Route guard
+- `app/core/auth.py` - Backend JWT verification
 
-### Style Reference Flow
-1. Style ref uploaded BEFORE framework analysis
-2. Included in images sent to Gemini Vision
-3. Special instructions tell AI to extract colors/style
-4. During image generation, style ref is passed as reference image
-5. Prompt prefix tells Gemini which image is the style reference
+### Landing Page
+- `frontend/src/pages/LandingPage.tsx` - Composes all sections
+- `frontend/src/components/landing/*.tsx` - Individual sections
 
-### Prompt History
-- v1 = Original generation
-- v2+ = Regenerations with user feedback
-- `PromptHistory` table tracks all versions
-- Prompt viewer shows full context for any version
+### Generator App
+- `frontend/src/pages/HomePage.tsx` - Main app flow
+- `frontend/src/components/*.tsx` - App components
 
-### Key Debugging Logs
-```
-[API ENDPOINT] /frameworks/analyze called
-[API ENDPOINT] Request color_mode: locked_palette
-[API ENDPOINT] Request locked_colors: ['#705baa', '#e4dce8']
-[API ENDPOINT] Request style_reference_path: storage/uploads/xxx.png
+### Backend Services
+- `app/prompts/ai_designer.py` - All AI prompts
+- `app/services/generation_service.py` - Main orchestration
+- `app/services/gemini_service.py` - Image generation
+- `app/services/supabase_storage_service.py` - Cloud storage
 
-[GEMINI COLOR MODE DEBUG] LOCKED PALETTE MODE ACTIVATED!
-[GEMINI COLOR MODE DEBUG] Colors to lock: #705baa, #e4dce8
+## Supabase Setup
 
-[MAIN] Using 3 reference images:
-  [Image 1] storage/uploads/product.png (PRIMARY PRODUCT)
-  [Image 2] storage/uploads/style.png (STYLE REFERENCE)
-  [Image 3] storage/uploads/logo.png (LOGO)
-```
+### Required Buckets
+Create these buckets in Supabase Storage:
+1. `uploads` - For user-uploaded product images
+2. `generated` - For AI-generated listing images
 
-## API Cost (Gemini Free Tier)
-- 1,500 images/day via Google AI Studio
-- Typical session: ~10 images (4 previews + 5 main + edits)
-- Can do ~150 sessions/day on free tier
+### Auth Configuration
+- Enable Email provider in Supabase Auth settings
+- Disable email confirmation for development (optional)
 
 ## Future Scope
+- Restyle `/app` to match landing page design system
+- Credit-based pricing system
 - A+ Content (Enhanced Brand Content) images
-- Brand story modules
 - Batch generation for multiple products
-- Cloud storage integration
+- Social login (Google, GitHub)

@@ -1,46 +1,6 @@
 import React, { useState } from 'react';
 import type { BrandVibe } from '../api/types';
 
-// Brand vibe options with descriptions
-const VIBE_OPTIONS: { value: BrandVibe; label: string; description: string; icon: string }[] = [
-  {
-    value: 'clean_modern',
-    label: 'Clean & Modern',
-    description: 'Minimal, tech-forward, sophisticated',
-    icon: '✨',
-  },
-  {
-    value: 'premium_luxury',
-    label: 'Premium Luxury',
-    description: 'Elegant, exclusive, aspirational',
-    icon: '💎',
-  },
-  {
-    value: 'bold_energetic',
-    label: 'Bold & Energetic',
-    description: 'Dynamic, confident, action-oriented',
-    icon: '⚡',
-  },
-  {
-    value: 'natural_organic',
-    label: 'Natural & Organic',
-    description: 'Earthy, authentic, wholesome',
-    icon: '🌿',
-  },
-  {
-    value: 'playful_fun',
-    label: 'Playful & Fun',
-    description: 'Vibrant, youthful, joyful',
-    icon: '🎨',
-  },
-  {
-    value: 'clinical_trust',
-    label: 'Clinical & Trustworthy',
-    description: 'Professional, scientific, reliable',
-    icon: '🔬',
-  },
-];
-
 export interface ProductFormData {
   productTitle: string;
   feature1: string;
@@ -206,7 +166,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       <div>
         <label
           htmlFor="productTitle"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-white mb-1"
         >
           Product Title *
         </label>
@@ -218,14 +178,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           onChange={handleChange}
           disabled={disabled}
           placeholder="e.g., Organic Vitamin D3 Gummies - Natural Immune Support"
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-redd-500 focus:border-transparent disabled:bg-slate-700 disabled:cursor-not-allowed"
           maxLength={200}
         />
       </div>
 
       {/* Brand Section */}
-      <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-        <h3 className="text-sm font-medium text-gray-700">
+      <div className="bg-slate-700/50 rounded-lg p-4 space-y-4 border border-slate-600">
+        <h3 className="text-sm font-medium text-white">
           Brand Identity (Optional)
         </h3>
 
@@ -233,7 +193,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         <div>
           <label
             htmlFor="brandName"
-            className="block text-xs text-gray-500 mb-1"
+            className="block text-xs text-slate-400 mb-1"
           >
             Brand Name
           </label>
@@ -245,41 +205,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             onChange={handleChange}
             disabled={disabled}
             placeholder="e.g., VitaGlow"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+            className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-redd-500 focus:border-transparent disabled:bg-slate-700"
             maxLength={100}
           />
         </div>
 
         {/* Brand Logo */}
         <div>
-          <label className="block text-xs text-gray-500 mb-1">
+          <label className="block text-xs text-slate-400 mb-1">
             Brand Logo
           </label>
           {logoPreview ? (
-            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-3">
+            <div className="flex items-center gap-3 bg-slate-800 border border-slate-600 rounded-lg p-3">
               <img
                 src={logoPreview}
                 alt="Logo preview"
                 className="w-16 h-16 object-contain rounded"
               />
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700">
+                <p className="text-sm font-medium text-white">
                   {formData.logoFile?.name}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400">
                   {formData.logoFile && (formData.logoFile.size / 1024).toFixed(1)} KB
                 </p>
               </div>
               <button
                 type="button"
                 onClick={removeLogo}
-                className="text-red-500 hover:text-red-700 text-sm"
+                className="text-red-400 hover:text-red-300 text-sm"
               >
                 Remove
               </button>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-primary-400 transition-colors">
+            <div className="border-2 border-dashed border-slate-600 rounded-lg p-4 text-center hover:border-redd-500/50 transition-colors bg-slate-800/50">
               <input
                 type="file"
                 accept="image/*"
@@ -292,41 +252,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 htmlFor="logo-upload"
                 className="cursor-pointer block"
               >
-                <div className="text-gray-400 mb-1">
+                <div className="text-slate-500 mb-1">
                   <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <span className="text-sm text-gray-500">Click to upload logo</span>
-                <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+                <span className="text-sm text-slate-400">Click to upload logo</span>
+                <p className="text-xs text-slate-500 mt-1">PNG, JPG up to 5MB</p>
               </label>
             </div>
           )}
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Logo will be incorporated into all generated images
           </p>
         </div>
 
         {/* Brand Colors */}
         <div>
-          <label className="block text-xs text-gray-500 mb-1">
+          <label className="block text-xs text-slate-400 mb-1">
             Brand Colors (up to 5)
           </label>
           <div className="flex flex-wrap gap-2 mb-2">
             {formData.brandColors.map((color) => (
               <div
                 key={color}
-                className="flex items-center gap-1 bg-white border rounded-full px-2 py-1"
+                className="flex items-center gap-1 bg-slate-800 border border-slate-600 rounded-full px-2 py-1"
               >
                 <div
-                  className="w-4 h-4 rounded-full border"
+                  className="w-4 h-4 rounded-full border border-slate-500"
                   style={{ backgroundColor: color }}
                 />
-                <span className="text-xs">{color}</span>
+                <span className="text-xs text-slate-300">{color}</span>
                 <button
                   type="button"
                   onClick={() => removeColor(color)}
-                  className="text-gray-400 hover:text-red-500 ml-1"
+                  className="text-slate-400 hover:text-red-400 ml-1"
                 >
                   x
                 </button>
@@ -338,33 +298,33 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               type="color"
               value={colorInput}
               onChange={(e) => setColorInput(e.target.value)}
-              className="w-10 h-10 rounded cursor-pointer"
+              className="w-10 h-10 rounded cursor-pointer bg-slate-800 border border-slate-600"
             />
             <input
               type="text"
               value={colorInput}
               onChange={(e) => setColorInput(e.target.value)}
               placeholder="#RRGGBB"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500"
               maxLength={7}
             />
             <button
               type="button"
               onClick={addColor}
               disabled={formData.brandColors.length >= 5}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Add
             </button>
           </div>
           <div className="flex gap-1 mt-2">
-            <span className="text-xs text-gray-400">Quick picks:</span>
+            <span className="text-xs text-slate-500">Quick picks:</span>
             {DEFAULT_COLORS.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setColorInput(c)}
-                className="w-5 h-5 rounded-full border border-gray-300 hover:scale-110 transition-transform"
+                className="w-5 h-5 rounded-full border border-slate-500 hover:scale-110 transition-transform"
                 style={{ backgroundColor: c }}
               />
             ))}
@@ -373,41 +333,41 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       </div>
 
       {/* Style & Color Section */}
-      <div className="bg-blue-50 rounded-lg p-4 space-y-4">
-        <h3 className="text-sm font-medium text-gray-700">
+      <div className="bg-slate-700/50 rounded-lg p-4 space-y-4 border border-redd-500/20">
+        <h3 className="text-sm font-medium text-white">
           Style & Color Options (Optional)
         </h3>
 
         {/* Style Reference Image */}
         <div>
-          <label className="block text-xs text-gray-500 mb-1">
+          <label className="block text-xs text-slate-400 mb-1">
             Style Reference Image
           </label>
           {styleRefPreview ? (
-            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-3">
+            <div className="flex items-center gap-3 bg-slate-800 border border-slate-600 rounded-lg p-3">
               <img
                 src={styleRefPreview}
                 alt="Style reference preview"
                 className="w-20 h-20 object-cover rounded"
               />
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700">
+                <p className="text-sm font-medium text-white">
                   {formData.styleReferenceFile?.name}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-400">
                   {formData.styleReferenceFile && (formData.styleReferenceFile.size / 1024).toFixed(1)} KB
                 </p>
               </div>
               <button
                 type="button"
                 onClick={removeStyleRef}
-                className="text-red-500 hover:text-red-700 text-sm"
+                className="text-red-400 hover:text-red-300 text-sm"
               >
                 Remove
               </button>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center hover:border-blue-400 transition-colors bg-white">
+            <div className="border-2 border-dashed border-redd-500/30 rounded-lg p-4 text-center hover:border-redd-500/50 transition-colors bg-slate-800/50">
               <input
                 type="file"
                 accept="image/*"
@@ -420,13 +380,13 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 htmlFor="style-ref-upload"
                 className="cursor-pointer block"
               >
-                <div className="text-blue-400 mb-1">
+                <div className="text-redd-400 mb-1">
                   <svg className="w-8 h-8 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
                   </svg>
                 </div>
-                <span className="text-sm text-gray-600">Upload style reference</span>
-                <p className="text-xs text-gray-400 mt-1">AI will match this visual style</p>
+                <span className="text-sm text-slate-300">Upload style reference</span>
+                <p className="text-xs text-slate-500 mt-1">AI will match this visual style</p>
               </label>
             </div>
           )}
@@ -434,7 +394,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
         {/* Color Count Selector */}
         <div>
-          <label className="block text-xs text-gray-500 mb-1">
+          <label className="block text-xs text-slate-400 mb-1">
             Number of Colors in Palette
           </label>
           <div className="flex gap-2">
@@ -443,8 +403,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
               onClick={() => setFormData(prev => ({ ...prev, colorCount: null }))}
               className={`px-3 py-2 rounded-lg text-sm ${
                 formData.colorCount === null
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-redd-500 text-white'
+                  : 'bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-700'
               }`}
             >
               AI Decides
@@ -456,8 +416,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 onClick={() => setFormData(prev => ({ ...prev, colorCount: count }))}
                 className={`w-10 h-10 rounded-lg text-sm font-medium ${
                   formData.colorCount === count
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    ? 'bg-redd-500 text-white'
+                    : 'bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-700'
                 }`}
               >
                 {count}
@@ -468,24 +428,24 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
         {/* Color Palette Picker */}
         <div>
-          <label className="block text-xs text-gray-500 mb-1">
+          <label className="block text-xs text-slate-400 mb-1">
             Color Palette (leave empty for AI to generate)
           </label>
           <div className="flex flex-wrap gap-2 mb-2">
             {formData.colorPalette.map((color) => (
               <div
                 key={color}
-                className="flex items-center gap-1 bg-white border rounded-full px-2 py-1"
+                className="flex items-center gap-1 bg-slate-800 border border-slate-600 rounded-full px-2 py-1"
               >
                 <div
-                  className="w-4 h-4 rounded-full border"
+                  className="w-4 h-4 rounded-full border border-slate-500"
                   style={{ backgroundColor: color }}
                 />
-                <span className="text-xs">{color}</span>
+                <span className="text-xs text-slate-300">{color}</span>
                 <button
                   type="button"
                   onClick={() => removePaletteColor(color)}
-                  className="text-gray-400 hover:text-red-500 ml-1"
+                  className="text-slate-400 hover:text-red-400 ml-1"
                 >
                   x
                 </button>
@@ -498,26 +458,26 @@ export const ProductForm: React.FC<ProductFormProps> = ({
                 type="color"
                 value={paletteColorInput}
                 onChange={(e) => setPaletteColorInput(e.target.value)}
-                className="w-10 h-10 rounded cursor-pointer"
+                className="w-10 h-10 rounded cursor-pointer bg-slate-800 border border-slate-600"
               />
               <input
                 type="text"
                 value={paletteColorInput}
                 onChange={(e) => setPaletteColorInput(e.target.value)}
                 placeholder="#RRGGBB"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500"
                 maxLength={7}
               />
               <button
                 type="button"
                 onClick={addPaletteColor}
-                className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm"
+                className="px-4 py-2 bg-redd-500/20 text-redd-400 rounded-lg hover:bg-redd-500/30 text-sm border border-redd-500/30"
               >
                 Add Color
               </button>
             </div>
           )}
-          <p className="text-xs text-gray-400 mt-2">
+          <p className="text-xs text-slate-500 mt-2">
             These colors will be used for all generated images. First color = primary, second = secondary, rest = accents.
           </p>
         </div>
@@ -525,14 +485,14 @@ export const ProductForm: React.FC<ProductFormProps> = ({
 
       {/* Key Features */}
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700">
+        <h3 className="text-sm font-medium text-white">
           Key Features (Optional - leave blank if unsure)
         </h3>
 
         <div>
           <label
             htmlFor="feature1"
-            className="block text-xs text-gray-500 mb-1"
+            className="block text-xs text-slate-400 mb-1"
           >
             Feature 1 - Primary benefit
           </label>
@@ -544,7 +504,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             onChange={handleChange}
             disabled={disabled}
             placeholder="e.g., 5000 IU Vitamin D3 per serving"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+            className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-redd-500 focus:border-transparent disabled:bg-slate-700"
             maxLength={100}
           />
         </div>
@@ -552,7 +512,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         <div>
           <label
             htmlFor="feature2"
-            className="block text-xs text-gray-500 mb-1"
+            className="block text-xs text-slate-400 mb-1"
           >
             Feature 2 - Secondary benefit
           </label>
@@ -564,7 +524,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             onChange={handleChange}
             disabled={disabled}
             placeholder="e.g., Organic, non-GMO ingredients"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+            className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-redd-500 focus:border-transparent disabled:bg-slate-700"
             maxLength={100}
           />
         </div>
@@ -572,7 +532,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         <div>
           <label
             htmlFor="feature3"
-            className="block text-xs text-gray-500 mb-1"
+            className="block text-xs text-slate-400 mb-1"
           >
             Feature 3 - Additional benefit
           </label>
@@ -584,7 +544,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
             onChange={handleChange}
             disabled={disabled}
             placeholder="e.g., Great-tasting natural berry flavor"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+            className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-redd-500 focus:border-transparent disabled:bg-slate-700"
             maxLength={100}
           />
         </div>
@@ -594,7 +554,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       <div>
         <label
           htmlFor="targetAudience"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-white mb-1"
         >
           Target Audience (Optional)
         </label>
@@ -606,7 +566,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           onChange={handleChange}
           disabled={disabled}
           placeholder="e.g., Health-conscious adults 30-55"
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+          className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-redd-500 focus:border-transparent disabled:bg-slate-700"
           maxLength={150}
         />
       </div>
@@ -615,7 +575,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       <div>
         <label
           htmlFor="keywords"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-white mb-1"
         >
           Target Keywords (Optional)
         </label>
@@ -627,23 +587,23 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           disabled={disabled}
           placeholder="Enter keywords separated by commas (e.g., vitamin d gummies, immune support, organic vitamins)"
           rows={2}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+          className="w-full px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-redd-500 focus:border-transparent disabled:bg-slate-700"
         />
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-slate-500 mt-1">
           Keywords help optimize images for Amazon search intent
         </p>
       </div>
 
       {/* Global Note for All Images */}
-      <div className="bg-purple-50 rounded-lg p-4">
+      <div className="bg-slate-700/50 rounded-lg p-4 border border-purple-500/20">
         <div className="flex justify-between items-center mb-1">
           <label
             htmlFor="globalNote"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-white"
           >
             Global Instructions for All Images (Optional)
           </label>
-          <span className={`text-xs ${formData.globalNote.length > 1800 ? 'text-orange-600' : 'text-gray-400'}`}>
+          <span className={`text-xs ${formData.globalNote.length > 1800 ? 'text-orange-400' : 'text-slate-500'}`}>
             {formData.globalNote.length}/2000
           </span>
         </div>
@@ -656,9 +616,9 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           maxLength={2000}
           placeholder="e.g., Use warm lighting, avoid text overlays, keep backgrounds minimal, emphasize the golden color of the product..."
           rows={3}
-          className="w-full px-4 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 disabled:bg-gray-100"
+          className="w-full px-4 py-2 bg-slate-800 border border-purple-500/30 rounded-lg text-white placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-slate-700"
         />
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-slate-500 mt-1">
           These instructions will be applied to ALL 5 generated images. Use this for style preferences, things to avoid, or specific requirements.
         </p>
       </div>
@@ -671,8 +631,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
           w-full py-3 px-6 rounded-lg font-semibold text-white transition-all duration-200
           ${
             disabled || !isFormValid || isGenerating
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-primary-600 hover:bg-primary-700 shadow-lg hover:shadow-xl'
+              ? 'bg-slate-600 cursor-not-allowed'
+              : 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20 hover:shadow-xl hover:shadow-redd-500/30'
           }
         `}
       >

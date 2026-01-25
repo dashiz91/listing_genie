@@ -3,7 +3,7 @@ File Upload API Endpoints
 """
 import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from app.services.storage_service import StorageService
+from app.services.supabase_storage_service import SupabaseStorageService
 from app.dependencies import get_storage_service
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 @router.post("/")
 async def upload_product_image(
     file: UploadFile = File(...),
-    storage: StorageService = Depends(get_storage_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Upload a product image for processing.
@@ -75,6 +75,8 @@ async def upload_product_image(
         # Save the upload
         upload_id, file_path = storage.save_upload(content, file.filename or "upload.png")
 
+        logger.info(f"[UPLOAD] Saved to Supabase: upload_id={upload_id}, path={file_path}")
+
         return {
             "upload_id": upload_id,
             "file_path": file_path,
@@ -92,7 +94,7 @@ async def upload_product_image(
 @router.delete("/{upload_id}")
 async def delete_upload(
     upload_id: str,
-    storage: StorageService = Depends(get_storage_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Delete an uploaded file.
