@@ -5,6 +5,7 @@ import { Layout } from './components/Layout';
 import { HomePage } from './pages/HomePage';
 import { LandingPage } from './pages/LandingPage';
 import { AuthPage } from './pages/AuthPage';
+import { ProjectsPage } from './pages/ProjectsPage';
 
 function App() {
   return (
@@ -24,6 +25,18 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <HomePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Projects - protected, requires authentication */}
+          <Route
+            path="/app/projects"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ProjectsPage />
                 </Layout>
               </ProtectedRoute>
             }

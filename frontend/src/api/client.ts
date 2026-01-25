@@ -14,6 +14,8 @@ import type {
   FrameworkGenerationResponse,
   DesignFramework,
   PromptHistory,
+  ProjectListResponse,
+  ProjectDetailResponse,
 } from './types';
 
 const API_BASE = '/api';
@@ -278,6 +280,49 @@ class ApiClient {
       { timeout: 600000 } // 10 minute timeout for prompt generation + image generation
     );
     return response.data;
+  }
+
+  // ============================================================================
+  // Projects - User's generation session history
+  // ============================================================================
+
+  // List user's projects with pagination
+  async listProjects(
+    page: number = 1,
+    pageSize: number = 12,
+    statusFilter?: string
+  ): Promise<ProjectListResponse> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      page_size: pageSize.toString(),
+    });
+    if (statusFilter && statusFilter !== 'all') {
+      params.append('status_filter', statusFilter);
+    }
+    const response = await this.client.get<ProjectListResponse>(
+      `/projects/?${params.toString()}`
+    );
+    return response.data;
+  }
+
+  // Get project detail with all images
+  async getProjectDetail(sessionId: string): Promise<ProjectDetailResponse> {
+    const response = await this.client.get<ProjectDetailResponse>(
+      `/projects/${sessionId}`
+    );
+    return response.data;
+  }
+
+  // Rename a project
+  async renameProject(sessionId: string, newTitle: string): Promise<void> {
+    await this.client.patch(`/projects/${sessionId}`, {
+      new_title: newTitle,
+    });
+  }
+
+  // Delete a project
+  async deleteProject(sessionId: string): Promise<void> {
+    await this.client.delete(`/projects/${sessionId}`);
   }
 }
 

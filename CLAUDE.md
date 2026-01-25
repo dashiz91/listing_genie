@@ -15,18 +15,21 @@ AI-powered Amazon listing image generator that creates professional product imag
 │   /          → Landing Page (marketing site)                    │
 │   /auth      → Authentication (login/signup)                    │
 │   /app       → Listing Generator (protected, requires auth)     │
+│   /app/projects → Projects page (saved listings history)        │
 │                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │   FRONTEND (React + Vite + Tailwind + shadcn/ui)                │
 │   └── src/                                                      │
-│       ├── components/landing/   # Landing page sections         │
-│       ├── components/ui/        # shadcn/ui components          │
-│       ├── components/           # App components                │
-│       ├── contexts/             # Auth context (Supabase)       │
-│       ├── pages/LandingPage.tsx # Marketing landing             │
-│       ├── pages/AuthPage.tsx    # Login/Signup                  │
-│       └── pages/HomePage.tsx    # Generator tool (protected)    │
+│       ├── components/landing/        # Landing page sections    │
+│       ├── components/amazon-preview/ # Amazon listing mockup UI │
+│       ├── components/ui/             # shadcn/ui components     │
+│       ├── components/                # App components           │
+│       ├── contexts/                  # Auth context (Supabase)  │
+│       ├── pages/LandingPage.tsx      # Marketing landing        │
+│       ├── pages/AuthPage.tsx         # Login/Signup             │
+│       ├── pages/HomePage.tsx         # Generator tool           │
+│       └── pages/ProjectsPage.tsx     # Saved projects history   │
 │                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
@@ -88,6 +91,7 @@ listing_genie/
 ├── app/                              # Backend Python application
 │   ├── api/endpoints/
 │   │   ├── generation.py             # Main generation endpoints
+│   │   ├── projects.py               # Projects CRUD (list, rename, delete)
 │   │   ├── images.py                 # Image serving (Supabase signed URLs)
 │   │   ├── upload.py                 # File upload to Supabase
 │   │   └── health.py                 # Health check
@@ -142,13 +146,27 @@ listing_genie/
 │   │   │   │   ├── how-it-works.tsx
 │   │   │   │   ├── pricing.tsx
 │   │   │   │   └── cta-footer.tsx
+│   │   │   ├── amazon-preview/       # Amazon listing mockup experience
+│   │   │   │   ├── AmazonListingPreview.tsx  # Main container
+│   │   │   │   ├── ThumbnailGallery.tsx      # Draggable thumbnails
+│   │   │   │   ├── MainImageViewer.tsx       # Large image with zoom
+│   │   │   │   ├── ProductInfoPanel.tsx      # Product details mockup
+│   │   │   │   ├── PreviewToolbar.tsx        # Device toggle, actions
+│   │   │   │   ├── QuickEditBar.tsx          # Edit/regen buttons
+│   │   │   │   ├── VersionNavigator.tsx      # Version history nav
+│   │   │   │   ├── SaveConfirmModal.tsx      # Save to projects
+│   │   │   │   └── CelebrationOverlay.tsx    # Success confetti
 │   │   │   ├── ui/                   # shadcn/ui components (button, card, etc.)
 │   │   │   ├── ProtectedRoute.tsx    # Auth guard component
 │   │   │   ├── Layout.tsx            # App layout wrapper
 │   │   │   ├── ProductForm.tsx       # Product info form
-│   │   │   ├── ImageGallery.tsx      # Generated images display
+│   │   │   ├── ImageGallery.tsx      # Generated images display (legacy)
 │   │   │   ├── ImageUploader.tsx     # Multi-image uploader
 │   │   │   ├── FrameworkSelector.tsx # Framework selection UI
+│   │   │   ├── ProjectCard.tsx       # Project list item card
+│   │   │   ├── ProjectDetailModal.tsx # View project details
+│   │   │   ├── RenameModal.tsx       # Rename project modal
+│   │   │   ├── DeleteConfirmModal.tsx # Delete confirmation
 │   │   │   └── StyleSelector.tsx     # Style preset selector
 │   │   ├── contexts/
 │   │   │   └── AuthContext.tsx       # Supabase auth state
@@ -158,7 +176,8 @@ listing_genie/
 │   │   ├── pages/
 │   │   │   ├── LandingPage.tsx       # Marketing landing (/)
 │   │   │   ├── AuthPage.tsx          # Login/Signup (/auth)
-│   │   │   └── HomePage.tsx          # Generator tool (/app)
+│   │   │   ├── HomePage.tsx          # Generator tool (/app)
+│   │   │   └── ProjectsPage.tsx      # Saved projects (/app/projects)
 │   │   ├── styles/index.css          # Global styles + Tailwind
 │   │   ├── App.tsx                   # Router setup with auth
 │   │   └── main.tsx                  # Entry point
@@ -213,6 +232,22 @@ Upload a style reference image and AI matches that visual style across all gener
 - **Edit**: Modify existing image while preserving layout
 - **Regenerate**: Generate completely new image with feedback
 
+### Amazon Preview Experience
+Results display as an authentic Amazon product listing mockup:
+- **Thumbnail Gallery**: Draggable reorder, click to select
+- **Main Image Viewer**: Large preview with hover zoom lens
+- **Product Info Panel**: Title, bullets, price, buy button mockup
+- **Device Toggle**: Switch between Desktop and Mobile layouts
+- **Version History**: Navigate between regenerated versions with arrows
+- **Quick Edit Bar**: Fast access to edit/regenerate/view-prompt per image
+- **Export**: Download all images or export mockup as PNG
+
+### Projects Management
+- **Projects Page**: View all saved generation sessions
+- **Project Cards**: Thumbnail preview, status, date
+- **Rename/Delete**: Manage saved projects
+- **Detail Modal**: View all 5 images from a project
+
 ### Cloud Storage (Supabase)
 - Uploads stored in `supabase://uploads/{uuid}.png`
 - Generated images in `supabase://generated/{session_id}/{image_type}.png`
@@ -239,6 +274,14 @@ GET  /api/generate/{session_id}/prompts  Get all prompts
 ### Images
 ```
 GET /api/images/{session_id}/{image_type}  Get image (redirects to signed URL)
+```
+
+### Projects
+```
+GET    /api/projects/                   List user's projects (paginated)
+GET    /api/projects/{session_id}       Get project details
+PATCH  /api/projects/{session_id}       Rename project
+DELETE /api/projects/{session_id}       Delete project and images
 ```
 
 ### Health
@@ -295,6 +338,7 @@ npm run dev
 - Landing Page: http://localhost:5173/
 - Auth Page: http://localhost:5173/auth
 - Generator App: http://localhost:5173/app (requires login)
+- Projects: http://localhost:5173/app/projects (requires login)
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
@@ -319,6 +363,14 @@ npm run dev
 - `frontend/src/pages/HomePage.tsx` - Main app flow
 - `frontend/src/components/*.tsx` - App components
 
+### Amazon Preview Experience
+- `frontend/src/components/amazon-preview/AmazonListingPreview.tsx` - Main container
+- `frontend/src/components/amazon-preview/*.tsx` - All preview components
+
+### Projects
+- `frontend/src/pages/ProjectsPage.tsx` - Projects listing page
+- `app/api/endpoints/projects.py` - Projects CRUD API
+
 ### Backend Services
 - `app/prompts/ai_designer.py` - All AI prompts
 - `app/services/generation_service.py` - Main orchestration
@@ -337,8 +389,9 @@ Create these buckets in Supabase Storage:
 - Disable email confirmation for development (optional)
 
 ## Future Scope
-- Restyle `/app` to match landing page design system
-- Credit-based pricing system
+- Credit-based pricing system (Stripe integration)
 - A+ Content (Enhanced Brand Content) images
 - Batch generation for multiple products
 - Social login (Google, GitHub)
+- Mobile app (React Native)
+- Team collaboration features

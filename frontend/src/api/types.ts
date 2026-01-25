@@ -302,3 +302,42 @@ export interface PromptHistory {
     product_analysis?: Record<string, unknown>;
   };
 }
+
+// ============================================================================
+// Projects - User's generation session history
+// ============================================================================
+
+export interface ProjectListItem {
+  session_id: string;
+  product_title: string;
+  status: GenerationStatus;
+  created_at: string;
+  image_count: number;
+  complete_count: number;
+  thumbnail_url?: string;
+}
+
+export interface ProjectListResponse {
+  projects: ProjectListItem[];
+  total: number;
+  page: number;
+  total_pages: number;
+}
+
+export interface ProjectImageDetail {
+  image_type: ImageType;
+  status: GenerationStatus;
+  storage_path?: string;
+  image_url?: string;
+  error_message?: string;
+}
+
+export interface ProjectDetailResponse {
+  session_id: string;
+  product_title: string;
+  status: GenerationStatus;
+  created_at: string;
+  completed_at?: string;
+  brand_name?: string;
+  images: ProjectImageDetail[];
+}

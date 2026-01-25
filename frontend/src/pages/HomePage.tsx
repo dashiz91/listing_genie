@@ -3,7 +3,7 @@ import { apiClient } from '../api/client';
 import { ImageUploader, UploadWithPreview } from '../components/ImageUploader';
 import { ProductForm, ProductFormData } from '../components/ProductForm';
 import { FrameworkSelector } from '../components/FrameworkSelector';
-import { ImageGallery } from '../components/ImageGallery';
+import { AmazonListingPreview } from '../components/amazon-preview';
 import type {
   HealthResponse,
   SessionImage,
@@ -616,27 +616,34 @@ export const HomePage: React.FC = () => {
         </div>
       )}
 
-      {step === 'results' && sessionId && (
+      {step === 'results' && sessionId && formData && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-white">
-              Your Listing Images
+              Amazon Listing Preview
             </h2>
-            <button
-              onClick={handleStartOver}
-              className="px-4 py-2 bg-slate-800 text-white text-sm rounded-lg hover:bg-slate-700 transition-colors border border-slate-700"
-            >
-              New Project
-            </button>
+            <div className="flex items-center gap-2">
+              {generationStatus === 'complete' && (
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
+                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                  <span className="text-green-400 text-sm font-medium">Ready</span>
+                </span>
+              )}
+            </div>
           </div>
 
-          <ImageGallery
+          <AmazonListingPreview
+            productTitle={formData.productTitle}
+            brandName={formData.brandName}
+            features={[formData.feature1, formData.feature2, formData.feature3]}
+            targetAudience={formData.targetAudience}
             sessionId={sessionId}
             images={images}
-            status={generationStatus}
+            framework={selectedFramework || undefined}
             onRetry={handleRetry}
             onRegenerateSingle={handleRegenerateSingle}
             onEditSingle={handleEditImage}
+            onStartOver={handleStartOver}
           />
         </div>
       )}

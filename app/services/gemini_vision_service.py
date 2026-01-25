@@ -40,6 +40,21 @@ def _get_storage_service() -> "SupabaseStorageService":
         _storage_service = SupabaseStorageService()
     return _storage_service
 
+
+def _image_path_exists(path: str) -> bool:
+    """
+    Check if an image path exists (handles both local paths and Supabase URLs).
+
+    For Supabase URLs (supabase://...), we trust they exist since they come from
+    our upload endpoint. For local paths, we check if the file exists.
+    """
+    if path.startswith("supabase://"):
+        # Trust Supabase URLs - they came from our upload endpoint
+        return True
+    else:
+        # Local file path - check if it exists
+        return Path(path).exists()
+
 # Import the prompts from standalone prompts module (they're model-agnostic)
 from app.prompts.ai_designer import (
     PRINCIPAL_DESIGNER_VISION_PROMPT,
@@ -129,8 +144,8 @@ class GeminiVisionService:
         if not self.client:
             raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
 
-        # Validate primary image exists
-        if not Path(product_image_path).exists():
+        # Validate primary image exists (handles both local paths and Supabase URLs)
+        if not _image_path_exists(product_image_path):
             raise ValueError(f"Product image not found: {product_image_path}")
 
         # Build list of all images to send
@@ -139,14 +154,14 @@ class GeminiVisionService:
 
         if additional_image_paths:
             for path in additional_image_paths:
-                if Path(path).exists():
+                if _image_path_exists(path):
                     all_image_paths.append(path)
                 else:
                     logger.warning(f"Additional image not found, skipping: {path}")
 
         # Add style reference image (if provided)
         has_style_reference = False
-        if style_reference_path and Path(style_reference_path).exists():
+        if style_reference_path and _image_path_exists(style_reference_path):
             all_image_paths.append(style_reference_path)
             style_ref_index = len(all_image_paths)  # 1-indexed
             has_style_reference = True

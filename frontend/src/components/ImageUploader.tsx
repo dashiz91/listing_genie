@@ -26,18 +26,36 @@ const getCachedUploads = (): CachedUpload[] => {
 };
 
 const saveCachedUpload = (upload: UploadResponse, previewDataUrl: string) => {
-  const cached = getCachedUploads();
-  const newEntry: CachedUpload = {
-    upload_id: upload.upload_id,
-    file_path: upload.file_path,
-    filename: upload.filename,
-    preview_url: previewDataUrl,
-    timestamp: Date.now(),
-  };
-  // Remove duplicates and add new one at the front
-  const filtered = cached.filter(c => c.upload_id !== upload.upload_id);
-  const updated = [newEntry, ...filtered].slice(0, MAX_CACHED);
-  localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
+  try {
+    const cached = getCachedUploads();
+    const newEntry: CachedUpload = {
+      upload_id: upload.upload_id,
+      file_path: upload.file_path,
+      filename: upload.filename,
+      preview_url: previewDataUrl,
+      timestamp: Date.now(),
+    };
+    // Remove duplicates and add new one at the front
+    const filtered = cached.filter(c => c.upload_id !== upload.upload_id);
+    const updated = [newEntry, ...filtered].slice(0, MAX_CACHED);
+
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
+    } catch (quotaError) {
+      // localStorage quota exceeded - clear cache and try again with just this item
+      console.warn('localStorage quota exceeded, clearing cache');
+      localStorage.removeItem(CACHE_KEY);
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify([newEntry]));
+      } catch {
+        // Still failing - just skip caching
+        console.warn('Unable to cache upload, skipping');
+      }
+    }
+  } catch (error) {
+    // Non-critical - just skip caching
+    console.warn('Failed to cache upload:', error);
+  }
 };
 
 const removeCachedUpload = (uploadId: string) => {

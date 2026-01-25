@@ -11,7 +11,7 @@ import base64
 import json
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from openai import AsyncOpenAI
 
 from app.config import settings
@@ -23,7 +23,48 @@ from app.prompts.ai_designer import (
     STYLE_REFERENCE_INSTRUCTIONS,
 )
 
+if TYPE_CHECKING:
+    from app.services.supabase_storage_service import SupabaseStorageService
+
 logger = logging.getLogger(__name__)
+
+# Storage service singleton for loading images from Supabase
+_storage_service: Optional["SupabaseStorageService"] = None
+
+
+def _get_storage_service() -> "SupabaseStorageService":
+    """Get or create the storage service singleton"""
+    global _storage_service
+    if _storage_service is None:
+        from app.services.supabase_storage_service import SupabaseStorageService
+        _storage_service = SupabaseStorageService()
+    return _storage_service
+
+
+def _image_path_exists(path: str) -> bool:
+    """
+    Check if an image path exists (handles both local paths and Supabase URLs).
+
+    For Supabase URLs (supabase://...), we trust they exist since they come from
+    our upload endpoint. For local paths, we check if the file exists.
+    """
+    if path.startswith("supabase://"):
+        # Trust Supabase URLs - they came from our upload endpoint
+        return True
+    else:
+        # Local file path - check if it exists
+        return Path(path).exists()
+
+
+def _load_image_bytes(image_path: str) -> bytes:
+    """Load image file as bytes (from local path or Supabase)"""
+    if image_path.startswith("supabase://"):
+        storage = _get_storage_service()
+        return storage.get_file_bytes(image_path)
+    else:
+        # Local file path (for backwards compatibility)
+        with open(image_path, "rb") as f:
+            return f.read()
 
 # NOTE: AI Designer prompts are now in app/prompts/ai_designer.py
 # Imported at top: PRINCIPAL_DESIGNER_VISION_PROMPT, GENERATE_IMAGE_PROMPTS_PROMPT,
@@ -689,9 +730,9 @@ class OpenAIVisionService:
             self.client = AsyncOpenAI(api_key=self.api_key)
 
     def _encode_image(self, image_path: str) -> str:
-        """Encode image to base64 for API"""
-        with open(image_path, "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode("utf-8")
+        """Encode image to base64 for API (handles both local paths and Supabase URLs)"""
+        image_bytes = _load_image_bytes(image_path)
+        return base64.b64encode(image_bytes).decode("utf-8")
 
     def _get_image_media_type(self, image_path: str) -> str:
         """Get media type from file extension"""
@@ -739,8 +780,8 @@ class OpenAIVisionService:
         if not self.client:
             raise ValueError("OpenAI client not initialized - check OPENAI_API_KEY")
 
-        # Validate primary image exists
-        if not Path(product_image_path).exists():
+        # Validate primary image exists (handles both local paths and Supabase URLs)
+        if not _image_path_exists(product_image_path):
             raise ValueError(f"Product image not found: {product_image_path}")
 
         # Build list of all images to send
@@ -749,13 +790,13 @@ class OpenAIVisionService:
 
         if additional_image_paths:
             for path in additional_image_paths:
-                if Path(path).exists():
+                if _image_path_exists(path):
                     all_image_paths.append(path)
                 else:
                     logger.warning(f"Additional image not found, skipping: {path}")
 
         # Add style reference if provided
-        if style_reference_path and Path(style_reference_path).exists():
+        if style_reference_path and _image_path_exists(style_reference_path):
             all_image_paths.append(style_reference_path)
             style_ref_index = len(all_image_paths)
             logger.info(f"[OpenAI] Including style reference as Image #{style_ref_index}")
