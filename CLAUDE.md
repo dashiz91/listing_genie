@@ -21,14 +21,15 @@ AI-powered Amazon listing image generator that creates professional product imag
 │                                                                 │
 │   FRONTEND (React + Vite + Tailwind + shadcn/ui)                │
 │   └── src/                                                      │
-│       ├── components/landing/        # Landing page sections    │
+│       ├── components/split-layout/   # Split-screen experience  │
+│       ├── components/live-preview/   # Real-time preview        │
 │       ├── components/amazon-preview/ # Amazon listing mockup UI │
+│       ├── components/landing/        # Landing page sections    │
 │       ├── components/ui/             # shadcn/ui components     │
-│       ├── components/                # App components           │
 │       ├── contexts/                  # Auth context (Supabase)  │
 │       ├── pages/LandingPage.tsx      # Marketing landing        │
 │       ├── pages/AuthPage.tsx         # Login/Signup             │
-│       ├── pages/HomePage.tsx         # Generator tool           │
+│       ├── pages/HomePage.tsx         # Split-screen generator   │
 │       └── pages/ProjectsPage.tsx     # Saved projects history   │
 │                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
@@ -138,6 +139,14 @@ listing_genie/
 │   │   │   ├── client.ts             # API client (includes auth token)
 │   │   │   └── types.ts              # TypeScript types
 │   │   ├── components/
+│   │   │   ├── split-layout/         # Split-screen layout system
+│   │   │   │   ├── SplitScreenLayout.tsx     # Two-panel responsive container
+│   │   │   │   ├── WorkshopPanel.tsx         # Left: form sections (accordion)
+│   │   │   │   ├── ShowroomPanel.tsx         # Right: live preview wrapper
+│   │   │   │   └── index.ts                  # Exports
+│   │   │   ├── live-preview/         # Real-time preview component
+│   │   │   │   ├── LivePreview.tsx           # Always-visible preview (5 states)
+│   │   │   │   └── index.ts                  # Exports
 │   │   │   ├── landing/              # Landing page components
 │   │   │   │   ├── navbar.tsx
 │   │   │   │   ├── hero.tsx
@@ -146,28 +155,19 @@ listing_genie/
 │   │   │   │   ├── how-it-works.tsx
 │   │   │   │   ├── pricing.tsx
 │   │   │   │   └── cta-footer.tsx
-│   │   │   ├── amazon-preview/       # Amazon listing mockup experience
-│   │   │   │   ├── AmazonListingPreview.tsx  # Main container
+│   │   │   ├── amazon-preview/       # Amazon listing mockup (post-generation)
+│   │   │   │   ├── AmazonListingPreview.tsx  # Full preview with edit/regen
 │   │   │   │   ├── ThumbnailGallery.tsx      # Draggable thumbnails
 │   │   │   │   ├── MainImageViewer.tsx       # Large image with zoom
 │   │   │   │   ├── ProductInfoPanel.tsx      # Product details mockup
 │   │   │   │   ├── PreviewToolbar.tsx        # Device toggle, actions
 │   │   │   │   ├── QuickEditBar.tsx          # Edit/regen buttons
-│   │   │   │   ├── VersionNavigator.tsx      # Version history nav
-│   │   │   │   ├── SaveConfirmModal.tsx      # Save to projects
 │   │   │   │   └── CelebrationOverlay.tsx    # Success confetti
-│   │   │   ├── ui/                   # shadcn/ui components (button, card, etc.)
+│   │   │   ├── ui/                   # shadcn/ui components
 │   │   │   ├── ProtectedRoute.tsx    # Auth guard component
 │   │   │   ├── Layout.tsx            # App layout wrapper
-│   │   │   ├── ProductForm.tsx       # Product info form
-│   │   │   ├── ImageGallery.tsx      # Generated images display (legacy)
 │   │   │   ├── ImageUploader.tsx     # Multi-image uploader
-│   │   │   ├── FrameworkSelector.tsx # Framework selection UI
-│   │   │   ├── ProjectCard.tsx       # Project list item card
-│   │   │   ├── ProjectDetailModal.tsx # View project details
-│   │   │   ├── RenameModal.tsx       # Rename project modal
-│   │   │   ├── DeleteConfirmModal.tsx # Delete confirmation
-│   │   │   └── StyleSelector.tsx     # Style preset selector
+│   │   │   └── FrameworkSelector.tsx # Framework selection UI
 │   │   ├── contexts/
 │   │   │   └── AuthContext.tsx       # Supabase auth state
 │   │   ├── lib/
@@ -196,6 +196,39 @@ listing_genie/
 ```
 
 ## Core Features
+
+### Living Preview Experience (Split-Screen UI)
+The generator uses an immersive split-screen layout where the Amazon listing preview is ALWAYS visible:
+
+```
+┌─────────────────────────────┬───────────────────────────────────┐
+│     THE WORKSHOP            │         THE SHOWROOM              │
+│     (Form & Controls)       │         (Live Preview)            │
+│                             │                                   │
+│  📸 Product Photos          │   [Thumbnails] [Main Image]       │
+│  📝 Product Info (title,    │                                   │
+│     features, audience)     │   BRAND NAME                      │
+│  🎨 Brand Identity          │   Product Title (real-time)       │
+│  🖌️ Style & Colors          │   ★★★★☆ 4.5 (1,247)              │
+│  📋 Global Instructions     │   $XX.XX                          │
+│  🖼️ Design Framework        │   • Feature 1 (real-time)         │
+│                             │   • Feature 2 (real-time)         │
+│  [Analyze] [Generate]       │   • Feature 3 (real-time)         │
+└─────────────────────────────┴───────────────────────────────────┘
+```
+
+**Preview States:**
+- `empty` - No uploads yet, shows upload prompt
+- `photos_only` - Photos uploaded, prompts for product details
+- `filling` - Real-time updates as user types title/features
+- `framework_selected` - Styled preview with framework colors
+- `generating` - Progress indicator, images appear one-by-one
+- `complete` - Full Amazon mockup with edit/regenerate options
+
+**Responsive Layout:**
+- Desktop (>1024px): 40/60 split
+- Tablet (768-1024px): 50/50 split
+- Mobile (<768px): Stacked with collapsible mini-preview
 
 ### Authentication (Supabase Auth)
 - Email/password signup and login
@@ -359,13 +392,16 @@ npm run dev
 - `frontend/src/pages/LandingPage.tsx` - Composes all sections
 - `frontend/src/components/landing/*.tsx` - Individual sections
 
-### Generator App
-- `frontend/src/pages/HomePage.tsx` - Main app flow
-- `frontend/src/components/*.tsx` - App components
+### Generator App (Split-Screen)
+- `frontend/src/pages/HomePage.tsx` - Orchestrates split layout and state
+- `frontend/src/components/split-layout/SplitScreenLayout.tsx` - Two-panel container
+- `frontend/src/components/split-layout/WorkshopPanel.tsx` - Left panel (form sections)
+- `frontend/src/components/split-layout/ShowroomPanel.tsx` - Right panel (preview wrapper)
+- `frontend/src/components/live-preview/LivePreview.tsx` - Real-time preview (5 states)
 
-### Amazon Preview Experience
-- `frontend/src/components/amazon-preview/AmazonListingPreview.tsx` - Main container
-- `frontend/src/components/amazon-preview/*.tsx` - All preview components
+### Amazon Preview (Post-Generation)
+- `frontend/src/components/amazon-preview/AmazonListingPreview.tsx` - Full preview with editing
+- `frontend/src/components/amazon-preview/*.tsx` - Thumbnails, zoom, edit bar, etc.
 
 ### Projects
 - `frontend/src/pages/ProjectsPage.tsx` - Projects listing page
