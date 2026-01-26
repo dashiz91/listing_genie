@@ -16,6 +16,8 @@ import type {
   PromptHistory,
   ProjectListResponse,
   ProjectDetailResponse,
+  AplusModuleRequest,
+  AplusModuleResponse,
 } from './types';
 
 const API_BASE = '/api';
@@ -323,6 +325,24 @@ class ApiClient {
   // Delete a project
   async deleteProject(sessionId: string): Promise<void> {
     await this.client.delete(`/projects/${sessionId}`);
+  }
+
+  // ============================================================================
+  // A+ Content Module Generation
+  // ============================================================================
+
+  /**
+   * Generate a single A+ Content module image.
+   * For sequential/chained generation, pass the previous module's image_path
+   * to maintain visual design continuity.
+   */
+  async generateAplusModule(request: AplusModuleRequest): Promise<AplusModuleResponse> {
+    const response = await this.client.post<AplusModuleResponse>(
+      '/generate/aplus/generate',
+      request,
+      { timeout: 120000 } // 2 minute timeout per module
+    );
+    return response.data;
   }
 }
 

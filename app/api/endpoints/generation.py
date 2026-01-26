@@ -1022,3 +1022,169 @@ async def generate_with_framework(
     except Exception as e:
         logger.error(f"Generation with framework failed: {e}")
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+
+# ============== A+ Content Module Generation ==============
+
+class AplusModuleType(str, Enum):
+    """Types of A+ Content modules"""
+    FULL_IMAGE = "full_image"           # 1464x600 banner
+    DUAL_IMAGE = "dual_image"           # 650x350 each
+    FOUR_IMAGE = "four_image"           # 300x225 each
+    COMPARISON = "comparison"           # 200x225 each
+
+
+class AplusModuleRequest(BaseModel):
+    """Request to generate a single A+ Content module"""
+    session_id: str = Field(..., description="Session ID from listing generation")
+    module_type: AplusModuleType = Field(default=AplusModuleType.FULL_IMAGE)
+    module_index: int = Field(..., ge=0, le=6, description="Position in A+ section (0=first/top)")
+    previous_module_path: Optional[str] = Field(
+        None,
+        description="Path to the previous module's image for visual continuity chaining"
+    )
+    custom_instructions: Optional[str] = Field(None, max_length=500)
+
+
+class AplusModuleResponse(BaseModel):
+    """Response from A+ module generation"""
+    session_id: str
+    module_type: str
+    module_index: int
+    image_path: str
+    image_url: str
+    width: int
+    height: int
+    is_chained: bool  # True if this used a previous module as reference
+    generation_time_ms: int
+
+
+@router.post("/aplus/generate", response_model=AplusModuleResponse)
+async def generate_aplus_module(
+    request: AplusModuleRequest,
+    user: Optional[User] = Depends(get_optional_user),
+    gemini: GeminiService = Depends(get_gemini_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a single A+ Content module image.
+
+    For sequential/chained generation, pass the previous module's image_path
+    as previous_module_path. The AI will continue the visual design flow.
+    """
+    import time
+    from app.services.image_utils import resize_for_aplus_module, get_aspect_ratio_for_module, APLUS_DIMENSIONS
+    from app.prompts.templates.aplus_modules import get_aplus_prompt
+    from app.models.database import GenerationSession, DesignContext
+
+    start_time = time.time()
+
+    try:
+        # Get session and its context
+        session = db.query(GenerationSession).filter(
+            GenerationSession.id == request.session_id
+        ).first()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Get design context for framework info
+        design_context = db.query(DesignContext).filter(
+            DesignContext.session_id == request.session_id
+        ).first()
+
+        # Determine position in chain
+        if request.module_index == 0:
+            position = "first"
+        elif request.previous_module_path:
+            position = "middle"  # Could also be "last" but we don't know total count
+        else:
+            position = "only"
+
+        # Build the prompt
+        framework = design_context.selected_framework if design_context else {}
+        prompt = get_aplus_prompt(
+            module_type=request.module_type.value,
+            position=position,
+            product_title=session.product_title,
+            brand_name=session.brand_name or "",
+            features=[f for f in [session.feature_1, session.feature_2, session.feature_3] if f],
+            target_audience=session.target_audience or "",
+            framework_name=framework.get("framework_name", "Professional"),
+            framework_style=framework.get("design_philosophy", "Clean and modern"),
+            primary_color=framework.get("colors", [{}])[0].get("hex", "#333333"),
+            color_palette=[c.get("hex", "#333333") for c in framework.get("colors", [])],
+            framework_mood=framework.get("brand_voice", "Professional"),
+            custom_instructions=request.custom_instructions or "",
+        )
+
+        # Collect reference images
+        reference_paths = []
+
+        # Add product images from session
+        if session.upload_path:
+            reference_paths.append(session.upload_path)
+
+        # Add previous module for chaining (CRITICAL for visual continuity)
+        is_chained = False
+        if request.previous_module_path:
+            reference_paths.append(request.previous_module_path)
+            is_chained = True
+
+        # Get aspect ratio for this module type
+        aspect_ratio = get_aspect_ratio_for_module(request.module_type.value)
+
+        # Generate the image
+        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, chained={is_chained})")
+
+        generated_image = await gemini.generate_image(
+            prompt=prompt,
+            reference_image_paths=reference_paths if reference_paths else None,
+            aspect_ratio=aspect_ratio,
+            image_size="1K",  # Use 1K for cost savings
+        )
+
+        if not generated_image:
+            raise HTTPException(status_code=500, detail="Image generation failed")
+
+        # Resize to exact A+ dimensions
+        target_width, target_height = APLUS_DIMENSIONS[request.module_type.value]
+        final_image = resize_for_aplus_module(
+            generated_image,
+            request.module_type.value,
+            mobile=False
+        )
+
+        # Save to storage
+        image_filename = f"aplus_{request.module_type.value}_{request.module_index}.png"
+        image_path = storage.save_generated_image(
+            final_image,
+            request.session_id,
+            image_filename.replace(".png", "")  # Storage adds extension
+        )
+
+        # Get signed URL
+        image_url = storage.get_signed_url(image_path, expires_in=3600)
+
+        generation_time_ms = int((time.time() - start_time) * 1000)
+
+        logger.info(f"A+ module generated in {generation_time_ms}ms: {image_path}")
+
+        return AplusModuleResponse(
+            session_id=request.session_id,
+            module_type=request.module_type.value,
+            module_index=request.module_index,
+            image_path=image_path,
+            image_url=image_url,
+            width=target_width,
+            height=target_height,
+            is_chained=is_chained,
+            generation_time_ms=generation_time_ms,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"A+ module generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"A+ generation failed: {str(e)}")

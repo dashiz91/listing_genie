@@ -341,3 +341,37 @@ export interface ProjectDetailResponse {
   brand_name?: string;
   images: ProjectImageDetail[];
 }
+
+// ============================================================================
+// A+ Content Module Types
+// ============================================================================
+
+export type AplusModuleType = 'full_image' | 'dual_image' | 'four_image' | 'comparison';
+
+export interface AplusModuleRequest {
+  session_id: string;
+  module_type: AplusModuleType;
+  module_index: number;  // Position in A+ section (0 = first/top)
+  previous_module_path?: string;  // For visual continuity chaining
+  custom_instructions?: string;
+}
+
+export interface AplusModuleResponse {
+  session_id: string;
+  module_type: string;
+  module_index: number;
+  image_path: string;
+  image_url: string;
+  width: number;
+  height: number;
+  is_chained: boolean;
+  generation_time_ms: number;
+}
+
+// A+ Module dimensions (for UI reference)
+export const APLUS_DIMENSIONS: Record<AplusModuleType, { width: number; height: number }> = {
+  full_image: { width: 1464, height: 600 },
+  dual_image: { width: 650, height: 350 },
+  four_image: { width: 300, height: 225 },
+  comparison: { width: 200, height: 225 },
+};

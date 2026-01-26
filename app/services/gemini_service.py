@@ -73,6 +73,7 @@ class GeminiService:
         reference_image_path: Optional[str] = None,
         reference_image_paths: Optional[List[str]] = None,
         aspect_ratio: str = "1:1",
+        image_size: str = "1K",
         max_retries: int = 3
     ) -> Optional[PILImage.Image]:
         """
@@ -82,7 +83,8 @@ class GeminiService:
             prompt: The generation prompt including style and context
             reference_image_path: Single reference image path (backwards compat)
             reference_image_paths: List of reference image paths
-            aspect_ratio: Output aspect ratio (1:1 for Amazon square images)
+            aspect_ratio: Output aspect ratio. Supported: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9
+            image_size: Output resolution. "1K" ($0.134), "2K" ($0.134), "4K" ($0.24). Default 1K for cost savings.
             max_retries: Number of retry attempts on failure
 
         Returns:
@@ -113,6 +115,7 @@ class GeminiService:
         logger.info("[GEMINI IMAGE GEN] === FULL REQUEST DETAILS ===")
         logger.info(f"[GEMINI IMAGE GEN] Model: {self.model}")
         logger.info(f"[GEMINI IMAGE GEN] Aspect Ratio: {aspect_ratio}")
+        logger.info(f"[GEMINI IMAGE GEN] Image Size: {image_size}")
         logger.info(f"[GEMINI IMAGE GEN] Max Retries: {max_retries}")
         logger.info(f"[GEMINI IMAGE GEN] Response Modalities: ['Image']")
         logger.info("-" * 40)
@@ -142,7 +145,8 @@ class GeminiService:
                     config=types.GenerateContentConfig(
                         response_modalities=['Image'],
                         image_config=types.ImageConfig(
-                            aspect_ratio=aspect_ratio
+                            aspect_ratio=aspect_ratio,
+                            image_size=image_size
                         )
                     )
                 )
@@ -171,6 +175,7 @@ class GeminiService:
         prompt: str,
         reference_image: PILImage.Image,
         aspect_ratio: str = "1:1",
+        image_size: str = "1K",
         max_retries: int = 3
     ) -> Optional[PILImage.Image]:
         """
@@ -180,6 +185,7 @@ class GeminiService:
             prompt: The generation prompt
             reference_image: PIL Image object as reference
             aspect_ratio: Output aspect ratio
+            image_size: Output resolution ("1K", "2K", "4K"). Default 1K for cost savings.
             max_retries: Number of retry attempts
 
         Returns:
@@ -201,7 +207,8 @@ class GeminiService:
                     config=types.GenerateContentConfig(
                         response_modalities=['Image'],
                         image_config=types.ImageConfig(
-                            aspect_ratio=aspect_ratio
+                            aspect_ratio=aspect_ratio,
+                            image_size=image_size
                         )
                     )
                 )
@@ -228,6 +235,7 @@ class GeminiService:
         source_image_path: str,
         edit_instructions: str,
         aspect_ratio: str = "1:1",
+        image_size: str = "1K",
         max_retries: int = 3
     ) -> Optional[PILImage.Image]:
         """
@@ -240,6 +248,7 @@ class GeminiService:
             source_image_path: Path to the image to edit
             edit_instructions: What to change (e.g., "Change the headline to 'New Text'")
             aspect_ratio: Output aspect ratio (should match source)
+            image_size: Output resolution ("1K", "2K", "4K"). Default 1K for cost savings.
             max_retries: Number of retry attempts
 
         Returns:
@@ -270,6 +279,7 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
         logger.info("[GEMINI EDIT] === FULL EDIT REQUEST DETAILS ===")
         logger.info(f"[GEMINI EDIT] Model: {self.model}")
         logger.info(f"[GEMINI EDIT] Aspect Ratio: {aspect_ratio}")
+        logger.info(f"[GEMINI EDIT] Image Size: {image_size}")
         logger.info(f"[GEMINI EDIT] Source Image: {source_image_path}")
         logger.info(f"[GEMINI EDIT] Source Image Size: {source_image.size}")
         logger.info("-" * 40)
@@ -292,7 +302,8 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
                     config=types.GenerateContentConfig(
                         response_modalities=['Image'],
                         image_config=types.ImageConfig(
-                            aspect_ratio=aspect_ratio
+                            aspect_ratio=aspect_ratio,
+                            image_size=image_size
                         )
                     )
                 )
