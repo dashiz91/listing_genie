@@ -211,6 +211,7 @@ Respond with ONLY valid JSON (no markdown, no code fences):
       "role": "The role this banner plays in the story (e.g., 'The Reveal', 'Deep Craft')",
       "headline": "Internal reference headline (NOT rendered in image)",
       "mood": "The feeling this banner evokes in one phrase",
+      "scene_description": "A 50-100 word description of the PHYSICAL SCENE as if a camera is pulling back to reveal more of the same space. Describe surfaces, backgrounds, and objects as EXTENSIONS of one continuous environment — same table/surface extending further, same wall continuing, same lighting. NEVER describe a different camera angle, zoom level, or scene change. Instead describe what new objects appear in the foreground of the SAME space as the camera reveals more. Include connecting elements (scattered items, draped fabric, etc.) that span the transition zone.",
       "generation_prompt": "The COMPLETE generation prompt for this module. ~300-500 words. References PRODUCT_PHOTO, STYLE_REFERENCE. Describes full scene, background, edges. For module 0: top opens clean, bottom settles into a specific color/gradient. For modules 1+: references PREVIOUS_MODULE, top continues from previous bottom edge."
     }}
   ]
@@ -276,6 +277,26 @@ CRAFT NOTES:
 IMAGE_LABEL_PRODUCT = "PRODUCT_PHOTO"
 IMAGE_LABEL_STYLE = "STYLE_REFERENCE"
 IMAGE_LABEL_PREVIOUS = "PREVIOUS_MODULE"
+
+
+CANVAS_INPAINTING_PROMPT = """Edit this image to complete it as ONE single continuous photograph.
+The top portion shows {previous_scene_description}. The bottom portion is blank and needs to be filled.
+
+IMPORTANT: This must look like ONE single photograph taken with a camera pulled back to show a wider view. {current_scene_description} NO edge, NO shelf, NO line, NO break. Single continuous perspective, single light source, one unified scene.
+
+Do NOT render any text, headlines, logos, or typography in the image.
+"""
+
+
+def build_canvas_inpainting_prompt(
+    previous_scene_description: str,
+    current_scene_description: str,
+) -> str:
+    """Build the inpainting prompt for canvas extension."""
+    return CANVAS_INPAINTING_PROMPT.format(
+        previous_scene_description=previous_scene_description,
+        current_scene_description=current_scene_description,
+    )
 
 
 def get_aplus_module_prompt(visual_script: dict, module_index: int, custom_instructions: str = "") -> Optional[str]:

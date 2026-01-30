@@ -14,7 +14,7 @@ from app.core.auth import User, get_optional_user
 logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
-from app.services.gemini_service import GeminiService, get_gemini_service
+from app.services.gemini_service import GeminiService, get_gemini_service, _load_image_from_path
 from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.generation_service import GenerationService
 from app.services.vision_service import VisionService, get_vision_service as get_unified_vision_service
@@ -1151,8 +1151,10 @@ async def generate_aplus_module(
     from app.services.image_utils import resize_for_aplus_module, get_aspect_ratio_for_module, APLUS_DIMENSIONS
     from app.prompts.templates.aplus_modules import (
         get_aplus_prompt, build_aplus_module_prompt, get_aplus_module_prompt,
+        build_canvas_inpainting_prompt,
         IMAGE_LABEL_PRODUCT, IMAGE_LABEL_STYLE, IMAGE_LABEL_PREVIOUS,
     )
+    from app.services.canvas_compositor import CanvasCompositor
     from app.models.database import GenerationSession, DesignContext, ImageTypeEnum as DBImageTypeEnum
 
     start_time = time.time()
@@ -1258,10 +1260,107 @@ async def generate_aplus_module(
         # Get aspect ratio for this module type
         aspect_ratio = get_aspect_ratio_for_module(request.module_type.value)
 
-        # Generate the image
-        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, chained={is_chained}, named_images={use_named_images})")
+        # === Canvas Extension Decision ===
+        # For modules 1+, check if we can use gradient canvas inpainting
+        # for seamless transitions (requires scene_description on both modules)
+        use_canvas_extension = False
+        if (
+            request.module_index > 0
+            and request.previous_module_path
+            and visual_script
+        ):
+            modules = visual_script.get("modules", [])
+            prev_idx = request.module_index - 1
+            curr_idx = request.module_index
+            if prev_idx < len(modules) and curr_idx < len(modules):
+                prev_scene = modules[prev_idx].get("scene_description")
+                curr_scene = modules[curr_idx].get("scene_description")
+                if prev_scene and curr_scene:
+                    use_canvas_extension = True
+                    logger.info(
+                        f"Canvas extension enabled for module {request.module_index} "
+                        f"(prev_scene={len(prev_scene)} chars, curr_scene={len(curr_scene)} chars)"
+                    )
 
-        if use_named_images:
+        # Generate the image
+        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, chained={is_chained}, named_images={use_named_images}, canvas_ext={use_canvas_extension})")
+
+        generated_image = None
+
+        if use_canvas_extension:
+            # Canvas extension workflow: gradient canvas → generate (not edit!) → crop
+            # Key insight from docs: Gemini must receive the canvas as a REFERENCE IMAGE
+            # in a generation call, NOT as an edit source. Edit mode modifies globally;
+            # generation mode with canvas reference is what produces seamless fills.
+            compositor = CanvasCompositor()
+            modules = visual_script.get("modules", [])
+            prev_scene = modules[request.module_index - 1]["scene_description"]
+            curr_scene = modules[request.module_index]["scene_description"]
+
+            # 1. Load previous module image
+            prev_image = _load_image_from_path(request.previous_module_path)
+            logger.info(f"Loaded previous module image: {prev_image.size}")
+
+            # 2. Create gradient canvas (1464x1171, 5:4 ratio)
+            canvas = compositor.create_gradient_canvas(prev_image)
+
+            # 2b. Save canvas to storage for debugging
+            debug_canvas_path = storage.save_generated_image(
+                request.session_id,
+                f"debug_canvas_{request.module_index}",
+                canvas
+            )
+            logger.info(f"Debug canvas saved: {debug_canvas_path}")
+
+            # 3. Build inpainting prompt
+            inpaint_prompt = build_canvas_inpainting_prompt(
+                previous_scene_description=prev_scene,
+                current_scene_description=curr_scene,
+            )
+
+            # 4. Send canvas as REFERENCE IMAGE to generate call (NOT edit)
+            # The canvas is the image Gemini should "complete" — it sees the top
+            # portion as existing content and the blank bottom as space to fill.
+            # 4:3 is the proven ratio from the continuity technique doc.
+            completed_canvas = await gemini.generate_image_from_pil(
+                prompt=inpaint_prompt,
+                reference_image=canvas,
+                aspect_ratio="4:3",
+                image_size="1K",
+            )
+
+            if completed_canvas:
+                # 4b. Save raw Gemini output for debugging
+                debug_output_path = storage.save_generated_image(
+                    request.session_id,
+                    f"debug_canvas_output_{request.module_index}",
+                    completed_canvas
+                )
+                logger.info(f"Debug canvas output saved: {debug_output_path}")
+
+                # 5. Split into two seamless modules (both from same image = no seam)
+                top_module, bottom_module = compositor.split_canvas_output(completed_canvas)
+                generated_image = bottom_module
+
+                # 6. Overwrite previous module with Gemini's refined top half
+                #    This ensures the seam between modules is invisible since
+                #    both come from the exact same Gemini output.
+                prev_module_idx = request.module_index - 1
+                prev_filename = f"aplus_{request.module_type.value}_{prev_module_idx}"
+                prev_path = storage.save_generated_image(
+                    request.session_id,
+                    prev_filename,
+                    top_module,
+                )
+                logger.info(f"Overwrote previous module {prev_module_idx} with refined version: {prev_path}")
+
+                # Override prompt for history — record the inpainting prompt
+                prompt = inpaint_prompt
+            else:
+                logger.warning("Canvas extension failed, falling back to standard generation")
+                use_canvas_extension = False  # Fall through to standard path
+
+        if not use_canvas_extension and use_named_images:
             # New path: labeled images so the prompt can reference them by name
             named_images = []
             if session.upload_path:
@@ -1277,7 +1376,7 @@ async def generate_aplus_module(
                 aspect_ratio=aspect_ratio,
                 image_size="1K",
             )
-        else:
+        elif not generated_image:
             # Legacy path: unnamed reference images
             reference_paths = []
             if session.upload_path:
@@ -1332,15 +1431,22 @@ async def generate_aplus_module(
 
             # Build reference images list with types
             ref_images_for_history = []
-            if session.upload_path:
-                ref_images_for_history.append({"type": "primary", "path": session.upload_path})
-            if session.style_reference_path:
-                ref_images_for_history.append({"type": "style_reference", "path": session.style_reference_path})
-            if request.previous_module_path:
+            if use_canvas_extension:
+                # Canvas extension: only the gradient canvas was sent to Gemini
                 ref_images_for_history.append({
-                    "type": f"previous_module_{request.module_index - 1}",
-                    "path": request.previous_module_path,
+                    "type": "gradient_canvas",
+                    "path": debug_canvas_path,
                 })
+            else:
+                if session.upload_path:
+                    ref_images_for_history.append({"type": "primary", "path": session.upload_path})
+                if session.style_reference_path:
+                    ref_images_for_history.append({"type": "style_reference", "path": session.style_reference_path})
+                if request.previous_module_path:
+                    ref_images_for_history.append({
+                        "type": f"previous_module_{request.module_index - 1}",
+                        "path": request.previous_module_path,
+                    })
 
             # Map module_index to ImageTypeEnum (aplus_0 .. aplus_4)
             aplus_image_type = DBImageTypeEnum(f"aplus_{request.module_index}")

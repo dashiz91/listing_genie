@@ -202,7 +202,11 @@ class GeminiService:
         max_retries: int = 3
     ) -> Optional[PILImage.Image]:
         """
-        Generate an image using Gemini with a PIL Image reference.
+        Generate an image using Gemini with a PIL Image as reference.
+
+        The reference image is sent alongside the prompt so Gemini can see it
+        and use it as visual context. Used for canvas inpainting where the
+        gradient canvas is the reference Gemini should "complete."
 
         Args:
             prompt: The generation prompt
@@ -217,14 +221,29 @@ class GeminiService:
         if not self.client:
             raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
 
-        # Prepare contents
-        contents = [prompt, reference_image]
+        # Prepare contents — image FIRST so Gemini "sees" it before reading instructions.
+        # Critical for canvas inpainting: model must process the visual (top portion +
+        # blank bottom) before receiving the "complete this" instruction.
+        contents = [reference_image, prompt]
+
+        # === LOGGING ===
+        logger.info("=" * 80)
+        logger.info("[GEMINI GEN PIL] === GENERATE WITH PIL REFERENCE ===")
+        logger.info(f"[GEMINI GEN PIL] Model: {self.model}")
+        logger.info(f"[GEMINI GEN PIL] Aspect Ratio: {aspect_ratio}")
+        logger.info(f"[GEMINI GEN PIL] Reference Image Size: {reference_image.size}")
+        logger.info("-" * 40)
+        logger.info("[GEMINI GEN PIL] PROMPT:")
+        for i, line in enumerate(prompt.split('\n')):
+            logger.info(f"[GEN PIL L{i+1:03d}] {line}")
+        logger.info("=" * 80)
 
         for attempt in range(max_retries):
             try:
-                logger.info(f"Generating image from PIL (attempt {attempt + 1}/{max_retries})")
+                logger.info(f"[GEMINI GEN PIL] Generating from PIL reference (attempt {attempt + 1}/{max_retries})")
 
-                response = self.client.models.generate_content(
+                # Use ASYNC API
+                response = await self.client.aio.models.generate_content(
                     model=self.model,
                     contents=contents,
                     config=types.GenerateContentConfig(
@@ -240,13 +259,14 @@ class GeminiService:
                 for part in response.candidates[0].content.parts:
                     if part.inline_data is not None:
                         image = PILImage.open(BytesIO(part.inline_data.data))
-                        logger.info(f"Image generated successfully: {image.size}")
+                        logger.info(f"[GEMINI GEN PIL] Image generated successfully: {image.size}")
                         return image
 
+                logger.warning("[GEMINI GEN PIL] No image in response")
                 return None
 
             except Exception as e:
-                logger.error(f"Generation attempt {attempt + 1} failed: {e}")
+                logger.error(f"[GEMINI GEN PIL] Generation attempt {attempt + 1} failed: {e}")
                 if attempt == max_retries - 1:
                     raise e
                 await asyncio.sleep(2 ** attempt)
@@ -346,6 +366,91 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
                 if attempt == max_retries - 1:
                     raise e
                 # Exponential backoff
+                await asyncio.sleep(2 ** attempt)
+
+        return None
+
+    async def edit_image_from_pil(
+        self,
+        source_image: PILImage.Image,
+        edit_instructions: str,
+        aspect_ratio: str = "5:4",
+        image_size: str = "1K",
+        max_retries: int = 3,
+        raw_prompt: bool = False
+    ) -> Optional[PILImage.Image]:
+        """
+        Edit an in-memory PIL Image using Gemini's image editing capability.
+
+        Args:
+            source_image: PIL Image object to edit
+            edit_instructions: What to change / complete
+            aspect_ratio: Output aspect ratio (default 5:4 for canvas inpainting)
+            image_size: Output resolution
+            max_retries: Number of retry attempts
+            raw_prompt: If True, send edit_instructions as-is without wrapping
+                        in the generic edit template. Essential for canvas inpainting
+                        where the prompt is already carefully crafted.
+
+        Returns:
+            PIL Image object with edits applied, or None if failed
+        """
+        if not self.client:
+            raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
+
+        if raw_prompt:
+            prompt = edit_instructions
+        else:
+            prompt = f"""Edit this image. {edit_instructions}
+
+IMPORTANT: Keep all other elements exactly the same.
+Only modify what was specifically requested.
+Maintain the same style, colors, layout, composition, and any text/graphics not mentioned."""
+
+        contents = [prompt, source_image]
+
+        # === LOGGING ===
+        logger.info("=" * 80)
+        logger.info("[GEMINI EDIT PIL] === EDIT FROM PIL IMAGE ===")
+        logger.info(f"[GEMINI EDIT PIL] Model: {self.model}")
+        logger.info(f"[GEMINI EDIT PIL] Aspect Ratio: {aspect_ratio}")
+        logger.info(f"[GEMINI EDIT PIL] Raw Prompt: {raw_prompt}")
+        logger.info(f"[GEMINI EDIT PIL] Source Image Size: {source_image.size}")
+        logger.info("-" * 40)
+        logger.info("[GEMINI EDIT PIL] PROMPT:")
+        for i, line in enumerate(prompt.split('\n')):
+            logger.info(f"[EDIT PIL L{i+1:03d}] {line}")
+        logger.info("=" * 80)
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"[GEMINI EDIT PIL] Editing image (attempt {attempt + 1}/{max_retries})")
+
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_modalities=['Image'],
+                        image_config=types.ImageConfig(
+                            aspect_ratio=aspect_ratio,
+                            image_size=image_size
+                        )
+                    )
+                )
+
+                for part in response.candidates[0].content.parts:
+                    if part.inline_data is not None:
+                        image = PILImage.open(BytesIO(part.inline_data.data))
+                        logger.info(f"Image edited from PIL successfully: {image.size}")
+                        return image
+
+                logger.warning("No image in edit-from-PIL response")
+                return None
+
+            except Exception as e:
+                logger.error(f"Edit-from-PIL attempt {attempt + 1} failed: {e}")
+                if attempt == max_retries - 1:
+                    raise e
                 await asyncio.sleep(2 ** attempt)
 
         return None

@@ -405,6 +405,7 @@ export interface AplusVisualScriptModule {
   role: string;
   headline: string;
   mood: string;
+  scene_description?: string;  // 50-100 word scene description for canvas inpainting
   generation_prompt?: string;  // Full pre-written prompt (new format)
   // Legacy fields (optional for backward compat with old visual scripts)
   product_angle?: string;
