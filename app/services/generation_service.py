@@ -247,6 +247,7 @@ class GenerationService:
         prompt_text: str,
         user_feedback: Optional[str] = None,
         change_summary: Optional[str] = None,
+        reference_image_paths: Optional[List[Dict]] = None,
     ) -> PromptHistory:
         """
         Store a prompt in the history for future reference.
@@ -259,6 +260,8 @@ class GenerationService:
             prompt_text: The actual prompt sent to image generator
             user_feedback: User feedback that triggered this version (null for v1)
             change_summary: AI's interpretation of changes made
+            reference_image_paths: Actual reference images passed to generation
+                Format: [{"type": "primary", "path": "..."}, {"type": "previous_module", "path": "..."}]
 
         Returns:
             Created PromptHistory record
@@ -278,6 +281,7 @@ class GenerationService:
             prompt_text=prompt_text,
             user_feedback=user_feedback,
             change_summary=change_summary,
+            reference_image_paths=reference_image_paths,
         )
 
         self.db.add(history)
@@ -1573,15 +1577,20 @@ Make it count.
         session.status = GenerationStatusEnum.PROCESSING
         self.db.commit()
 
-        logger.info(f"Starting PARALLEL generation of all 5 images for session {session.id}")
+        logger.info(f"Starting SEQUENTIAL generation of all 5 images for session {session.id}")
 
-        # Generate all 5 images IN PARALLEL using asyncio.gather
-        # This is 5x faster than sequential generation!
-        results = await asyncio.gather(
-            *[self.generate_single_image(session, image_type) for image_type in self.IMAGE_TYPES]
-        )
+        # Generate all 5 images SEQUENTIALLY (one at a time)
+        # This allows the frontend to show progress as each image completes
+        results = []
+        for i, image_type in enumerate(self.IMAGE_TYPES):
+            logger.info(f"Generating image {i+1}/5: {image_type.value}")
+            result = await self.generate_single_image(session, image_type)
+            results.append(result)
+            # Commit after each image so frontend can poll and see progress
+            self.db.commit()
+            logger.info(f"Completed image {i+1}/5: {image_type.value} - status: {result.status}")
 
-        logger.info(f"All 5 images generated in parallel for session {session.id}")
+        logger.info(f"All 5 images generated sequentially for session {session.id}")
 
         # Update session status based on results
         complete_count = sum(1 for r in results if r.status == SchemaStatus.COMPLETE)

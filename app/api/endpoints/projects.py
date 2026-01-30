@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from app.dependencies import get_db, get_storage_service
 from app.core.auth import User, get_current_user
-from app.models.database import GenerationSession, ImageRecord, GenerationStatusEnum
+from app.models.database import GenerationSession, ImageRecord, GenerationStatusEnum, DesignContext
 from app.services.supabase_storage_service import SupabaseStorageService
 
 logger = logging.getLogger(__name__)
@@ -56,8 +56,16 @@ class ProjectImageDetail(BaseModel):
     error_message: Optional[str] = None
 
 
+class AplusModuleDetail(BaseModel):
+    """A+ module info for project restoration"""
+    module_index: int
+    module_type: str
+    image_url: Optional[str] = None
+    image_path: Optional[str] = None
+
+
 class ProjectDetailResponse(BaseModel):
-    """Full project detail"""
+    """Full project detail with all session fields for state restoration"""
     session_id: str
     product_title: str
     status: str
@@ -65,6 +73,29 @@ class ProjectDetailResponse(BaseModel):
     completed_at: Optional[str] = None
     brand_name: Optional[str] = None
     images: List[ProjectImageDetail]
+    # Form fields
+    feature_1: Optional[str] = None
+    feature_2: Optional[str] = None
+    feature_3: Optional[str] = None
+    target_audience: Optional[str] = None
+    global_note: Optional[str] = None
+    # Upload paths
+    upload_path: Optional[str] = None
+    additional_upload_paths: Optional[List[str]] = None
+    # Brand & style
+    brand_colors: Optional[List[str]] = None
+    color_palette: Optional[List[str]] = None
+    color_count: Optional[int] = None
+    logo_path: Optional[str] = None
+    style_reference_path: Optional[str] = None
+    # Design framework (full JSON)
+    design_framework: Optional[dict] = None
+    # Product analysis from DesignContext
+    product_analysis: Optional[dict] = None
+    product_analysis_summary: Optional[str] = None
+    # A+ Content
+    aplus_visual_script: Optional[dict] = None
+    aplus_modules: Optional[List[AplusModuleDetail]] = None
 
 
 class RenameRequest(BaseModel):
@@ -202,6 +233,50 @@ async def get_project_detail(
             error_message=img.error_message,
         ))
 
+    # Load DesignContext for product analysis
+    design_context = db.query(DesignContext).filter(
+        DesignContext.session_id == session_id
+    ).first()
+
+    # Build product analysis summary text from raw analysis
+    product_analysis_summary = None
+    if design_context and design_context.product_analysis:
+        pa = design_context.product_analysis
+        if isinstance(pa, dict):
+            product_analysis_summary = pa.get("summary") or pa.get("product_category", "")
+
+    # Load A+ modules — probe storage for existing A+ images
+    aplus_modules_list = None
+    # Determine slot count: from visual script if available, otherwise default 5
+    aplus_slot_count = 0
+    if session.aplus_visual_script:
+        aplus_slot_count = len(session.aplus_visual_script.get("modules", []))
+    if aplus_slot_count == 0:
+        # Probe default 5 slots even without a visual script
+        aplus_slot_count = 5
+
+    aplus_modules_list = []
+    for i in range(aplus_slot_count):
+        storage_key = f"aplus_full_image_{i}"
+        try:
+            url = storage.get_generated_url(session.id, storage_key, expires_in=3600)
+            aplus_modules_list.append(AplusModuleDetail(
+                module_index=i,
+                module_type="full_image",
+                image_url=url,
+                image_path=f"supabase://generated/{session.id}/{storage_key}.png",
+            ))
+        except Exception:
+            # Module not generated yet — empty slot
+            aplus_modules_list.append(AplusModuleDetail(
+                module_index=i,
+                module_type="full_image",
+            ))
+
+    # Only return A+ data if at least one module has an image
+    if not any(m.image_url for m in aplus_modules_list):
+        aplus_modules_list = None
+
     return ProjectDetailResponse(
         session_id=session.id,
         product_title=session.product_title,
@@ -210,6 +285,29 @@ async def get_project_detail(
         completed_at=session.completed_at.isoformat() if session.completed_at else None,
         brand_name=session.brand_name,
         images=images,
+        # Form fields
+        feature_1=session.feature_1,
+        feature_2=session.feature_2,
+        feature_3=session.feature_3,
+        target_audience=session.target_audience,
+        global_note=session.global_note,
+        # Upload paths
+        upload_path=session.upload_path,
+        additional_upload_paths=session.additional_upload_paths or [],
+        # Brand & style
+        brand_colors=session.brand_colors or [],
+        color_palette=session.color_palette or [],
+        color_count=session.color_count,
+        logo_path=session.logo_path,
+        style_reference_path=session.style_reference_path,
+        # Design framework
+        design_framework=session.design_framework_json,
+        # Product analysis
+        product_analysis=design_context.product_analysis if design_context else None,
+        product_analysis_summary=product_analysis_summary,
+        # A+ Content
+        aplus_visual_script=session.aplus_visual_script,
+        aplus_modules=aplus_modules_list,
     )
 
 

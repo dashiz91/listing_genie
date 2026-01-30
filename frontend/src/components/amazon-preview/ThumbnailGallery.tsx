@@ -80,18 +80,17 @@ const SortableThumbnail: React.FC<SortableThumbnailProps> = ({
     <button
       ref={setNodeRef}
       style={style}
-      onClick={() => isComplete && onSelect()}
-      disabled={!isComplete}
+      onClick={() => onSelect()}
       role="option"
       aria-selected={isSelected}
       aria-label={`${image.label || `Image ${index + 1}`}${isSelected ? ' (selected)' : ''}${isProcessing ? ' (loading)' : ''}${isDraggingEnabled && isComplete ? ' - drag to reorder' : ''}`}
       className={cn(
-        'relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-200',
+        'relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer',
         'focus:outline-none focus:ring-2 focus:ring-redd-500 focus:ring-offset-2 focus:ring-offset-slate-50',
         isSelected
           ? 'border-redd-500 ring-2 ring-redd-500/30 scale-105'
           : 'border-slate-300 hover:border-slate-400 hover:scale-102',
-        !isComplete && 'opacity-50 cursor-not-allowed',
+        !isComplete && !isProcessing && 'opacity-70',
         isDragging && 'shadow-lg scale-110 cursor-grabbing',
         isDraggingEnabled && isComplete && !isDragging && 'cursor-grab'
       )}
@@ -250,18 +249,17 @@ export const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
         return (
           <button
             key={image.type}
-            onClick={() => isComplete && onSelect(image.type)}
-            disabled={!isComplete}
+            onClick={() => onSelect(image.type)}
             role="option"
             aria-selected={isSelected}
             aria-label={`${image.label || `Image ${index + 1}`}${isSelected ? ' (selected)' : ''}${isProcessing ? ' (loading)' : ''}`}
             className={cn(
-              'relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-200',
+              'relative w-14 h-14 md:w-16 md:h-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer',
               'focus:outline-none focus:ring-2 focus:ring-redd-500 focus:ring-offset-2 focus:ring-offset-slate-50',
               isSelected
                 ? 'border-redd-500 ring-2 ring-redd-500/30 scale-105'
                 : 'border-slate-300 hover:border-slate-400 hover:scale-102',
-              !isComplete && 'opacity-50 cursor-not-allowed'
+              !isComplete && !isProcessing && 'opacity-70'
             )}
           >
             {/* Image number badge */}

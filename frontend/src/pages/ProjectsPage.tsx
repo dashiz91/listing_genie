@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import {
   Select,
@@ -18,6 +18,7 @@ import type { ProjectListItem } from '../api/types';
 const PAGE_SIZE = 12;
 
 export const ProjectsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -301,6 +302,7 @@ export const ProjectsPage: React.FC = () => {
                 key={project.session_id}
                 project={project}
                 onClick={() => setSelectedProject(project.session_id)}
+                onContinue={() => navigate(`/app?project=${project.session_id}`)}
                 onRename={() => setRenameModal({ id: project.session_id, title: project.product_title })}
                 onDelete={() => setDeleteModal({ id: project.session_id, title: project.product_title })}
               />

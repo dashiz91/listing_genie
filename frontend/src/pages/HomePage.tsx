@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { SplitScreenLayout, WorkshopPanel, ShowroomPanel } from '../components/split-layout';
 import type { WorkshopFormData } from '../components/split-layout';
@@ -9,7 +10,10 @@ import type {
   SessionImage,
   GenerationStatus,
   DesignFramework,
+  AplusVisualScript,
 } from '../api/types';
+import type { AplusModule } from '../components/preview-slots/AplusSection';
+import type { SlotStatus } from '../components/preview-slots/ImageSlot';
 
 // Helper to extract error message from various error formats
 const extractErrorMessage = (err: any, fallback: string): string => {
@@ -61,9 +65,14 @@ const initialFormData: WorkshopFormData = {
   colorCount: null,
   colorPalette: [],
   globalNote: '',
+  styleCount: 4, // Default to 4 style options
 };
 
 export const HomePage: React.FC = () => {
+  // URL params for project loading
+  const [searchParams, setSearchParams] = useSearchParams();
+  const projectParam = searchParams.get('project');
+
   // Health check state
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -83,17 +92,159 @@ export const HomePage: React.FC = () => {
 
   // Generation state
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const sessionCreatingRef = useRef<Promise<string> | null>(null);
   const [generationStatus, setGenerationStatus] = useState<GenerationStatus>('pending');
   const [images, setImages] = useState<SessionImage[]>([]);
+
+  // Keep ref in sync with state
+  const updateSessionId = useCallback((id: string | null) => {
+    sessionIdRef.current = id;
+    setSessionId(id);
+  }, []);
 
   // UI state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<string[]>(['photos', 'product']);
+  const [_isLoadingProject, setIsLoadingProject] = useState(false);
 
   // Uploaded paths (for API calls)
   const [logoPath, setLogoPath] = useState<string | null>(null);
+
+  // A+ Content modules state — default 5x full-width banners (1464x600)
+  const [aplusModules, setAplusModules] = useState<AplusModule[]>(() => {
+    return Array.from({ length: 5 }, (_, i) => ({
+      id: `aplus-${i + 1}`,
+      type: 'full_image' as const,
+      index: i,
+      status: 'ready' as SlotStatus,
+    }));
+  });
+
+  // A+ Art Director visual script state
+  const [aplusVisualScript, setAplusVisualScript] = useState<AplusVisualScript | null>(null);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+
+  // Load project from URL param (?project= or ?session=)
+  useEffect(() => {
+    const loadProject = async () => {
+      const sessionParam = projectParam || searchParams.get('session');
+      if (!sessionParam) return;
+
+      setIsLoadingProject(true);
+      try {
+        const project = await apiClient.getProjectDetail(sessionParam);
+
+        // 1. Restore form data
+        setFormData((prev) => ({
+          ...prev,
+          productTitle: project.product_title,
+          brandName: project.brand_name || '',
+          feature1: project.feature_1 || '',
+          feature2: project.feature_2 || '',
+          feature3: project.feature_3 || '',
+          targetAudience: project.target_audience || '',
+          globalNote: project.global_note || '',
+          brandColors: project.brand_colors || [],
+          colorPalette: project.color_palette || [],
+          colorCount: project.color_count || null,
+          // Files can't be restored, but previews can via signed URLs
+          logoFile: null,
+          logoPreview: project.logo_path ? apiClient.getFileUrl(project.logo_path) : null,
+          styleReferenceFile: null,
+          // Don't show framework previews as user style references
+          styleReferencePreview:
+            project.style_reference_path &&
+            !project.style_reference_path.includes('framework_preview')
+              ? apiClient.getFileUrl(project.style_reference_path)
+              : null,
+        }));
+
+        // 2. Restore upload previews from paths
+        if (project.upload_path) {
+          const allPaths = [project.upload_path, ...(project.additional_upload_paths || [])];
+          const restoredUploads: UploadWithPreview[] = allPaths.map((path, idx) => ({
+            upload_id: `restored-${idx}`,
+            file_path: path,
+            filename: `product-${idx + 1}.png`,
+            size: 0,
+            preview_url: apiClient.getFileUrl(path),
+          }));
+          setUploads(restoredUploads);
+        }
+
+        // 3. Restore logo path for generation calls
+        if (project.logo_path) {
+          setLogoPath(project.logo_path);
+        }
+
+        // 4. Restore design framework
+        if (project.design_framework) {
+          const fw = project.design_framework as DesignFramework;
+          // If the framework has no preview_url, use the style_reference_path
+          // (which stores the framework preview image after selection)
+          if (!fw.preview_url && project.style_reference_path) {
+            fw.preview_url = apiClient.getFileUrl(project.style_reference_path);
+          }
+          setSelectedFramework(fw);
+          // Put it in frameworks array so the Workshop panel shows
+          // "Generate" instead of "Preview Styles"
+          setFrameworks([fw]);
+        }
+
+        // 5. Restore product analysis
+        if (project.product_analysis_summary) {
+          setProductAnalysis(project.product_analysis_summary);
+        }
+        if (project.product_analysis) {
+          setProductAnalysisRaw(project.product_analysis);
+        }
+
+        // 6. Restore session and images
+        updateSessionId(project.session_id);
+        setGenerationStatus(project.status as GenerationStatus);
+
+        const sessionImages: SessionImage[] = project.images.map((img) => ({
+          type: img.image_type,
+          status: img.status as 'complete' | 'processing' | 'failed' | 'pending',
+          label: getImageLabel(img.image_type),
+          url: img.image_url || undefined,
+          error: img.error_message || undefined,
+        }));
+        setImages(sessionImages);
+
+        // 7. Restore A+ Content state
+        if (project.aplus_visual_script) {
+          setAplusVisualScript(project.aplus_visual_script);
+        }
+        if (project.aplus_modules && project.aplus_modules.length > 0) {
+          setAplusModules(
+            project.aplus_modules.map((m, i) => ({
+              id: `aplus-${i + 1}`,
+              type: (m.module_type || 'full_image') as 'full_image',
+              index: m.module_index,
+              status: (m.image_url ? 'complete' : 'ready') as SlotStatus,
+              imageUrl: m.image_url || undefined,
+              imagePath: m.image_path || undefined,
+            }))
+          );
+        }
+
+        // Persist session in URL (replace ?project= with ?session=)
+        setSearchParams({ session: project.session_id }, { replace: true });
+      } catch (err) {
+        console.error('Failed to load project:', err);
+        setError('Failed to load project. It may have been deleted.');
+        setSearchParams({}, { replace: true });
+      } finally {
+        setIsLoadingProject(false);
+      }
+    };
+
+    loadProject();
+  }, [projectParam]);
 
   // Health check on mount
   useEffect(() => {
@@ -256,6 +407,7 @@ export const HomePage: React.FC = () => {
         color_mode: colorMode,
         locked_colors: lockedColors,
         style_reference_path: uploadedStyleRefPath,
+        framework_count: formData.styleCount, // Number of styles to generate (1-4)
       });
 
       setProductAnalysis(response.product_analysis);
@@ -275,9 +427,19 @@ export const HomePage: React.FC = () => {
   // Handle framework select
   const handleSelectFramework = useCallback((framework: DesignFramework) => {
     setSelectedFramework(framework);
-  }, []);
+    // Initialize pending images when framework is selected
+    if (images.length === 0 || images.every((img) => !img.url)) {
+      setImages([
+        { type: 'main', status: 'pending', label: 'Main Image' },
+        { type: 'infographic_1', status: 'pending', label: 'Infographic 1' },
+        { type: 'infographic_2', status: 'pending', label: 'Infographic 2' },
+        { type: 'lifestyle', status: 'pending', label: 'Lifestyle' },
+        { type: 'comparison', status: 'pending', label: 'Comparison' },
+      ]);
+    }
+  }, [images]);
 
-  // Handle generate
+  // Handle generate all
   const handleGenerate = useCallback(async () => {
     if (uploads.length === 0 || !selectedFramework) return;
 
@@ -316,8 +478,10 @@ export const HomePage: React.FC = () => {
         productAnalysisRaw || undefined
       );
 
-      setSessionId(response.session_id);
+      updateSessionId(response.session_id);
       setGenerationStatus(response.status);
+      // Persist session to URL for refresh resilience
+      setSearchParams({ session: response.session_id }, { replace: true });
 
       // Convert to SessionImage format
       const sessionImages: SessionImage[] = response.images.map((img) => ({
@@ -337,7 +501,120 @@ export const HomePage: React.FC = () => {
       setError(extractErrorMessage(err, 'Failed to generate images. Please try again.'));
       setIsGenerating(false);
     }
-  }, [uploads, formData, selectedFramework, logoPath, productAnalysisRaw]);
+  }, [uploads, formData, selectedFramework, logoPath, productAnalysisRaw, setSearchParams]);
+
+  // Helper: ensure a session exists (fast — create_only, no image generation)
+  // Uses a mutex (ref) to prevent duplicate session creation when multiple slots are clicked concurrently
+  const ensureSession = useCallback(async (): Promise<string> => {
+    // Already have a session
+    if (sessionIdRef.current) return sessionIdRef.current;
+
+    // Another call is already creating the session — wait for it
+    if (sessionCreatingRef.current) {
+      return sessionCreatingRef.current;
+    }
+
+    const primaryUpload = uploads[0];
+    const keywords = formData.keywords
+      .split(',')
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0)
+      .map((keyword) => ({ keyword, intents: [] }));
+
+    // Create session only (no generation) — returns fast
+    const creationPromise = (async () => {
+      const response = await apiClient.generateWithFramework(
+        {
+          product_title: formData.productTitle,
+          feature_1: formData.feature1 || undefined,
+          feature_2: formData.feature2 || undefined,
+          feature_3: formData.feature3 || undefined,
+          target_audience: formData.targetAudience || undefined,
+          keywords,
+          upload_path: primaryUpload.file_path,
+          additional_upload_paths: uploads.slice(1).map((u) => u.file_path),
+          brand_name: formData.brandName || undefined,
+          brand_colors: formData.brandColors,
+          logo_path: logoPath || undefined,
+          style_reference_path: selectedFramework!.preview_path || undefined,
+          global_note: formData.globalNote || undefined,
+        },
+        selectedFramework!,
+        productAnalysisRaw || undefined,
+        undefined,  // no singleImageType
+        true  // create_only — fast, no generation
+      );
+
+      updateSessionId(response.session_id);
+      setGenerationStatus(response.status);
+      // Persist session to URL for refresh resilience
+      setSearchParams({ session: response.session_id }, { replace: true });
+
+      // Set initial images (all pending)
+      const sessionImages: SessionImage[] = response.images.map((img) => ({
+        type: img.image_type,
+        status: img.status,
+        label: getImageLabel(img.image_type),
+        url: img.storage_path,
+        error: img.error_message,
+      }));
+      setImages(sessionImages);
+
+      return response.session_id;
+    })();
+
+    sessionCreatingRef.current = creationPromise;
+
+    try {
+      return await creationPromise;
+    } finally {
+      sessionCreatingRef.current = null;
+    }
+  }, [uploads, selectedFramework, formData, logoPath, productAnalysisRaw, updateSessionId, setSearchParams]);
+
+  // Handle generate single image (when clicking individual slot) — fire-and-forget, concurrent
+  const handleGenerateSingle = useCallback(
+    async (imageType: string) => {
+      if (uploads.length === 0 || !selectedFramework) return;
+
+      // Set image to processing immediately
+      setImages((prev) =>
+        prev.map((img) => (img.type === imageType ? { ...img, status: 'processing' as const } : img))
+      );
+      setError(null);
+
+      try {
+        // Ensure we have a session (fast — create_only, no generation)
+        const currentSessionId = await ensureSession();
+
+        // Generate this single image via /single endpoint
+        const result = await apiClient.regenerateSingleImage(currentSessionId, imageType);
+
+        setImages((prev) =>
+          prev.map((img) =>
+            img.type === imageType
+              ? {
+                  ...img,
+                  status: result.status as 'pending' | 'processing' | 'complete' | 'failed',
+                  url: result.storage_path,
+                  error: result.error_message,
+                }
+              : img
+          )
+        );
+      } catch (err: any) {
+        console.error('Single image generation failed:', err);
+        setImages((prev) =>
+          prev.map((img) =>
+            img.type === imageType
+              ? { ...img, status: 'failed' as const, error: err.message || 'Generation failed' }
+              : img
+          )
+        );
+      }
+    },
+    [uploads, selectedFramework, ensureSession]
+  );
 
   // Handle retry
   const handleRetry = useCallback(async () => {
@@ -434,6 +711,168 @@ export const HomePage: React.FC = () => {
     [sessionId]
   );
 
+  // Ensure visual script exists (auto-generate if missing)
+  const ensureVisualScript = useCallback(async (sid: string): Promise<AplusVisualScript | null> => {
+    if (aplusVisualScript) return aplusVisualScript;
+
+    setIsGeneratingScript(true);
+    try {
+      const response = await apiClient.generateAplusVisualScript(sid, 5);
+      setAplusVisualScript(response.visual_script);
+      return response.visual_script;
+    } catch (err: any) {
+      console.error('Visual script generation failed:', err);
+      return null; // Will fall back to legacy prompts
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  }, [aplusVisualScript]);
+
+  // Handle generate A+ module
+  const handleGenerateAplusModule = useCallback(
+    async (moduleIndex: number) => {
+      if (!sessionId) return;
+
+      const module = aplusModules[moduleIndex];
+      if (!module) return;
+
+      // Set module to generating
+      setAplusModules((prev) =>
+        prev.map((m, idx) =>
+          idx === moduleIndex ? { ...m, status: 'generating' as SlotStatus } : m
+        )
+      );
+
+      try {
+        // Auto-generate visual script if missing
+        await ensureVisualScript(sessionId);
+
+        // Get previous module path for chaining (if not first module)
+        const prevModule = moduleIndex > 0 ? aplusModules[moduleIndex - 1] : null;
+        const previousModulePath = prevModule?.imagePath;
+
+        // Call API to generate A+ module
+        const result = await apiClient.generateAplusModule({
+          session_id: sessionId,
+          module_type: module.type,
+          module_index: moduleIndex,
+          previous_module_path: previousModulePath,
+        });
+
+        // Update module with result
+        setAplusModules((prev) =>
+          prev.map((m, idx) =>
+            idx === moduleIndex
+              ? {
+                  ...m,
+                  status: 'complete' as SlotStatus,
+                  imageUrl: result.image_url,
+                  imagePath: result.image_path,
+                  promptText: result.prompt_text,
+                }
+              : m
+          )
+        );
+      } catch (err: any) {
+        console.error('A+ module generation failed:', err);
+        setAplusModules((prev) =>
+          prev.map((m, idx) =>
+            idx === moduleIndex
+              ? {
+                  ...m,
+                  status: 'error' as SlotStatus,
+                  errorMessage: extractErrorMessage(err, 'A+ generation failed'),
+                }
+              : m
+          )
+        );
+      }
+    },
+    [sessionId, aplusModules, ensureVisualScript]
+  );
+
+  // Handle generate ALL A+ modules sequentially with Art Director
+  const handleGenerateAllAplus = useCallback(async () => {
+    if (!sessionId) return;
+
+    setIsGeneratingScript(true);
+    try {
+      // Step 1: Generate visual script
+      await ensureVisualScript(sessionId);
+      setIsGeneratingScript(false);
+
+      // Step 2: Generate modules sequentially (0 → 4)
+      let prevPath: string | undefined;
+      for (let i = 0; i < aplusModules.length; i++) {
+        // Mark current as generating
+        setAplusModules((prev) =>
+          prev.map((m, idx) =>
+            idx === i ? { ...m, status: 'generating' as SlotStatus } : m
+          )
+        );
+
+        try {
+          const result = await apiClient.generateAplusModule({
+            session_id: sessionId,
+            module_type: 'full_image',
+            module_index: i,
+            previous_module_path: prevPath,
+          });
+
+          prevPath = result.image_path;
+
+          setAplusModules((prev) =>
+            prev.map((m, idx) =>
+              idx === i
+                ? {
+                    ...m,
+                    status: 'complete' as SlotStatus,
+                    imageUrl: result.image_url,
+                    imagePath: result.image_path,
+                    promptText: result.prompt_text,
+                  }
+                : m
+            )
+          );
+        } catch (err: any) {
+          console.error(`A+ module ${i} generation failed:`, err);
+          setAplusModules((prev) =>
+            prev.map((m, idx) =>
+              idx === i
+                ? {
+                    ...m,
+                    status: 'error' as SlotStatus,
+                    errorMessage: extractErrorMessage(err, 'A+ generation failed'),
+                  }
+                : m
+            )
+          );
+          break; // Stop chain on error
+        }
+      }
+    } catch (err: any) {
+      console.error('A+ generation failed:', err);
+      setIsGeneratingScript(false);
+    }
+  }, [sessionId, aplusModules, ensureVisualScript]);
+
+  // Handle regenerate A+ module
+  const handleRegenerateAplusModule = useCallback(
+    async (moduleIndex: number) => {
+      // Reset module status and regenerate
+      setAplusModules((prev) =>
+        prev.map((m, idx) =>
+          idx === moduleIndex
+            ? { ...m, status: 'ready' as SlotStatus, imageUrl: undefined, imagePath: undefined, errorMessage: undefined }
+            : m
+        )
+      );
+      // Trigger generation
+      handleGenerateAplusModule(moduleIndex);
+    },
+    [handleGenerateAplusModule]
+  );
+
   // Handle start over
   const handleStartOver = useCallback(() => {
     setUploads([]);
@@ -442,7 +881,7 @@ export const HomePage: React.FC = () => {
     setSelectedFramework(null);
     setProductAnalysis('');
     setProductAnalysisRaw(null);
-    setSessionId(null);
+    updateSessionId(null);
     setGenerationStatus('pending');
     setImages([]);
     setIsAnalyzing(false);
@@ -450,6 +889,19 @@ export const HomePage: React.FC = () => {
     setLogoPath(null);
     setError(null);
     setExpandedSections(['photos', 'product']);
+    // Clear session from URL
+    setSearchParams({}, { replace: true });
+    // Reset A+ modules and visual script
+    setAplusVisualScript(null);
+    setIsGeneratingScript(false);
+    setAplusModules(
+      Array.from({ length: 5 }, (_, i) => ({
+        id: `aplus-${i + 1}`,
+        type: 'full_image' as const,
+        index: i,
+        status: 'ready' as SlotStatus,
+      }))
+    );
   }, []);
 
   const isGeminiConfigured = health?.dependencies?.gemini === 'configured';
@@ -511,8 +963,17 @@ export const HomePage: React.FC = () => {
             targetAudience={formData.targetAudience}
             productImages={uploads}
             selectedFramework={selectedFramework || undefined}
+            isAnalyzing={isAnalyzing}
             sessionId={sessionId || undefined}
             images={images}
+            aplusModules={aplusModules}
+            aplusVisualScript={aplusVisualScript}
+            isGeneratingScript={isGeneratingScript}
+            onGenerateAplusModule={handleGenerateAplusModule}
+            onRegenerateAplusModule={handleRegenerateAplusModule}
+            onGenerateAllAplus={handleGenerateAllAplus}
+            onGenerateSingle={handleGenerateSingle}
+            onGenerateAll={handleGenerate}
             onRegenerateSingle={handleRegenerateSingle}
             onEditSingle={handleEditSingle}
             onRetry={handleRetry}

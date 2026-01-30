@@ -12,6 +12,7 @@ import type { ProjectListItem, GenerationStatus } from '../api/types';
 interface ProjectCardProps {
   project: ProjectListItem;
   onClick: () => void;
+  onContinue: () => void;
   onRename: () => void;
   onDelete: () => void;
 }
@@ -27,6 +28,7 @@ const statusConfig: Record<GenerationStatus, { label: string; variant: 'default'
 export const ProjectCard: React.FC<ProjectCardProps> = ({
   project,
   onClick,
+  onContinue,
   onRename,
   onDelete,
 }) => {
@@ -102,6 +104,19 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="bg-slate-800 border-slate-700">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onContinue();
+                }}
+                className="text-slate-300 hover:text-white hover:bg-slate-700 cursor-pointer"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Continue Editing
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={(e) => {
                   e.stopPropagation();

@@ -25,6 +25,12 @@ class ImageTypeEnum(enum.Enum):
     COMPARISON = "comparison"
     # Style previews
     STYLE_PREVIEW = "style_preview"
+    # A+ Content modules (0-indexed)
+    APLUS_0 = "aplus_0"
+    APLUS_1 = "aplus_1"
+    APLUS_2 = "aplus_2"
+    APLUS_3 = "aplus_3"
+    APLUS_4 = "aplus_4"
 
 
 class IntentTypeEnum(enum.Enum):
@@ -78,6 +84,9 @@ class GenerationSession(Base):
 
     # Global note/instructions applied to all image generations
     global_note = Column(Text, nullable=True)
+
+    # A+ Content: Art Director visual script (JSON plan for all modules)
+    aplus_visual_script = Column(JSON, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime, default=func.now())
@@ -185,6 +194,10 @@ class PromptHistory(Base):
 
     # The prompt that was sent to image generator
     prompt_text = Column(Text, nullable=False)
+
+    # Actual reference images passed to the generation call
+    # Format: [{"type": "primary", "path": "supabase://..."}, {"type": "previous_module", "path": "..."}]
+    reference_image_paths = Column(JSON, nullable=True)
 
     # User feedback that triggered this version (null for v1)
     user_feedback = Column(Text, nullable=True)

@@ -2,7 +2,8 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/api/client';
-import type { SessionImage, DesignFramework, PromptHistory } from '@/api/types';
+import type { SessionImage, DesignFramework } from '@/api/types';
+import { PromptModal } from '@/components/PromptModal';
 import { ThumbnailGallery } from './ThumbnailGallery';
 import { MainImageViewer } from './MainImageViewer';
 import { ProductInfoPanel } from './ProductInfoPanel';
@@ -11,6 +12,8 @@ import { QuickEditBar } from './QuickEditBar';
 import { VersionNavigator } from './VersionNavigator';
 import { SaveConfirmModal } from './SaveConfirmModal';
 import { CelebrationOverlay } from './CelebrationOverlay';
+import { AmazonHeader } from './AmazonHeader';
+import { AmazonBreadcrumbs } from './AmazonBreadcrumbs';
 import {
   Sheet,
   SheetContent,
@@ -44,11 +47,15 @@ interface AmazonListingPreviewProps {
   targetAudience?: string;
 
   // Images
-  sessionId: string;
+  sessionId?: string;
   images: SessionImage[];
 
   // Design framework (for copy/colors)
   framework?: DesignFramework;
+
+  // Generation callbacks (for clickable slots)
+  onGenerateSingle?: (imageType: string) => void;
+  onGenerateAll?: () => void;
 
   // Callbacks (preserve existing functionality)
   onRetry?: () => void;
@@ -75,10 +82,16 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   features,
   sessionId,
   images,
+  framework,
+  onGenerateSingle,
+  onGenerateAll: _onGenerateAll, // Reserved for "Generate All" button
   onRegenerateSingle,
   onEditSingle,
   onStartOver,
 }) => {
+  void _onGenerateAll; // Reserved for future "Generate All" button
+  // Get accent color from framework
+  const accentColor = framework?.colors?.find((c) => c.role === 'primary')?.hex || '#C85A35';
   // Local state
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
   const [selectedImageType, setSelectedImageType] = useState<string>('main');
@@ -105,11 +118,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
-  // Prompt viewer state (dev mode)
+  // Prompt viewer state (dev mode) — image type string or null
   const [showPromptModal, setShowPromptModal] = useState<string | null>(null);
-  const [currentPrompt, setCurrentPrompt] = useState<PromptHistory | null>(null);
-  const [loadingPrompt, setLoadingPrompt] = useState(false);
-  const [promptError, setPromptError] = useState<string | null>(null);
 
   // Navigation
   const navigate = useNavigate();
@@ -185,12 +195,14 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   // Image URL with cache busting
   const getImageUrl = useCallback(
     (imageType: string) => {
+      if (!sessionId) return '';
       const baseUrl = apiClient.getImageUrl(sessionId, imageType);
       const cacheKey = imageCacheKey[imageType];
       return cacheKey ? `${baseUrl}?t=${cacheKey}` : baseUrl;
     },
     [sessionId, imageCacheKey]
   );
+
 
   // Navigate to previous version
   const handlePreviousVersion = useCallback(() => {
@@ -246,6 +258,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   // Download a single image
   const downloadImage = useCallback(
     async (imageType: string, label: string) => {
+      if (!sessionId) return;
       const url = apiClient.getImageUrl(sessionId, imageType);
       const response = await fetch(url);
       const blob = await response.blob();
@@ -344,24 +357,21 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   }, [editingImageType, editInstructions, onEditSingle]);
 
   // Handle view prompt (dev mode)
-  const handleViewPrompt = useCallback(async (imageType: string) => {
-    setLoadingPrompt(true);
-    setPromptError(null);
-    try {
-      const prompt = await apiClient.getImagePrompt(sessionId, imageType);
-      setCurrentPrompt(prompt);
-      setShowPromptModal(imageType);
-    } catch (err) {
-      console.error('Failed to load prompt:', err);
-      setPromptError('No prompt found for this image.');
-      setShowPromptModal(imageType);
-    } finally {
-      setLoadingPrompt(false);
-    }
+  const handleViewPrompt = useCallback((imageType: string) => {
+    if (sessionId) setShowPromptModal(imageType);
   }, [sessionId]);
 
-  // Check if selected image is processing
+  // Check if selected image is processing or pending
   const isSelectedProcessing = selectedImage?.status === 'processing';
+  const isSelectedPending = !selectedImage || selectedImage?.status === 'pending' || selectedImage?.status === 'failed';
+
+  // Handle generate single image
+  const handleGenerateSingle = useCallback(
+    (imageType: string) => {
+      onGenerateSingle?.(imageType);
+    },
+    [onGenerateSingle]
+  );
 
   // Count complete images
   const completeImageCount = useMemo(
@@ -434,7 +444,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
 
   // Export preview as PNG
   const handleExportImage = useCallback(async () => {
-    if (!previewContainerRef.current) return;
+    if (!previewContainerRef.current || !sessionId) return;
 
     setIsExporting(true);
     try {
@@ -573,68 +583,80 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
             </button>
           </div>
           {/* Fullscreen content */}
-          <div className="flex-1 overflow-auto p-8 flex items-center justify-center">
+          <div className="flex-1 overflow-auto p-4 md:p-8 flex items-center justify-center">
             <div
               ref={previewContainerRef}
               className={cn(
                 'rounded-xl overflow-hidden border border-slate-200 shadow-2xl',
-                'bg-white max-w-5xl w-full',
+                'bg-white max-w-6xl w-full',
                 deviceMode === 'mobile' ? 'max-w-sm' : ''
               )}
             >
-              {/* Desktop or Mobile layout - same as below */}
+              {/* Desktop or Mobile layout with Amazon header */}
               {deviceMode === 'desktop' ? (
-                <div className="grid grid-cols-12 gap-0">
-                  <div className="col-span-1 p-4 border-r border-slate-200 bg-slate-50">
-                    <ThumbnailGallery
-                      images={sortedImages}
-                      selectedType={selectedImageType}
-                      onSelect={setSelectedImageType}
-                      getImageUrl={getImageUrl}
-                      onReorder={handleReorder}
-                    />
-                  </div>
-                  <div className="col-span-6 p-6 border-r border-slate-200">
-                    <MainImageViewer
-                      imageUrl={getImageUrl(selectedImage?.type || 'main')}
-                      imageLabel={IMAGE_LABELS[selectedImage?.type || 'main'] || 'Image'}
-                      imageType={selectedImage?.type || 'main'}
-                      isProcessing={isSelectedProcessing}
-                    />
-                  </div>
-                  <div className="col-span-5 p-6 bg-white">
-                    <ProductInfoPanel
-                      productTitle={productTitle}
-                      brandName={brandName}
-                      features={features}
-                    />
+                <div className="flex flex-col">
+                  <AmazonHeader />
+                  <AmazonBreadcrumbs productTitle={productTitle} />
+                  <div className="grid grid-cols-12 gap-0 border-t border-slate-200">
+                    <div className="col-span-1 p-4 border-r border-slate-200 bg-white">
+                      <ThumbnailGallery
+                        images={sortedImages}
+                        selectedType={selectedImageType}
+                        onSelect={setSelectedImageType}
+                        getImageUrl={getImageUrl}
+                        onReorder={handleReorder}
+                      />
+                    </div>
+                    <div className="col-span-6 p-6 border-r border-slate-200 bg-white">
+                      <MainImageViewer
+                        imageUrl={getImageUrl(selectedImage?.type || 'main')}
+                        imageLabel={IMAGE_LABELS[selectedImage?.type || 'main'] || 'Image'}
+                        imageType={selectedImage?.type || 'main'}
+                        isProcessing={isSelectedProcessing}
+                        isPending={isSelectedPending}
+                        accentColor={accentColor}
+                        onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                      />
+                    </div>
+                    <div className="col-span-5 p-6 bg-white overflow-y-auto max-h-[600px]">
+                      <ProductInfoPanel
+                        productTitle={productTitle}
+                        brandName={brandName}
+                        features={features}
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col">
-                  <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-50">
-                    <span className="text-sm font-medium text-slate-700">amazon</span>
-                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
+                  <div className="bg-[#131921] px-3 py-2 flex items-center gap-3">
+                    <span className="text-white text-lg font-bold">amazon</span>
+                    <div className="flex-1 flex items-center bg-white rounded-md px-2 py-1.5">
+                      <svg className="w-4 h-4 text-[#565959]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input type="text" placeholder="Search" className="flex-1 ml-2 text-sm focus:outline-none" />
+                    </div>
                   </div>
-                  <div className="p-4">
+                  <div className="p-4 bg-white">
                     <MainImageViewer
                       imageUrl={getImageUrl(selectedImage?.type || 'main')}
                       imageLabel={IMAGE_LABELS[selectedImage?.type || 'main'] || 'Image'}
                       imageType={selectedImage?.type || 'main'}
                       isProcessing={isSelectedProcessing}
+                      isPending={isSelectedPending}
+                      accentColor={accentColor}
+                      onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
                     />
                   </div>
-                  <div className="flex gap-2 px-4 pb-4 overflow-x-auto">
+                  <div className="flex gap-2 px-4 pb-4 overflow-x-auto bg-white">
                     {sortedImages.map((image, index) => (
                       <button
                         key={image.type}
-                        onClick={() => image.status === 'complete' && setSelectedImageType(image.type)}
-                        disabled={image.status !== 'complete'}
+                        onClick={() => setSelectedImageType(image.type)}
                         className={cn(
                           'flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all',
-                          image.type === selectedImageType ? 'border-redd-500' : 'border-slate-200',
+                          image.type === selectedImageType ? 'border-[#FF9900]' : 'border-slate-200',
                           image.status !== 'complete' && 'opacity-50'
                         )}
                       >
@@ -648,7 +670,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                       </button>
                     ))}
                   </div>
-                  <div className="p-4 border-t border-slate-200">
+                  <div className="p-4 border-t border-slate-200 bg-white">
                     <ProductInfoPanel productTitle={productTitle} brandName={brandName} features={features} />
                   </div>
                 </div>
@@ -666,68 +688,94 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
       <div
         ref={!isFullscreen ? previewContainerRef : undefined}
         className={cn(
-          'rounded-xl overflow-hidden border border-slate-700',
+          'rounded-xl overflow-hidden border border-slate-300 shadow-lg',
           'bg-white', // Amazon-style white background
           deviceMode === 'mobile' ? 'max-w-sm mx-auto' : ''
         )}
       >
         {deviceMode === 'desktop' ? (
-          // Desktop Layout - Amazon-style grid with responsive breakpoints
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-0">
-            {/* Thumbnails Column - horizontal on tablet, vertical on desktop */}
-            <div className="order-2 md:order-1 md:col-span-1 p-3 md:p-4 border-t md:border-t-0 md:border-r border-slate-200 bg-slate-50">
-              <ThumbnailGallery
-                images={sortedImages}
-                selectedType={selectedImageType}
-                onSelect={setSelectedImageType}
-                getImageUrl={getImageUrl}
-                onReorder={handleReorder}
-                className="flex-row md:flex-col overflow-x-auto md:overflow-x-visible"
-              />
-            </div>
+          // Desktop Layout - Amazon-style with header
+          <div className="flex flex-col">
+            {/* Amazon Header */}
+            <AmazonHeader />
 
-            {/* Main Image Column */}
-            <div className="order-1 md:order-2 md:col-span-6 p-4 md:p-6 border-b md:border-b-0 md:border-r border-slate-200">
-              <MainImageViewer
-                imageUrl={getImageUrl(selectedImage?.type || 'main')}
-                imageLabel={IMAGE_LABELS[selectedImage?.type || 'main'] || 'Image'}
-                imageType={selectedImage?.type || 'main'}
-                isProcessing={isSelectedProcessing}
-              />
-            </div>
+            {/* Breadcrumbs */}
+            <AmazonBreadcrumbs
+              category="Home & Kitchen"
+              subcategory="Planters"
+              productTitle={productTitle}
+            />
 
-            {/* Product Info Column */}
-            <div className="order-3 md:col-span-5 p-4 md:p-6 bg-white">
-              <ProductInfoPanel
-                productTitle={productTitle}
-                brandName={brandName}
-                features={features}
-              />
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-0 border-t border-slate-200">
+              {/* Thumbnails Column */}
+              <div className="order-2 md:order-1 md:col-span-1 p-3 md:p-4 border-t md:border-t-0 md:border-r border-slate-200 bg-white">
+                <ThumbnailGallery
+                  images={sortedImages}
+                  selectedType={selectedImageType}
+                  onSelect={setSelectedImageType}
+                  getImageUrl={getImageUrl}
+                  onReorder={handleReorder}
+                  className="flex-row md:flex-col overflow-x-auto md:overflow-x-visible"
+                />
+              </div>
+
+              {/* Main Image Column */}
+              <div className="order-1 md:order-2 md:col-span-6 p-4 md:p-6 border-b md:border-b-0 md:border-r border-slate-200 bg-white">
+                <MainImageViewer
+                  imageUrl={getImageUrl(selectedImage?.type || 'main')}
+                  imageLabel={IMAGE_LABELS[selectedImage?.type || 'main'] || 'Image'}
+                  imageType={selectedImage?.type || 'main'}
+                  isProcessing={isSelectedProcessing}
+                  isPending={isSelectedPending}
+                  accentColor={accentColor}
+                  onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                />
+              </div>
+
+              {/* Product Info Column */}
+              <div className="order-3 md:col-span-5 p-4 md:p-6 bg-white overflow-y-auto max-h-[600px]">
+                <ProductInfoPanel
+                  productTitle={productTitle}
+                  brandName={brandName}
+                  features={features}
+                />
+              </div>
             </div>
           </div>
         ) : (
-          // Mobile Layout
+          // Mobile Layout - Amazon App Style
           <div className="flex flex-col">
             {/* Mobile Header */}
-            <div className="flex items-center justify-between p-3 border-b border-slate-200 bg-slate-50">
-              <span className="text-sm font-medium text-slate-700">amazon</span>
-              <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+            <div className="bg-[#131921] px-3 py-2 flex items-center gap-3">
+              <span className="text-white text-lg font-bold">amazon</span>
+              <div className="flex-1 flex items-center bg-white rounded-md px-2 py-1.5">
+                <svg className="w-4 h-4 text-[#565959]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search Amazon"
+                  className="flex-1 ml-2 text-sm text-slate-800 focus:outline-none"
+                />
+              </div>
             </div>
 
             {/* Main Image */}
-            <div className="p-4">
+            <div className="p-4 bg-white">
               <MainImageViewer
                 imageUrl={getImageUrl(selectedImage?.type || 'main')}
                 imageLabel={IMAGE_LABELS[selectedImage?.type || 'main'] || 'Image'}
                 imageType={selectedImage?.type || 'main'}
                 isProcessing={isSelectedProcessing}
+                isPending={isSelectedPending}
+                accentColor={accentColor}
+                onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
               />
             </div>
 
             {/* Horizontal Thumbnails */}
-            <div className="flex gap-2 px-4 pb-4 overflow-x-auto">
+            <div className="flex gap-2 px-4 pb-4 overflow-x-auto bg-white">
               {sortedImages.map((image, index) => {
                 const isSelected = image.type === selectedImageType;
                 const isComplete = image.status === 'complete';
@@ -873,239 +921,13 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
       />
 
       {/* Prompt Viewer Modal (Dev Mode) */}
-      {showPromptModal && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"
-          onClick={() => {
-            setShowPromptModal(null);
-            setCurrentPrompt(null);
-            setPromptError(null);
-          }}
-        >
-          <div
-            className="bg-slate-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden shadow-xl border border-slate-700"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/80">
-              <div>
-                <h3 className="text-lg font-semibold text-white">
-                  Prompt for {showPromptModal.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                  {currentPrompt && ` (v${currentPrompt.version})`}
-                </h3>
-                {currentPrompt?.created_at && (
-                  <p className="text-xs text-slate-400">
-                    Generated: {new Date(currentPrompt.created_at).toLocaleString()}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => {
-                  setShowPromptModal(null);
-                  setCurrentPrompt(null);
-                  setPromptError(null);
-                }}
-                className="text-slate-400 hover:text-white p-1 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {loadingPrompt ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-redd-500"></div>
-                  <span className="ml-2 text-slate-300">Loading prompt...</span>
-                </div>
-              ) : promptError ? (
-                <div className="p-4 bg-yellow-900/30 rounded border border-yellow-700">
-                  <p className="text-sm text-yellow-300">{promptError}</p>
-                </div>
-              ) : currentPrompt ? (
-                <div className="space-y-4">
-                  {/* Designer Context Section - Full transparency */}
-                  {currentPrompt.designer_context && (
-                    <details className="p-3 bg-purple-900/20 rounded border border-purple-500/30" open>
-                      <summary className="text-sm font-medium text-purple-300 cursor-pointer hover:text-purple-200">
-                        🧠 AI Designer Context (click to collapse)
-                      </summary>
-                      <div className="mt-3 space-y-3 text-sm">
-                        {/* Product Info */}
-                        <div className="p-2 bg-slate-700/50 rounded border border-purple-500/20">
-                          <p className="font-medium text-purple-300">Product Info:</p>
-                          <p className="text-slate-200">Title: {currentPrompt.designer_context.product_info.title}</p>
-                          {currentPrompt.designer_context.product_info.brand_name && (
-                            <p className="text-slate-300">Brand: {currentPrompt.designer_context.product_info.brand_name}</p>
-                          )}
-                          {currentPrompt.designer_context.product_info.target_audience && (
-                            <p className="text-slate-300">Audience: {currentPrompt.designer_context.product_info.target_audience}</p>
-                          )}
-                        </div>
-
-                        {/* Framework Summary */}
-                        {currentPrompt.designer_context.framework_summary && (
-                          <div className="p-2 bg-slate-700/50 rounded border border-purple-500/20">
-                            <p className="font-medium text-purple-300">
-                              Framework: {currentPrompt.designer_context.framework_summary.name}
-                            </p>
-                            <p className="text-slate-300 text-xs mt-1">
-                              {currentPrompt.designer_context.framework_summary.philosophy}
-                            </p>
-                            <p className="text-slate-400 text-xs mt-1">
-                              Voice: {currentPrompt.designer_context.framework_summary.brand_voice}
-                            </p>
-                            {/* Colors */}
-                            <div className="flex gap-1 mt-2">
-                              {currentPrompt.designer_context.framework_summary.colors.map((c, i) => (
-                                <div
-                                  key={i}
-                                  className="w-6 h-6 rounded border border-slate-500"
-                                  style={{ backgroundColor: c.hex }}
-                                  title={`${c.name} (${c.role}): ${c.hex}`}
-                                />
-                              ))}
-                            </div>
-                            {/* Typography */}
-                            <p className="text-xs text-slate-400 mt-2">
-                              Fonts: {currentPrompt.designer_context.framework_summary.typography.headline_font} / {currentPrompt.designer_context.framework_summary.typography.body_font}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Image-specific Copy */}
-                        {currentPrompt.designer_context.image_copy && (
-                          <div className="p-2 bg-slate-700/50 rounded border border-purple-500/20">
-                            <p className="font-medium text-purple-300">Copy for this image:</p>
-                            <p className="text-slate-200">"{currentPrompt.designer_context.image_copy.headline}"</p>
-                            {currentPrompt.designer_context.image_copy.feature_callouts && currentPrompt.designer_context.image_copy.feature_callouts.length > 0 && (
-                              <ul className="text-xs text-slate-300 mt-1 list-disc list-inside">
-                                {currentPrompt.designer_context.image_copy.feature_callouts.map((f, i) => (
-                                  <li key={i}>{f}</li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Global Note */}
-                        {currentPrompt.designer_context.global_note && (
-                          <div className="p-2 bg-yellow-900/20 rounded border border-yellow-500/30">
-                            <p className="font-medium text-yellow-300">Global Instructions:</p>
-                            <p className="text-yellow-200 text-xs">{currentPrompt.designer_context.global_note}</p>
-                          </div>
-                        )}
-
-                        {/* Product Analysis */}
-                        {currentPrompt.designer_context.product_analysis && (
-                          <div className="p-2 bg-slate-700/50 rounded border border-purple-500/20">
-                            <p className="font-medium text-purple-300">AI Product Analysis:</p>
-                            <pre className="text-xs text-slate-300 whitespace-pre-wrap mt-1 max-h-32 overflow-y-auto">
-                              {JSON.stringify(currentPrompt.designer_context.product_analysis, null, 2)}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    </details>
-                  )}
-
-                  {/* Reference Images Section */}
-                  {currentPrompt.reference_images && currentPrompt.reference_images.length > 0 && (
-                    <div className="p-3 bg-green-900/20 rounded border border-green-500/30">
-                      <p className="text-sm font-medium text-green-300 mb-2">
-                        🖼️ Reference Images Used ({currentPrompt.reference_images.length}):
-                      </p>
-                      <div className="flex flex-wrap gap-3">
-                        {currentPrompt.reference_images.map((ref, idx) => {
-                          const isStyleRef = ref.type === 'style_reference';
-                          return (
-                            <div
-                              key={idx}
-                              className={`flex flex-col items-center ${isStyleRef ? 'p-2 bg-blue-900/30 rounded-lg' : ''}`}
-                            >
-                              <img
-                                src={`/api/images/file?path=${encodeURIComponent(ref.path)}`}
-                                alt={ref.type}
-                                className={`object-cover rounded border ${
-                                  isStyleRef
-                                    ? 'w-24 h-24 border-blue-500 border-2'
-                                    : 'w-16 h-16 border-green-600'
-                                }`}
-                                onError={(e) => {
-                                  // Fallback for images that can't load
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                              />
-                              <span className={`text-xs mt-1 capitalize ${
-                                isStyleRef ? 'text-blue-300 font-semibold' : 'text-green-300'
-                              }`}>
-                                {isStyleRef ? '⭐ Style Reference' : ref.type.replace('_', ' ')}
-                              </span>
-                              {isStyleRef && (
-                                <span className="text-[10px] text-blue-400">
-                                  (AI follows this style)
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-green-400 mt-2">
-                        These images were sent to Gemini as visual context
-                      </p>
-                    </div>
-                  )}
-
-                  {/* User Feedback Section (if regeneration) */}
-                  {currentPrompt.user_feedback && (
-                    <div className="p-3 bg-yellow-900/20 rounded border border-yellow-500/30">
-                      <p className="text-sm font-medium text-yellow-300 mb-1">
-                        🔄 User Regeneration Request:
-                      </p>
-                      <p className="text-sm text-yellow-200">{currentPrompt.user_feedback}</p>
-                    </div>
-                  )}
-
-                  {/* AI Interpretation (if available) */}
-                  {currentPrompt.change_summary && (
-                    <div className="p-3 bg-blue-900/20 rounded border border-blue-500/30">
-                      <p className="text-sm font-medium text-blue-300 mb-1">
-                        🤖 AI Interpretation:
-                      </p>
-                      <p className="text-sm text-blue-200">{currentPrompt.change_summary}</p>
-                    </div>
-                  )}
-
-                  {/* Main Prompt Text */}
-                  <div>
-                    <p className="text-sm font-medium text-slate-200 mb-2">
-                      Full Prompt Sent to Gemini:
-                    </p>
-                    <pre className="whitespace-pre-wrap text-sm bg-slate-900 p-4 rounded border border-slate-600 font-mono text-slate-300 max-h-96 overflow-y-auto">
-                      {currentPrompt.prompt_text}
-                    </pre>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-700 bg-slate-800/80">
-              <button
-                onClick={() => {
-                  setShowPromptModal(null);
-                  setCurrentPrompt(null);
-                  setPromptError(null);
-                }}
-                className="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+      {showPromptModal && sessionId && (
+        <PromptModal
+          sessionId={sessionId}
+          imageType={showPromptModal}
+          title={`Prompt for ${showPromptModal.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`}
+          onClose={() => setShowPromptModal(null)}
+        />
       )}
     </div>
   );

@@ -77,6 +77,7 @@ export interface WorkshopFormData {
   colorCount: number | null;
   colorPalette: string[];
   globalNote: string;
+  styleCount: number; // Number of style frameworks to generate (1-4)
 }
 
 interface WorkshopPanelProps {
@@ -734,8 +735,8 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
         </div>
       </CollapsibleSection>
 
-      {/* Section 6: Design Framework (only show if frameworks available) */}
-      {frameworks.length > 0 && (
+      {/* Section 6: Design Framework - Show during analysis or when frameworks available */}
+      {(isAnalyzing || frameworks.length > 0) && (
         <CollapsibleSection
           title="Design Framework"
           icon={
@@ -746,7 +747,11 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
           isOpen={isSectionOpen('framework')}
           onToggle={() => toggleSection('framework')}
           badge={
-            selectedFramework ? (
+            isAnalyzing ? (
+              <span className="ml-2 px-2 py-0.5 bg-redd-500/20 text-redd-400 text-xs rounded-full animate-pulse">
+                Analyzing...
+              </span>
+            ) : selectedFramework ? (
               <span className="ml-2 px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">
                 Selected
               </span>
@@ -754,15 +759,65 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
           }
         >
           <div className="space-y-4">
+            {/* Loading Skeleton during analysis */}
+            {isAnalyzing && frameworks.length === 0 && (
+              <>
+                {/* AI Analysis skeleton */}
+                <div className="p-3 bg-slate-700/50 rounded-lg border border-slate-600 animate-pulse">
+                  <div className="h-3 w-20 bg-slate-600 rounded mb-2" />
+                  <div className="h-4 w-full bg-slate-600 rounded mb-1" />
+                  <div className="h-4 w-3/4 bg-slate-600 rounded" />
+                </div>
+
+                {/* Framework cards skeleton with shimmer */}
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].slice(0, formData.styleCount).map((i) => (
+                    <div
+                      key={i}
+                      className="relative rounded-lg border-2 border-slate-600 overflow-hidden"
+                    >
+                      {/* Shimmer overlay */}
+                      <div className="aspect-square bg-slate-700 relative overflow-hidden">
+                        <div
+                          className="absolute inset-0 animate-shimmer"
+                          style={{
+                            background: 'linear-gradient(90deg, transparent 0%, rgba(200,90,53,0.2) 50%, transparent 100%)',
+                            backgroundSize: '200% 100%',
+                          }}
+                        />
+                        {/* Pulsing icon */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-10 h-10 border-3 border-redd-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                            <span className="text-xs text-slate-400">Creating style {i}...</span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Name skeleton */}
+                      <div className="p-2 bg-slate-800">
+                        <div className="h-3 w-2/3 bg-slate-600 rounded animate-pulse" />
+                        <div className="flex gap-1 mt-2">
+                          {[1, 2, 3, 4].map((j) => (
+                            <div key={j} className="w-4 h-4 rounded-full bg-slate-600 animate-pulse" />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
             {/* Product Analysis */}
-            {productAnalysis && (
+            {productAnalysis && !isAnalyzing && (
               <div className="p-3 bg-slate-700/50 rounded-lg border border-slate-600">
                 <p className="text-xs font-medium text-redd-400 mb-1">AI Analysis</p>
                 <p className="text-sm text-slate-300">{productAnalysis}</p>
               </div>
             )}
 
-            {/* Framework Cards (mini) */}
+            {/* Framework Cards (mini) - only show when not analyzing */}
+            {!isAnalyzing && frameworks.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               {frameworks.map((framework) => {
                 const isSelected = selectedFramework?.framework_id === framework.framework_id;
@@ -817,6 +872,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                 );
               })}
             </div>
+            )}
           </div>
         </CollapsibleSection>
       )}
@@ -824,26 +880,52 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
       {/* Action Button */}
       <div className="pt-4 border-t border-slate-700">
         {frameworks.length === 0 ? (
-          // Analyze button
-          <button
-            onClick={onAnalyze}
-            disabled={!canAnalyze || isAnalyzing}
-            className={cn(
-              'w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all',
-              canAnalyze && !isAnalyzing
-                ? 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20'
-                : 'bg-slate-700 cursor-not-allowed'
-            )}
-          >
-            {isAnalyzing ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Analyzing Product...
-              </span>
-            ) : (
-              'Preview Design Styles'
-            )}
-          </button>
+          <div className="space-y-4">
+            {/* Style count selector */}
+            <div className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3">
+              <div>
+                <label className="text-sm font-medium text-white">Style Options</label>
+                <p className="text-xs text-slate-500 mt-0.5">How many design styles to preview</p>
+              </div>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4].map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => onFormChange({ styleCount: count })}
+                    className={cn(
+                      'w-9 h-9 rounded-lg font-medium transition-all',
+                      formData.styleCount === count
+                        ? 'bg-redd-500 text-white'
+                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-white'
+                    )}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Analyze button */}
+            <button
+              onClick={onAnalyze}
+              disabled={!canAnalyze || isAnalyzing}
+              className={cn(
+                'w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all',
+                canAnalyze && !isAnalyzing
+                  ? 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20'
+                  : 'bg-slate-700 cursor-not-allowed'
+              )}
+            >
+              {isAnalyzing ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Analyzing Product...
+                </span>
+              ) : (
+                `Preview ${formData.styleCount} Design Style${formData.styleCount > 1 ? 's' : ''}`
+              )}
+            </button>
+          </div>
         ) : (
           // Generate button
           <button

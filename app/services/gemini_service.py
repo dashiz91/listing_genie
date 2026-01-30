@@ -6,7 +6,7 @@ from google import genai
 from google.genai import types
 from PIL import Image as PILImage
 from pathlib import Path
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, Tuple, TYPE_CHECKING
 from io import BytesIO
 import asyncio
 import logging
@@ -72,6 +72,7 @@ class GeminiService:
         prompt: str,
         reference_image_path: Optional[str] = None,
         reference_image_paths: Optional[List[str]] = None,
+        named_images: Optional[List[Tuple[str, str]]] = None,
         aspect_ratio: str = "1:1",
         image_size: str = "1K",
         max_retries: int = 3
@@ -82,7 +83,10 @@ class GeminiService:
         Args:
             prompt: The generation prompt including style and context
             reference_image_path: Single reference image path (backwards compat)
-            reference_image_paths: List of reference image paths
+            reference_image_paths: List of reference image paths (unnamed)
+            named_images: List of (label, path) tuples — images are interleaved with
+                          text labels so the model can reference them by name.
+                          When provided, reference_image_path(s) are ignored.
             aspect_ratio: Output aspect ratio. Supported: 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9
             image_size: Output resolution. "1K" ($0.134), "2K" ($0.134), "4K" ($0.24). Default 1K for cost savings.
             max_retries: Number of retry attempts on failure
@@ -93,22 +97,36 @@ class GeminiService:
         if not self.client:
             raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
 
-        # Prepare contents: prompt + optional reference images
-        contents = [prompt]
+        contents = []
 
-        # Handle single path (backwards compat)
-        if reference_image_path and not reference_image_paths:
-            reference_image_paths = [reference_image_path]
-
-        # Add reference images if provided
-        if reference_image_paths:
-            for ref_path in reference_image_paths:
+        if named_images:
+            # New path: interleave text labels with images, then prompt last
+            for label, path in named_images:
                 try:
-                    reference_image = _load_image_from_path(ref_path)
-                    contents.append(reference_image)
+                    img = _load_image_from_path(path)
+                    contents.append(f"{label}:")
+                    contents.append(img)
                 except Exception as e:
-                    logger.error(f"Error loading reference image '{ref_path}': {e}")
-                    raise ValueError(f"Failed to load reference image: {ref_path}")
+                    logger.error(f"Error loading named image '{label}' from '{path}': {e}")
+                    raise ValueError(f"Failed to load named image '{label}': {path}")
+            contents.append(prompt)
+        else:
+            # Legacy path: prompt first, then unnamed images
+            contents = [prompt]
+
+            # Handle single path (backwards compat)
+            if reference_image_path and not reference_image_paths:
+                reference_image_paths = [reference_image_path]
+
+            # Add reference images if provided
+            if reference_image_paths:
+                for ref_path in reference_image_paths:
+                    try:
+                        reference_image = _load_image_from_path(ref_path)
+                        contents.append(reference_image)
+                    except Exception as e:
+                        logger.error(f"Error loading reference image '{ref_path}': {e}")
+                        raise ValueError(f"Failed to load reference image: {ref_path}")
 
         # === COMPREHENSIVE GEMINI API LOGGING ===
         logger.info("=" * 80)
@@ -118,20 +136,25 @@ class GeminiService:
         logger.info(f"[GEMINI IMAGE GEN] Image Size: {image_size}")
         logger.info(f"[GEMINI IMAGE GEN] Max Retries: {max_retries}")
         logger.info(f"[GEMINI IMAGE GEN] Response Modalities: ['Image']")
+        logger.info(f"[GEMINI IMAGE GEN] Named Images: {bool(named_images)}")
         logger.info("-" * 40)
         logger.info("[GEMINI IMAGE GEN] PROMPT TEXT:")
         logger.info("-" * 40)
-        # Log full prompt (split into chunks if very long)
         prompt_lines = prompt.split('\n')
         for i, line in enumerate(prompt_lines):
             logger.info(f"[PROMPT L{i+1:03d}] {line}")
         logger.info("-" * 40)
-        logger.info(f"[GEMINI IMAGE GEN] REFERENCE IMAGES ({len(reference_image_paths) if reference_image_paths else 0} total):")
-        if reference_image_paths:
-            for i, ref_path in enumerate(reference_image_paths):
-                logger.info(f"[GEMINI IMAGE GEN]   Image {i+1}: {ref_path}")
+        if named_images:
+            logger.info(f"[GEMINI IMAGE GEN] NAMED IMAGES ({len(named_images)} total):")
+            for label, path in named_images:
+                logger.info(f"[GEMINI IMAGE GEN]   {label}: {path}")
         else:
-            logger.info("[GEMINI IMAGE GEN]   (No reference images)")
+            logger.info(f"[GEMINI IMAGE GEN] REFERENCE IMAGES ({len(reference_image_paths) if reference_image_paths else 0} total):")
+            if reference_image_paths:
+                for i, ref_path in enumerate(reference_image_paths):
+                    logger.info(f"[GEMINI IMAGE GEN]   Image {i+1}: {ref_path}")
+            else:
+                logger.info("[GEMINI IMAGE GEN]   (No reference images)")
         logger.info("=" * 80)
 
         for attempt in range(max_retries):
@@ -326,6 +349,73 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
                 await asyncio.sleep(2 ** attempt)
 
         return None
+
+    async def generate_text_with_images(
+        self,
+        prompt: str,
+        image_paths: List[str],
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+        max_retries: int = 3,
+    ) -> str:
+        """
+        Generate text using Gemini with image context (for Art Director).
+
+        Loads images from paths and includes them alongside the text prompt,
+        allowing the AI to SEE the product while planning.
+
+        Args:
+            prompt: The generation prompt
+            image_paths: List of image paths (local or supabase://)
+            max_tokens: Maximum output tokens
+            temperature: Creativity level (0-1)
+            max_retries: Number of retry attempts
+
+        Returns:
+            Generated text string
+        """
+        if not self.client:
+            raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
+
+        text_model = "gemini-2.0-flash"
+
+        # Build contents: prompt + images
+        contents: list = [prompt]
+        for img_path in image_paths:
+            try:
+                img = _load_image_from_path(img_path)
+                contents.append(img)
+            except Exception as e:
+                logger.warning(f"Failed to load image for text generation: {img_path}: {e}")
+
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"Generating text with {len(image_paths)} images (attempt {attempt + 1}/{max_retries})")
+
+                response = await self.client.aio.models.generate_content(
+                    model=text_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        temperature=temperature,
+                        max_output_tokens=max_tokens,
+                    )
+                )
+
+                if response.candidates and response.candidates[0].content.parts:
+                    text = response.candidates[0].content.parts[0].text
+                    logger.info(f"Text with images generated successfully: {len(text)} chars")
+                    return text
+
+                logger.warning("No text in response")
+                return ""
+
+            except Exception as e:
+                logger.error(f"Text+image generation attempt {attempt + 1} failed: {e}")
+                if attempt == max_retries - 1:
+                    raise e
+                await asyncio.sleep(2 ** attempt)
+
+        return ""
 
     async def generate_text(
         self,

@@ -303,6 +303,35 @@ The user has selected a design framework. Now generate 5 DETAILED IMAGE GENERATI
 that will be sent DIRECTLY to an AI image generator (Gemini).
 
 =====================================================================
+              CRITICAL: PRODUCT REFERENCE RULE (MANDATORY)
+=====================================================================
+The user has uploaded a PRODUCT PHOTO. This photo shows THE EXACT PRODUCT to use.
+
+DO NOT generate a similar or generic version of the product.
+DO NOT create a "representation" or "interpretation" of the product.
+DO use the EXACT product as it appears in the uploaded photo.
+
+CRITICAL LANGUAGE RULES FOR YOUR PROMPTS:
+1. NEVER describe the product by its name (e.g., "The sun planter is centered...")
+2. ALWAYS reference the product as "The product (from the attached product photo)"
+   or "The product shown in Image 1" or "The exact product from the reference"
+3. This tells the AI to LOOK AT the attached image, not imagine a generic product
+
+WRONG: "The sun planter is positioned on a white background..."
+RIGHT: "The product (shown in Image 1) is positioned on a white background..."
+
+WRONG: "A decorative ceramic pot centered in the frame..."
+RIGHT: "The exact product from the provided photo centered in the frame..."
+
+In EVERY prompt, you MUST:
+1. Start with "Use the EXACT product shown in Image 1 (the product photo)"
+2. Describe the scene/layout using "the product" not the product name
+3. End with "Reproduce this specific product faithfully from the reference photo"
+
+The AI image generator will receive the product photo as Image 1. Your prompts
+must tell it to USE that exact product, not generate a similar item based on name.
+
+=====================================================================
                     THE 7 ESSENTIAL BUILDING BLOCKS
               (Each of your 5 prompts MUST contain ALL 7)
 =====================================================================
@@ -329,11 +358,24 @@ that will be sent DIRECTLY to an AI image generator (Gemini).
    - Describe WHERE colors appear: "subtle corner gradient", "text in charcoal", "icon accents"
    - NEVER say "product in [brand color]" - the product has its own real colors
 
+   IMPORTANT: Colors are to be APPLIED visually, NOT written as text!
+   - WRONG: "Show the hex code #C85A35 on the image"
+   - RIGHT: "Background gradient using #C85A35 coral tone"
+   - WRONG: "Write 'Primary Color: Orange' on the image"
+   - RIGHT: "Icons filled with the primary coral (#C85A35)"
+
 5. TYPOGRAPHY SPECIFICATION (The voice - exact details)
    - Font name: "{headline_font}" not just "sans-serif"
    - Weight: "Bold" or "SemiBold" or "Regular"
    - Exact text content in quotes: 'See It in Action' not "a headline"
    - Position: "top center", "bottom left corner", "above the product"
+
+   IMPORTANT: Fonts are to be APPLIED to text styling, NOT written as labels!
+   - WRONG: "Show 'Font: Montserrat Bold' on the image"
+   - RIGHT: "Headline 'Premium Quality' rendered in Montserrat Bold"
+   - WRONG: "Write the font name on the design"
+   - RIGHT: "Text styled in {headline_font} with {headline_weight} weight"
+   The font specification tells the AI HOW to render the text, not WHAT to write.
 
 6. COMPOSITION RULES (The structure)
    - Focal point: "product and hands are focal point", "product center, benefits radiating"
@@ -406,12 +448,14 @@ PHOTOGRAPHY STYLE:
 - Think: Apple product photography, catalog quality
 
 PROMPT STRUCTURE:
-"Professional e-commerce product photography of [EXACT PRODUCT] on pure white
-background (#FFFFFF). Studio lighting setup with soft diffused key light,
-subtle fill, and [specific shadow description]. Product shown at [angle]
-filling 85% of frame. [Product details from what you know]. No text,
-no graphics, no props. High-resolution catalog photography, Apple product
-photography quality."
+"Professional e-commerce product photography on pure white background (#FFFFFF).
+Use the EXACT product shown in Image 1 (the product photo) - do not generate a
+similar or generic version. The product (from Image 1) should be reproduced
+faithfully in terms of shape, color, design details, and proportions. Studio
+lighting setup with soft diffused key light, subtle fill, and [specific shadow
+description]. The product positioned at [angle] filling 85% of frame. No text,
+no graphics, no props. Reproduce this specific product from the reference photo.
+High-resolution catalog photography, Apple product photography quality."
 
 ---------------------------------------------------------------------
 
@@ -437,12 +481,15 @@ TYPOGRAPHY:
 - Color: Dark text ({text_dark_hex}) on light background
 
 PROMPT STRUCTURE:
-"Technical product infographic for [PRODUCT]. Clean [background color] background
-with subtle gradient. Product shown at center with [N] callout lines extending
-to feature labels: [Feature 1], [Feature 2], [Feature 3]. Thin lines in
-[accent color] with arrow endpoints. Dimension arrows showing [size].
-Headline '[HEADLINE TEXT]' at top in {headline_font} Bold. Professional
-technical illustration style, Amazon listing infographic quality."
+"Technical product infographic. Use the EXACT product shown in Image 1 (the
+product photo) - do not generate a similar or generic version. Clean [background
+color] background with subtle gradient. The product (from Image 1) shown at center
+with [N] callout lines extending to feature labels: [Feature 1], [Feature 2],
+[Feature 3]. Thin lines in [accent color] with arrow endpoints. Dimension arrows
+showing [size]. Headline '[HEADLINE TEXT]' at top rendered in {headline_font} Bold
+(apply this font to the text styling). Reproduce the specific product faithfully
+from the reference photo. Professional technical illustration style, Amazon
+listing infographic quality."
 
 ---------------------------------------------------------------------
 
@@ -467,12 +514,15 @@ BACKGROUND:
 - Can include subtle geometric pattern
 
 PROMPT STRUCTURE:
-"Benefits-focused infographic for [PRODUCT]. [Layout description] with product
-positioned [where]. Background: subtle [color] gradient. Show [N] benefit
+"Benefits-focused infographic. Use the EXACT product shown in Image 1 (the
+product photo) - do not generate a similar or generic version. [Layout description]
+with the product (from Image 1) positioned [where]. Background: subtle [color]
+gradient (apply color visually to background, not as text). Show [N] benefit
 icons in [icon style] style with labels: '[Benefit 1]', '[Benefit 2]',
-'[Benefit 3]'. Icons in [accent color]. Headline '[HEADLINE]' at top in
-{headline_font} Bold [color]. Brand logo '[BRAND]' in top-right corner,
-small. Clean, modern Amazon listing design quality."
+'[Benefit 3]'. Icons filled with [accent color]. Headline '[HEADLINE]' at top
+rendered in {headline_font} Bold (apply this font styling to the text).
+Brand logo '[BRAND]' in top-right corner, small. Reproduce the specific product
+faithfully from the reference photo. Clean, modern Amazon listing design quality."
 
 ---------------------------------------------------------------------
 
@@ -514,33 +564,41 @@ EXAMPLE OF EXCELLENT LIFESTYLE PROMPT:
 (Use this structure as your template for Image 4)
 
 "Editorial lifestyle photograph showing real human hands (feminine, well-manicured)
-gently placing or adjusting a small succulent plant inside [THE PRODUCT].
+gently placing or adjusting a small succulent plant inside the product.
+
+CRITICAL PRODUCT REQUIREMENT:
+Use the EXACT product shown in Image 1 (the product photo) - do not generate a
+similar or generic version. The product (from Image 1) must be reproduced
+faithfully in terms of shape, color, design details, and proportions. The product
+in this lifestyle scene must be identical to the one in the reference photo.
 
 Scene Setup:
-- Real person's hands actively interacting with the product - placing it on a
-  small table or adjusting the plant inside
+- Real person's hands actively interacting with the product (from Image 1) -
+  placing it on a small table or adjusting the plant inside
 - Setting: Bright, modern interior room with white or soft pastel walls
 - Surface: Small wooden side table next to a window
 - Natural daylight streaming in, crisp and bright (approximately 5200K)
 
-Color Palette & Accents:
-- Primary accent color: [brand primary color]
-- Subtle [primary color] corner accents or soft fade in upper corners
+Color Palette & Accents (APPLY visually, don't write as text):
+- Primary accent color applied to: corner accents, soft fade in upper corners
+- These colors are for UI/decorative elements only, NOT the product itself
 - Clean, minimal aesthetic
 
-Typography (if any text):
-- Top of image: '[HEADLINE]' in {headline_font} Bold, dark gray text
+Typography (if any text - APPLY font styling, don't write font names):
+- Top of image: '[HEADLINE]' rendered in {headline_font} Bold styling, dark gray
 - Positioned near top to keep center clear
+- The font specification means STYLE the text this way, not label the font
 
 Branding:
 - '[BRAND NAME]' logo text in top-right corner, modest size
 
 Composition:
 - Leave center of image clear (no text blocking the action)
-- Product and hands are the focal point
+- The product (from Image 1) and hands are the focal point
 - Casual, inviting at-home atmosphere
 - Lifestyle demonstration feel - capturing a moment of real use
 
+Reproduce the specific product faithfully from the reference photo.
 Style: Professional Amazon listing quality, editorial lifestyle photography,
 bright and inviting, NOT stock photo feel."
 
@@ -585,11 +643,14 @@ TEXT:
 - Trust badges if applicable (ratings, certifications)
 
 PROMPT STRUCTURE:
-"[Type: Package contents/Size comparison/Use cases] image for [PRODUCT].
-[Specific layout: flat lay on white, 2x2 grid, side-by-side]. Show
-[specific elements to include]. Each [item/scene] labeled with
-{headline_font} Regular text in [color]. Headline '[TEXT]' at top.
-Background: [clean white/light brand color]. Professional Amazon
+"[Type: Package contents/Size comparison/Use cases] image. Use the EXACT
+product shown in Image 1 (the product photo) - do not generate a similar or
+generic version. [Specific layout: flat lay on white, 2x2 grid, side-by-side].
+Show the product (from Image 1) with [specific elements to include]. Each
+[item/scene] labeled with text rendered in {headline_font} Regular styling
+(apply font to text, don't write font name). Headline '[TEXT]' at top.
+Background: [clean white/light brand color] (apply color visually). Reproduce
+the specific product faithfully from the reference photo. Professional Amazon
 listing quality, clear and informative."
 
 =====================================================================
@@ -625,6 +686,8 @@ All 5 images MUST share these elements for cohesion:
    - Same font family ({headline_font}) for all headlines
    - Same font ({body_font}) for all body/labels
    - Consistent sizing hierarchy
+   - IMPORTANT: Apply fonts to text styling - NEVER write font names as visible text
+   - "Rendered in Montserrat Bold" means style the text IN that font, not label it
 
 3. LIGHTING CONSISTENCY:
    - Same color temperature feel (~5200K bright, or whatever the framework specifies)
@@ -712,6 +775,27 @@ Take your time. Be meticulous. These prompts go directly to the AI image generat
 8. Image 4 MUST feature a real human being (hands minimum) in a real environment
 9. The lifestyle image (4) should follow the example template structure closely
 10. All prompts should end with a quality anchor statement
+
+=====================================================================
+           NEW CRITICAL RULES (MUST FOLLOW IN EVERY PROMPT)
+=====================================================================
+
+PRODUCT REFERENCE RULE:
+- EVERY prompt MUST start with: "Use the EXACT product shown in Image 1 (the
+  product photo) - do not generate a similar or generic version."
+- NEVER describe the product by its name (e.g., "The sun planter...")
+- ALWAYS use "The product (from Image 1)" or "The product shown in Image 1"
+- The AI will receive the product photo as Image 1 alongside the prompt
+- Do NOT generate a generic or similar product - use the EXACT one from the photo
+
+FONTS/COLORS APPLICATION RULE:
+- Fonts are to be APPLIED to text styling, not written as labels
+  WRONG: "Font: Montserrat Bold" visible on image
+  RIGHT: Text rendered/styled in Montserrat Bold
+- Colors are to be APPLIED visually, not written as hex codes
+  WRONG: "#C85A35" visible on image
+  RIGHT: Background using #C85A35 coral tone
+- These specifications tell the AI HOW to style, not WHAT to display as text
 '''
 
 
@@ -784,6 +868,12 @@ ORIGINAL PROMPT YOU WROTE:
    - Keep the same typography specifications
    - Keep the brand voice consistent
    - The image should still feel like part of the set
+
+4. CRITICAL RULES TO ALWAYS INCLUDE:
+   - PRODUCT REFERENCE: Include "Use the EXACT product shown in the provided
+     product photo - this is THE product, not a similar item."
+   - FONTS: Apply fonts to text styling, don't write font names as visible text
+   - COLORS: Apply colors visually (backgrounds, icons), don't write hex codes as text
 
 =====================================================================
                          OUTPUT FORMAT

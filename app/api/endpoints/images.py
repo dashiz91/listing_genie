@@ -1,7 +1,11 @@
 """
 Image Serving Endpoints
 """
+import logging
+import re
 from fastapi import APIRouter, HTTPException, Depends
+
+logger = logging.getLogger(__name__)
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.generation_service import GenerationService
@@ -21,6 +25,69 @@ def get_generation_service(
     """Dependency injection for GenerationService"""
     return GenerationService(db=db, gemini=gemini, storage=storage)
 
+
+# --- Static routes MUST be declared before parameterized /{session_id} ---
+
+@router.get("/file")
+async def get_file_by_path(
+    path: str,
+    storage: SupabaseStorageService = Depends(get_storage_service),
+):
+    """
+    Serve a file by its storage path (for reference image previews).
+    Handles Supabase paths (supabase://bucket/path format) and legacy local paths.
+    """
+    try:
+        # Normalise legacy local paths (storage\uploads\UUID.png or storage/uploads/UUID.png)
+        # into supabase:// URIs so older sessions still resolve.
+        normalised = path.replace("\\", "/")
+        if not normalised.startswith("supabase://"):
+            m = re.match(r"^storage/(uploads|generated)/(.+)$", normalised)
+            if m:
+                normalised = f"supabase://{m.group(1)}/{m.group(2)}"
+            else:
+                raise HTTPException(status_code=400, detail="Unrecognised storage path format.")
+
+        # Parse supabase:// URL and create signed URL
+        parts = normalised[len("supabase://"):].split("/", 1)
+        bucket = parts[0]
+        file_path = parts[1] if len(parts) > 1 else ""
+
+        response = storage.client.storage.from_(bucket).create_signed_url(
+            path=file_path,
+            expires_in=3600
+        )
+        signed_url = response.get('signedURL') or response.get('signedUrl') or ''
+        if signed_url:
+            return RedirectResponse(url=signed_url, status_code=302)
+        else:
+            logger.warning(f"No signed URL in response keys: {list(response.keys())}")
+            raise HTTPException(status_code=404, detail="File not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid path: {str(e)}")
+
+
+@router.get("/upload/{upload_id}")
+async def get_upload_file(
+    upload_id: str,
+    storage: SupabaseStorageService = Depends(get_storage_service),
+):
+    """
+    Serve an uploaded image file.
+    Redirects to a signed Supabase URL.
+    """
+    try:
+        signed_url = storage.get_upload_url(upload_id, expires_in=3600)
+        return RedirectResponse(url=signed_url, status_code=302)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# --- Parameterized routes after static ones ---
 
 @router.get("/{session_id}")
 async def get_session_images(
@@ -76,59 +143,6 @@ async def get_image_file(
         return RedirectResponse(url=signed_url, status_code=302)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Image not found")
-
-
-@router.get("/upload/{upload_id}")
-async def get_upload_file(
-    upload_id: str,
-    storage: SupabaseStorageService = Depends(get_storage_service),
-):
-    """
-    Serve an uploaded image file.
-    Redirects to a signed Supabase URL.
-    """
-    try:
-        signed_url = storage.get_upload_url(upload_id, expires_in=3600)
-        return RedirectResponse(url=signed_url, status_code=302)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Upload not found")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/file")
-async def get_file_by_path(
-    path: str,
-    storage: SupabaseStorageService = Depends(get_storage_service),
-):
-    """
-    Serve a file by its storage path (for reference image previews).
-    Handles Supabase paths (supabase://bucket/path format).
-    """
-    try:
-        if path.startswith("supabase://"):
-            # Parse supabase:// URL and create signed URL
-            parts = path[len("supabase://"):].split("/", 1)
-            bucket = parts[0]
-            file_path = parts[1] if len(parts) > 1 else ""
-
-            # Create signed URL
-            response = storage.client.storage.from_(bucket).create_signed_url(
-                path=file_path,
-                expires_in=3600
-            )
-            signed_url = response.get('signedURL', '')
-            if signed_url:
-                return RedirectResponse(url=signed_url, status_code=302)
-            else:
-                raise HTTPException(status_code=404, detail="File not found")
-        else:
-            # Legacy local file path - not supported anymore
-            raise HTTPException(status_code=400, detail="Local file paths not supported. Use Supabase storage.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid path: {str(e)}")
 
 
 def _get_image_label(image_type: str) -> str:

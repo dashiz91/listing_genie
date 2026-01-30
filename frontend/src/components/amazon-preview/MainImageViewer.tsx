@@ -1,22 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { GenerationLoader } from '../generation-loader';
 
 interface MainImageViewerProps {
   imageUrl: string;
   imageLabel: string;
   imageType: string;
   isProcessing?: boolean;
+  isPending?: boolean;
+  accentColor?: string;
+  onGenerate?: () => void;
   className?: string;
 }
 
 export const MainImageViewer: React.FC<MainImageViewerProps> = ({
   imageUrl,
   imageLabel,
-  imageType: _imageType,
+  imageType,
   isProcessing = false,
+  isPending = false,
+  accentColor = '#C85A35',
+  onGenerate,
   className,
 }) => {
-  void _imageType; // Reserved for future use
 
   const [isHovering, setIsHovering] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
@@ -50,18 +56,46 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
     });
   };
 
+  // Pending state - show generate button
+  if (isPending && onGenerate) {
+    return (
+      <div className={cn('relative', className)}>
+        <div className="aspect-square bg-slate-100 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-slate-300 hover:border-redd-500/50 transition-colors cursor-pointer group"
+          onClick={onGenerate}
+        >
+          <div
+            className="w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-all group-hover:scale-110"
+            style={{ backgroundColor: `${accentColor}20` }}
+          >
+            <svg
+              className="w-8 h-8 transition-colors"
+              style={{ color: accentColor }}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-slate-600 font-medium text-sm mb-1">Click to Generate</p>
+          <p className="text-slate-400 text-xs">{imageLabel}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Processing state - show loader
   if (isProcessing) {
     return (
-      <div
-        className={cn(
-          'relative aspect-square bg-slate-100 rounded-lg flex items-center justify-center',
-          className
-        )}
-      >
-        <div className="text-center">
-          <div className="w-12 h-12 mx-auto mb-4 border-4 border-redd-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-500 text-sm">Generating {imageLabel}...</p>
-        </div>
+      <div className={cn('relative', className)}>
+        <GenerationLoader
+          imageType={imageType}
+          aspectRatio="1:1"
+          accentColor={accentColor}
+          estimatedSeconds={12}
+          className="rounded-lg overflow-hidden"
+        />
       </div>
     );
   }

@@ -232,6 +232,9 @@ async def generate_single_image(
         # Pass the optional note to generate_single_image
         result = await service.generate_single_image(session, db_image_type, note=request.note)
 
+        # Update session status based on image statuses
+        service._update_session_status(session)
+
         return SingleImageResponse(
             session_id=session.id,
             image_type=request.image_type,
@@ -418,9 +421,14 @@ async def get_session_prompts(
     if not context:
         return []  # No prompts stored yet
 
-    # Get all prompt history entries for all image types
+    # Get all prompt history entries for all image types (listing + A+)
+    all_types = list(service.IMAGE_TYPES) + [
+        DBImageType.APLUS_0, DBImageType.APLUS_1, DBImageType.APLUS_2,
+        DBImageType.APLUS_3, DBImageType.APLUS_4,
+    ]
+
     results = []
-    for image_type in service.IMAGE_TYPES:
+    for image_type in all_types:
         history = service.get_prompt_history(context, image_type)
         for h in history:
             results.append(PromptHistoryResponse(
@@ -464,18 +472,23 @@ async def get_image_prompt(
     if not latest:
         raise HTTPException(status_code=404, detail=f"No prompt found for image type: {image_type}")
 
-    # Build reference images list from session data
-    reference_images = []
-    if session.upload_path:
-        reference_images.append({"type": "primary", "path": session.upload_path})
-    if session.additional_upload_paths:
-        for i, path in enumerate(session.additional_upload_paths):
-            reference_images.append({"type": f"additional_{i+1}", "path": path})
-    if session.style_reference_path:
-        reference_images.append({"type": "style_reference", "path": session.style_reference_path})
-    # Logo only for non-main images
-    if session.logo_path and image_type != "main":
-        reference_images.append({"type": "logo", "path": session.logo_path})
+    # Build reference images list
+    # If the prompt has stored reference_image_paths (A+ modules), use those
+    # Otherwise fall back to deriving from session data (listing images)
+    if latest.reference_image_paths:
+        reference_images = latest.reference_image_paths
+    else:
+        reference_images = []
+        if session.upload_path:
+            reference_images.append({"type": "primary", "path": session.upload_path})
+        if session.additional_upload_paths:
+            for i, path in enumerate(session.additional_upload_paths):
+                reference_images.append({"type": f"additional_{i+1}", "path": path})
+        if session.style_reference_path:
+            reference_images.append({"type": "style_reference", "path": session.style_reference_path})
+        # Logo only for non-main images
+        if session.logo_path and image_type != "main":
+            reference_images.append({"type": "logo", "path": session.logo_path})
 
     # Build designer context - everything that was fed to the AI Designer
     designer_context = {
@@ -508,6 +521,18 @@ async def get_image_prompt(
             if ic.get("image_type") == image_type:
                 designer_context["image_copy"] = ic
                 break
+
+    # For A+ modules, include the visual script in designer context
+    if image_type.startswith("aplus_") and session.aplus_visual_script:
+        designer_context["visual_script"] = session.aplus_visual_script
+        # Extract this module's section
+        try:
+            module_idx = int(image_type.split("_")[1])
+            script_modules = session.aplus_visual_script.get("modules", [])
+            if module_idx < len(script_modules):
+                designer_context["module_script"] = script_modules[module_idx]
+        except (ValueError, IndexError):
+            pass
 
     return PromptHistoryResponse(
         image_type=latest.image_type.value,
@@ -719,6 +744,13 @@ class FrameworkGenerationWithImageRequest(BaseModel):
         max_length=6,
         description="Hex colors to lock when color_mode is LOCKED_PALETTE (e.g., ['#FF5733', '#2E86AB'])"
     )
+    # Number of framework options to return (1-4, default 4)
+    framework_count: int = Field(
+        default=4,
+        ge=1,
+        le=4,
+        description="Number of design framework options to generate (1-4)"
+    )
 
 
 @router.post("/frameworks/analyze", response_model=FrameworkGenerationResponse)
@@ -786,6 +818,11 @@ async def analyze_and_generate_frameworks(
         )
 
         frameworks = result.get('frameworks', [])
+
+        # Limit to requested framework count (saves preview generation time/cost)
+        if request.framework_count < len(frameworks):
+            frameworks = frameworks[:request.framework_count]
+            logger.info(f"Limited to {request.framework_count} framework(s) as requested")
 
         # Step 2: Create a session for storing preview images
         from app.schemas.generation import StylePreviewRequest
@@ -871,7 +908,7 @@ async def analyze_and_generate_frameworks(
 
 
 class GenerateWithFrameworkRequest(BaseModel):
-    """Request to generate all 5 images with a selected framework"""
+    """Request to generate images with a selected framework"""
     product_title: str = Field(..., min_length=1, max_length=200)
     upload_path: str = Field(..., description="Path to primary product image")
     additional_upload_paths: List[str] = Field(
@@ -888,6 +925,10 @@ class GenerateWithFrameworkRequest(BaseModel):
     global_note: Optional[str] = Field(None, max_length=2000, description="Global instructions for all images")
     # AI's analysis from framework generation - used for context during regeneration
     product_analysis: Optional[dict] = Field(None, description="AI's product analysis from framework generation")
+    # Optional: Generate only a single image type (for clicking individual slots)
+    single_image_type: Optional[str] = Field(None, description="If provided, only generate this image type (main, infographic_1, etc.)")
+    # Optional: Just create the session without generating any images
+    create_only: bool = Field(False, description="If true, create session but skip image generation")
 
 
 @router.post("/frameworks/generate", response_model=GenerationResponse)
@@ -996,8 +1037,7 @@ async def generate_with_framework(
             global_note=request.global_note,
         )
 
-        # STEP 3: Generate all 5 images
-        logger.info("Starting generation of all 5 images...")
+        # STEP 3: Generate images (all 5 or just 1 if single_image_type specified)
         user_id = user.id if user else None
         session = service.create_session(gen_request, user_id=user_id)
 
@@ -1009,7 +1049,25 @@ async def generate_with_framework(
                 product_analysis=request.product_analysis,
             )
 
-        results = await service.generate_all_images(session)
+        # Check if we should create only, generate one, or generate all
+        if request.create_only:
+            # Just create session, no generation
+            logger.info("Session created (create_only mode), skipping generation")
+            results = service.get_session_results(session)
+        elif request.single_image_type:
+            # Generate only the specified image type
+            logger.info(f"Generating SINGLE image: {request.single_image_type}")
+            try:
+                db_image_type = DBImageType(request.single_image_type)
+                result = await service.generate_single_image(session, db_image_type)
+                # Get all image statuses (4 pending + 1 generated)
+                results = service.get_session_results(session)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid image type: {request.single_image_type}")
+        else:
+            # Generate all 5 images sequentially
+            logger.info("Starting generation of all 5 images...")
+            results = await service.generate_all_images(session)
 
         return GenerationResponse(
             session_id=session.id,
@@ -1057,6 +1115,22 @@ class AplusModuleResponse(BaseModel):
     height: int
     is_chained: bool  # True if this used a previous module as reference
     generation_time_ms: int
+    prompt_text: Optional[str] = None  # The prompt used for generation
+
+
+class AplusVisualScriptRequest(BaseModel):
+    """Request to generate Art Director visual script"""
+    session_id: str = Field(..., description="Session ID from listing generation")
+    module_count: int = Field(default=5, ge=1, le=7)
+
+
+class AplusVisualScriptResponse(BaseModel):
+    """Response with the visual script"""
+    session_id: str
+    visual_script: dict
+    module_count: int
+
+
 
 
 @router.post("/aplus/generate", response_model=AplusModuleResponse)
@@ -1075,8 +1149,11 @@ async def generate_aplus_module(
     """
     import time
     from app.services.image_utils import resize_for_aplus_module, get_aspect_ratio_for_module, APLUS_DIMENSIONS
-    from app.prompts.templates.aplus_modules import get_aplus_prompt
-    from app.models.database import GenerationSession, DesignContext
+    from app.prompts.templates.aplus_modules import (
+        get_aplus_prompt, build_aplus_module_prompt, get_aplus_module_prompt,
+        IMAGE_LABEL_PRODUCT, IMAGE_LABEL_STYLE, IMAGE_LABEL_PREVIOUS,
+    )
+    from app.models.database import GenerationSession, DesignContext, ImageTypeEnum as DBImageTypeEnum
 
     start_time = time.time()
 
@@ -1094,56 +1171,129 @@ async def generate_aplus_module(
             DesignContext.session_id == request.session_id
         ).first()
 
-        # Determine position in chain
-        if request.module_index == 0:
-            position = "first"
-        elif request.previous_module_path:
-            position = "middle"  # Could also be "last" but we don't know total count
-        else:
-            position = "only"
+        features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
+        framework = session.design_framework_json or {}
 
-        # Build the prompt
-        framework = design_context.selected_framework if design_context else {}
-        prompt = get_aplus_prompt(
-            module_type=request.module_type.value,
-            position=position,
-            product_title=session.product_title,
-            brand_name=session.brand_name or "",
-            features=[f for f in [session.feature_1, session.feature_2, session.feature_3] if f],
-            target_audience=session.target_audience or "",
-            framework_name=framework.get("framework_name", "Professional"),
-            framework_style=framework.get("design_philosophy", "Clean and modern"),
-            primary_color=framework.get("colors", [{}])[0].get("hex", "#333333"),
-            color_palette=[c.get("hex", "#333333") for c in framework.get("colors", [])],
-            framework_mood=framework.get("brand_voice", "Professional"),
-            custom_instructions=request.custom_instructions or "",
-        )
+        # Check for visual script — try new pre-written prompts first, then legacy
+        visual_script = session.aplus_visual_script
+        is_chained = bool(request.previous_module_path)
+        use_named_images = False
+        prompt = None
 
-        # Collect reference images
-        reference_paths = []
+        if visual_script:
+            # Try new format: Art Director pre-written generation_prompt
+            prompt = get_aplus_module_prompt(
+                visual_script=visual_script,
+                module_index=request.module_index,
+                custom_instructions=request.custom_instructions or "",
+            )
+            if prompt:
+                use_named_images = True
+                logger.info(f"Using Art Director pre-written prompt for module {request.module_index}")
 
-        # Add product images from session
-        if session.upload_path:
-            reference_paths.append(session.upload_path)
+        if not prompt and visual_script:
+            # Legacy visual script format (no generation_prompt field)
+            prompt = build_aplus_module_prompt(
+                product_title=session.product_title,
+                brand_name=session.brand_name or "",
+                features=features,
+                target_audience=session.target_audience or "",
+                framework=framework,
+                visual_script=visual_script,
+                module_index=request.module_index,
+                module_count=len(visual_script.get("modules", [])),
+                custom_instructions=request.custom_instructions or "",
+                is_chained=is_chained,
+            )
 
-        # Add previous module for chaining (CRITICAL for visual continuity)
-        is_chained = False
-        if request.previous_module_path:
-            reference_paths.append(request.previous_module_path)
-            is_chained = True
+        if not prompt:
+            # Fallback: no visual script at all
+            if request.module_index == 0:
+                position = "first"
+            elif request.previous_module_path:
+                position = "middle"
+            else:
+                position = "only"
+
+            framework_name = "Professional"
+            framework_style = "Clean and modern premium design"
+            framework_mood = "Professional and engaging"
+            primary_color = "#C85A35"
+            color_palette = [primary_color]
+
+            if framework:
+                framework_name = framework.get('framework_name', framework_name)
+                framework_style = framework.get('design_philosophy', framework_style)
+                framework_mood = framework.get('brand_voice', framework_mood)
+                colors = framework.get('colors', [])
+                if colors:
+                    color_palette = [c.get('hex', '#C85A35') for c in colors if c.get('hex')]
+                    primary_color = next(
+                        (c.get('hex') for c in colors if c.get('role') == 'primary'),
+                        colors[0].get('hex', '#C85A35') if colors else '#C85A35'
+                    )
+
+            if design_context:
+                if design_context.selected_framework_name:
+                    framework_name = design_context.selected_framework_name
+                if design_context.locked_colors:
+                    color_palette = design_context.locked_colors
+                    primary_color = design_context.locked_colors[0]
+
+            prompt = get_aplus_prompt(
+                module_type=request.module_type.value,
+                position=position,
+                product_title=session.product_title,
+                brand_name=session.brand_name or "",
+                features=features,
+                target_audience=session.target_audience or "",
+                framework_name=framework_name,
+                framework_style=framework_style,
+                primary_color=primary_color,
+                color_palette=color_palette,
+                framework_mood=framework_mood,
+                custom_instructions=request.custom_instructions or "",
+            )
 
         # Get aspect ratio for this module type
         aspect_ratio = get_aspect_ratio_for_module(request.module_type.value)
 
         # Generate the image
-        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, chained={is_chained})")
+        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, chained={is_chained}, named_images={use_named_images})")
 
-        generated_image = await gemini.generate_image(
-            prompt=prompt,
-            reference_image_paths=reference_paths if reference_paths else None,
-            aspect_ratio=aspect_ratio,
-            image_size="1K",  # Use 1K for cost savings
-        )
+        if use_named_images:
+            # New path: labeled images so the prompt can reference them by name
+            named_images = []
+            if session.upload_path:
+                named_images.append((IMAGE_LABEL_PRODUCT, session.upload_path))
+            if session.style_reference_path:
+                named_images.append((IMAGE_LABEL_STYLE, session.style_reference_path))
+            if request.previous_module_path:
+                named_images.append((IMAGE_LABEL_PREVIOUS, request.previous_module_path))
+
+            generated_image = await gemini.generate_image(
+                prompt=prompt,
+                named_images=named_images if named_images else None,
+                aspect_ratio=aspect_ratio,
+                image_size="1K",
+            )
+        else:
+            # Legacy path: unnamed reference images
+            reference_paths = []
+            if session.upload_path:
+                reference_paths.append(session.upload_path)
+            if session.style_reference_path:
+                reference_paths.append(session.style_reference_path)
+            if request.previous_module_path:
+                reference_paths.append(request.previous_module_path)
+                is_chained = True
+
+            generated_image = await gemini.generate_image(
+                prompt=prompt,
+                reference_image_paths=reference_paths if reference_paths else None,
+                aspect_ratio=aspect_ratio,
+                image_size="1K",
+            )
 
         if not generated_image:
             raise HTTPException(status_code=500, detail="Image generation failed")
@@ -1159,15 +1309,49 @@ async def generate_aplus_module(
         # Save to storage
         image_filename = f"aplus_{request.module_type.value}_{request.module_index}.png"
         image_path = storage.save_generated_image(
-            final_image,
             request.session_id,
-            image_filename.replace(".png", "")  # Storage adds extension
+            image_filename.replace(".png", ""),  # Storage adds extension
+            final_image
         )
 
         # Get signed URL
-        image_url = storage.get_signed_url(image_path, expires_in=3600)
+        image_url = storage.get_generated_url(request.session_id, image_filename.replace(".png", ""), expires_in=3600)
 
         generation_time_ms = int((time.time() - start_time) * 1000)
+
+        # Save prompt to PromptHistory (same system as listing images)
+        # Include the ACTUAL reference images passed to generation
+        try:
+            from app.services.generation_service import GenerationService
+            gen_service = GenerationService(db=db, gemini=gemini, storage=storage)
+
+            # Ensure DesignContext exists
+            design_ctx = gen_service.get_design_context(request.session_id)
+            if not design_ctx:
+                design_ctx = gen_service.create_design_context(session)
+
+            # Build reference images list with types
+            ref_images_for_history = []
+            if session.upload_path:
+                ref_images_for_history.append({"type": "primary", "path": session.upload_path})
+            if session.style_reference_path:
+                ref_images_for_history.append({"type": "style_reference", "path": session.style_reference_path})
+            if request.previous_module_path:
+                ref_images_for_history.append({
+                    "type": f"previous_module_{request.module_index - 1}",
+                    "path": request.previous_module_path,
+                })
+
+            # Map module_index to ImageTypeEnum (aplus_0 .. aplus_4)
+            aplus_image_type = DBImageTypeEnum(f"aplus_{request.module_index}")
+            gen_service.store_prompt_in_history(
+                context=design_ctx,
+                image_type=aplus_image_type,
+                prompt_text=prompt,
+                reference_image_paths=ref_images_for_history if ref_images_for_history else None,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to save A+ prompt history: {e}")
 
         logger.info(f"A+ module generated in {generation_time_ms}ms: {image_path}")
 
@@ -1181,6 +1365,7 @@ async def generate_aplus_module(
             height=target_height,
             is_chained=is_chained,
             generation_time_ms=generation_time_ms,
+            prompt_text=prompt,
         )
 
     except HTTPException:
@@ -1188,3 +1373,119 @@ async def generate_aplus_module(
     except Exception as e:
         logger.error(f"A+ module generation failed: {e}")
         raise HTTPException(status_code=500, detail=f"A+ generation failed: {str(e)}")
+
+
+# ============== A+ Art Director Visual Script ==============
+
+@router.post("/aplus/visual-script", response_model=AplusVisualScriptResponse)
+async def generate_aplus_visual_script(
+    request: AplusVisualScriptRequest,
+    user: Optional[User] = Depends(get_optional_user),
+    gemini: GeminiService = Depends(get_gemini_service),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate an Art Director visual script that plans the entire A+ section
+    as one unified visual narrative before generating any modules.
+    """
+    import json as json_module
+    from app.models.database import GenerationSession
+    from app.prompts.templates.aplus_modules import get_visual_script_prompt
+
+    try:
+        session = db.query(GenerationSession).filter(
+            GenerationSession.id == request.session_id
+        ).first()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Build framework dict from session
+        framework = session.design_framework_json or {}
+
+        # Build prompt
+        features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
+        prompt = get_visual_script_prompt(
+            product_title=session.product_title,
+            brand_name=session.brand_name or "",
+            features=features,
+            target_audience=session.target_audience or "",
+            framework=framework,
+            module_count=request.module_count,
+        )
+
+        # Collect product image paths for visual context
+        image_paths = []
+        if session.upload_path:
+            image_paths.append(session.upload_path)
+        if session.additional_upload_paths:
+            image_paths.extend(session.additional_upload_paths)
+
+        # Call Gemini with images so Art Director can SEE the product
+        logger.info(f"Generating visual script with {len(image_paths)} product images")
+        raw_text = await gemini.generate_text_with_images(
+            prompt=prompt,
+            image_paths=image_paths,
+            max_tokens=5000,
+            temperature=0.7,
+        )
+
+        # Parse JSON from response (strip markdown fences if present)
+        clean_text = raw_text.strip()
+        if clean_text.startswith("```"):
+            clean_text = clean_text.split("\n", 1)[1] if "\n" in clean_text else clean_text[3:]
+            if clean_text.endswith("```"):
+                clean_text = clean_text[:-3]
+            clean_text = clean_text.strip()
+
+        visual_script = json_module.loads(clean_text)
+
+        # Store on session
+        session.aplus_visual_script = visual_script
+        db.commit()
+
+        logger.info(f"Visual script generated with {len(visual_script.get('modules', []))} modules")
+
+        return AplusVisualScriptResponse(
+            session_id=request.session_id,
+            visual_script=visual_script,
+            module_count=request.module_count,
+        )
+
+    except HTTPException:
+        raise
+    except json_module.JSONDecodeError as e:
+        logger.error(f"Failed to parse visual script JSON: {e}")
+        raise HTTPException(status_code=500, detail="Art Director returned invalid JSON")
+    except Exception as e:
+        logger.error(f"Visual script generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Visual script generation failed: {str(e)}")
+
+
+@router.get("/aplus/{session_id}/visual-script", response_model=AplusVisualScriptResponse)
+async def get_aplus_visual_script(
+    session_id: str,
+    db: Session = Depends(get_db),
+):
+    """Get the stored visual script for a session."""
+    from app.models.database import GenerationSession
+
+    session = db.query(GenerationSession).filter(
+        GenerationSession.id == session_id
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if not session.aplus_visual_script:
+        raise HTTPException(status_code=404, detail="No visual script generated yet")
+
+    return AplusVisualScriptResponse(
+        session_id=session_id,
+        visual_script=session.aplus_visual_script,
+        module_count=len(session.aplus_visual_script.get("modules", [])),
+    )
+
+
+    # A+ prompts are stored in the same PromptHistory system as listing images.
+    # Use GET /generate/{session_id}/prompts/aplus_0 through aplus_4 to retrieve them.

@@ -18,6 +18,7 @@ import type {
   ProjectDetailResponse,
   AplusModuleRequest,
   AplusModuleResponse,
+  AplusVisualScriptResponse,
 } from './types';
 
 const API_BASE = '/api';
@@ -184,6 +185,11 @@ class ApiClient {
     return `${API_BASE}/images/upload/${uploadId}`;
   }
 
+  // Get signed URL for a storage path (supabase:// or upload path)
+  getFileUrl(storagePath: string): string {
+    return `${API_BASE}/images/file?path=${encodeURIComponent(storagePath)}`;
+  }
+
   // Get available style presets
   async getStyles(): Promise<StylePreset[]> {
     const response = await this.client.get<StylePreset[]>('/generate/styles/list');
@@ -258,10 +264,12 @@ class ApiClient {
   async generateWithFramework(
     request: GenerationRequest,
     framework: DesignFramework,
-    productAnalysis?: Record<string, unknown>  // AI's analysis for regeneration context
+    productAnalysis?: Record<string, unknown>,  // AI's analysis for regeneration context
+    singleImageType?: string,  // Optional: generate only this image type (for clicking individual slots)
+    createOnly?: boolean  // Optional: just create session, no generation
   ): Promise<GenerationResponse> {
     // Build request payload, ensuring arrays are never undefined
-    const payload = {
+    const payload: Record<string, unknown> = {
       product_title: request.product_title,
       upload_path: request.upload_path,
       additional_upload_paths: request.additional_upload_paths || [],
@@ -275,6 +283,16 @@ class ApiClient {
       // Include product_analysis for regeneration context
       product_analysis: productAnalysis || null,
     };
+
+    // If single_image_type is provided, only generate that one image
+    if (singleImageType) {
+      payload.single_image_type = singleImageType;
+    }
+
+    // If create_only, just create session without generating
+    if (createOnly) {
+      payload.create_only = true;
+    }
 
     const response = await this.client.post<GenerationResponse>(
       '/generate/frameworks/generate',  // New endpoint that generates prompts first
@@ -344,6 +362,35 @@ class ApiClient {
     );
     return response.data;
   }
+
+  /**
+   * Generate Art Director visual script that plans the entire A+ section
+   * as one unified visual narrative.
+   */
+  async generateAplusVisualScript(
+    sessionId: string,
+    moduleCount: number = 5
+  ): Promise<AplusVisualScriptResponse> {
+    const response = await this.client.post<AplusVisualScriptResponse>(
+      '/generate/aplus/visual-script',
+      { session_id: sessionId, module_count: moduleCount },
+      { timeout: 60000 } // 1 minute timeout for text generation
+    );
+    return response.data;
+  }
+
+  /**
+   * Get stored visual script for a session.
+   */
+  async getAplusVisualScript(sessionId: string): Promise<AplusVisualScriptResponse> {
+    const response = await this.client.get<AplusVisualScriptResponse>(
+      `/generate/aplus/${sessionId}/visual-script`
+    );
+    return response.data;
+  }
+
+  // A+ prompts use the same system as listing images.
+  // Use getImagePrompt(sessionId, 'aplus_0') through 'aplus_4' to retrieve them.
 }
 
 export const apiClient = new ApiClient();

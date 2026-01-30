@@ -10,3 +10,5 @@ export { QuickEditBar } from './QuickEditBar';
 export { VersionNavigator } from './VersionNavigator';
 export { SaveConfirmModal } from './SaveConfirmModal';
 export { CelebrationOverlay } from './CelebrationOverlay';
+export { AmazonHeader } from './AmazonHeader';
+export { AmazonBreadcrumbs } from './AmazonBreadcrumbs';

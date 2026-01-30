@@ -5,6 +5,7 @@ import type { SessionImage, DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
 import { LivePreview, PreviewState } from '../live-preview/LivePreview';
 import { AmazonListingPreview } from '../amazon-preview';
+import { AplusSection, type AplusModule } from '../preview-slots/AplusSection';
 
 interface ShowroomPanelProps {
   // Preview state
@@ -21,12 +22,23 @@ interface ShowroomPanelProps {
 
   // Framework
   selectedFramework?: DesignFramework;
+  isAnalyzing?: boolean;
 
   // Generation
   sessionId?: string;
   images: SessionImage[];
 
+  // A+ Content modules
+  aplusModules?: AplusModule[];
+  aplusVisualScript?: import('@/api/types').AplusVisualScript | null;
+  isGeneratingScript?: boolean;
+  onGenerateAplusModule?: (moduleIndex: number) => void;
+  onRegenerateAplusModule?: (moduleIndex: number) => void;
+  onGenerateAllAplus?: () => void;
+
   // Callbacks
+  onGenerateSingle?: (imageType: string) => void;
+  onGenerateAll?: () => void;
   onRegenerateSingle?: (imageType: string, note?: string) => void;
   onEditSingle?: (imageType: string, instructions: string) => void;
   onRetry?: () => void;
@@ -47,8 +59,17 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
   targetAudience,
   productImages,
   selectedFramework,
+  isAnalyzing = false,
   sessionId,
   images,
+  aplusModules = [],
+  aplusVisualScript,
+  isGeneratingScript = false,
+  onGenerateAplusModule,
+  onRegenerateAplusModule,
+  onGenerateAllAplus,
+  onGenerateSingle,
+  onGenerateAll,
   onRegenerateSingle,
   onEditSingle,
   onRetry,
@@ -73,13 +94,20 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
   const totalImages = images.length || 5;
   const generationProgress = totalImages > 0 ? (completeCount / totalImages) * 100 : 0;
 
+  // Get accent color from framework
+  const accentColor = selectedFramework?.colors?.find((c) => c.role === 'primary')?.hex || '#C85A35';
+
   // Toggle fullscreen
   const handleFullscreenToggle = useCallback(() => {
     setIsFullscreen((prev) => !prev);
   }, []);
 
-  // For completed generation, use the full AmazonListingPreview with all features
-  if (previewState === 'complete' && sessionId) {
+  // Check if we should show the Amazon-style interactive preview
+  // Show it when framework is selected OR when generating/complete
+  const showAmazonPreview = previewState === 'framework_selected' || previewState === 'generating' || previewState === 'complete';
+
+  // For framework_selected, generating, or complete states - show the full AmazonListingPreview
+  if (showAmazonPreview) {
     return (
       <div className={cn('h-full flex flex-col', className)}>
         {/* Fullscreen overlay */}
@@ -105,6 +133,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
                 sessionId={sessionId}
                 images={images}
                 framework={selectedFramework}
+                onGenerateSingle={onGenerateSingle}
+                onGenerateAll={onGenerateAll}
                 onRetry={onRetry}
                 onRegenerateSingle={onRegenerateSingle}
                 onEditSingle={onEditSingle}
@@ -115,7 +145,7 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
         )}
 
         {/* Normal view */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto space-y-6">
           <AmazonListingPreview
             productTitle={productTitle}
             brandName={brandName}
@@ -124,11 +154,29 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
             sessionId={sessionId}
             images={images}
             framework={selectedFramework}
+            onGenerateSingle={onGenerateSingle}
+            onGenerateAll={onGenerateAll}
             onRetry={onRetry}
             onRegenerateSingle={onRegenerateSingle}
             onEditSingle={onEditSingle}
             onStartOver={onStartOver}
           />
+
+          {/* A+ Content Section - Show when there are modules */}
+          {aplusModules.length > 0 && (
+            <AplusSection
+              modules={aplusModules}
+              sessionId={sessionId}
+              productTitle={productTitle}
+              accentColor={accentColor}
+              isEnabled={true}
+              visualScript={aplusVisualScript}
+              isGeneratingScript={isGeneratingScript}
+              onGenerateModule={onGenerateAplusModule}
+              onRegenerateModule={onRegenerateAplusModule}
+              onGenerateAll={onGenerateAllAplus}
+            />
+          )}
         </div>
       </div>
     );
@@ -168,7 +216,53 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
       </div>
 
       {/* Live Preview */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto relative">
+        {/* Style Analysis Overlay */}
+        {isAnalyzing && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/70 backdrop-blur-sm rounded-lg">
+            <div className="text-center space-y-6 p-8 max-w-sm">
+              {/* Animated rings */}
+              <div className="relative w-24 h-24 mx-auto">
+                <div className="absolute inset-0 rounded-full border-2 border-redd-500/30 animate-ping" />
+                <div className="absolute inset-2 rounded-full border-2 border-redd-500/50 animate-pulse" />
+                <div className="absolute inset-4 rounded-full border-2 border-redd-500 border-t-transparent animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-redd-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Text */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-white">Crafting Your Styles</h3>
+                <p className="text-sm text-slate-400">
+                  AI is analyzing your product and designing unique visual frameworks...
+                </p>
+              </div>
+
+              {/* Shimmer bars */}
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-2 rounded-full bg-slate-700 overflow-hidden"
+                    style={{ width: `${100 - i * 15}%`, margin: '0 auto' }}
+                  >
+                    <div
+                      className="h-full animate-shimmer rounded-full"
+                      style={{
+                        background: 'linear-gradient(90deg, transparent 0%, rgba(200,90,53,0.5) 50%, transparent 100%)',
+                        backgroundSize: '200% 100%',
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         <LivePreview
           state={previewState}
           productTitle={productTitle}
@@ -204,16 +298,6 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
         {previewState === 'filling' && (
           <p className="text-center text-sm text-slate-500">
             Preview updates in real-time as you type
-          </p>
-        )}
-        {previewState === 'framework_selected' && (
-          <p className="text-center text-sm text-slate-500">
-            Ready to generate your listing images
-          </p>
-        )}
-        {previewState === 'generating' && (
-          <p className="text-center text-sm text-slate-500">
-            {completeCount} of {totalImages} images generated
           </p>
         )}
       </div>

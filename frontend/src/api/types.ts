@@ -119,6 +119,8 @@ export interface FrameworkGenerationRequest {
   locked_colors?: string[];
   // Style reference image - AI extracts colors/style from this
   style_reference_path?: string;
+  // Number of frameworks/styles to generate (1-4, default 4)
+  framework_count?: number;
 }
 
 export interface FrameworkGenerationResponse {
@@ -340,6 +342,34 @@ export interface ProjectDetailResponse {
   completed_at?: string;
   brand_name?: string;
   images: ProjectImageDetail[];
+  // Form fields
+  feature_1?: string;
+  feature_2?: string;
+  feature_3?: string;
+  target_audience?: string;
+  global_note?: string;
+  // Upload paths
+  upload_path?: string;
+  additional_upload_paths?: string[];
+  // Brand & style
+  brand_colors?: string[];
+  color_palette?: string[];
+  color_count?: number;
+  logo_path?: string;
+  style_reference_path?: string;
+  // Design framework (full JSON)
+  design_framework?: DesignFramework;
+  // Product analysis
+  product_analysis?: Record<string, unknown>;
+  product_analysis_summary?: string;
+  // A+ Content
+  aplus_visual_script?: AplusVisualScript;
+  aplus_modules?: Array<{
+    module_index: number;
+    module_type: string;
+    image_url?: string;
+    image_path?: string;
+  }>;
 }
 
 // ============================================================================
@@ -366,7 +396,41 @@ export interface AplusModuleResponse {
   height: number;
   is_chained: boolean;
   generation_time_ms: number;
+  prompt_text?: string;
 }
+
+// A+ Art Director Visual Script
+export interface AplusVisualScriptModule {
+  index: number;
+  role: string;
+  headline: string;
+  mood: string;
+  generation_prompt?: string;  // Full pre-written prompt (new format)
+  // Legacy fields (optional for backward compat with old visual scripts)
+  product_angle?: string;
+  background_description?: string;
+  top_edge?: string;
+  bottom_edge?: string;
+  key_elements?: string[];
+  content_focus?: string;
+}
+
+export interface AplusVisualScript {
+  narrative_theme: string;
+  color_flow: string;
+  background_strategy: string;
+  edge_connection_strategy?: string;  // Legacy field, not in new format
+  modules: AplusVisualScriptModule[];
+}
+
+export interface AplusVisualScriptResponse {
+  session_id: string;
+  visual_script: AplusVisualScript;
+  module_count: number;
+}
+
+// A+ prompts use the same PromptHistory system as listing images.
+// Use getImagePrompt(sessionId, 'aplus_0') through 'aplus_4' to retrieve them.
 
 // A+ Module dimensions (for UI reference)
 export const APLUS_DIMENSIONS: Record<AplusModuleType, { width: number; height: number }> = {
