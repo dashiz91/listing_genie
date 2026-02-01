@@ -8,8 +8,6 @@ import { ThumbnailGallery } from './ThumbnailGallery';
 import { MainImageViewer } from './MainImageViewer';
 import { ProductInfoPanel } from './ProductInfoPanel';
 import { PreviewToolbar } from './PreviewToolbar';
-import { QuickEditBar } from './QuickEditBar';
-import { VersionNavigator } from './VersionNavigator';
 import { SaveConfirmModal } from './SaveConfirmModal';
 import { CelebrationOverlay } from './CelebrationOverlay';
 import { AmazonHeader } from './AmazonHeader';
@@ -21,23 +19,10 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import { ImageActionOverlay } from '@/components/shared/ImageActionOverlay';
+import type { ListingVersionState } from '@/pages/HomePage';
 
 type DeviceMode = 'desktop' | 'mobile';
-
-// Version info for each image
-interface ImageVersion {
-  version: number;
-  url: string;
-  timestamp: number;
-}
-
-// Track versions per image type
-interface ImageVersions {
-  [imageType: string]: {
-    versions: ImageVersion[];
-    currentIndex: number;
-  };
-}
 
 interface AmazonListingPreviewProps {
   // Product data
@@ -62,6 +47,10 @@ interface AmazonListingPreviewProps {
   onRegenerateSingle?: (imageType: string, note?: string) => void;
   onEditSingle?: (imageType: string, instructions: string) => void;
   onStartOver?: () => void;
+
+  // Version tracking (lifted to HomePage)
+  listingVersions?: ListingVersionState;
+  onVersionChange?: (imageType: string, index: number) => void;
 }
 
 // Default image type order
@@ -88,6 +77,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   onRegenerateSingle,
   onEditSingle,
   onStartOver,
+  listingVersions,
+  onVersionChange,
 }) => {
   void _onGenerateAll; // Reserved for future "Generate All" button
   // Get accent color from framework
@@ -99,13 +90,15 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   const [imageCacheKey, setImageCacheKey] = useState<Record<string, number>>({});
   const [customImageOrder, setCustomImageOrder] = useState<string[]>(DEFAULT_IMAGE_ORDER);
 
-  // Version state - track versions per image type
-  const [imageVersions, setImageVersions] = useState<ImageVersions>({});
-
   // Edit panel state
   const [editPanelOpen, setEditPanelOpen] = useState(false);
   const [editingImageType, setEditingImageType] = useState<string | null>(null);
   const [editInstructions, setEditInstructions] = useState('');
+
+  // Regenerate note panel state
+  const [regenPanelOpen, setRegenPanelOpen] = useState(false);
+  const [regenImageType, setRegenImageType] = useState<string | null>(null);
+  const [regenNote, setRegenNote] = useState('');
 
   // Save to Projects state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -123,36 +116,6 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
 
   // Navigation
   const navigate = useNavigate();
-
-  // Initialize versions from images
-  useEffect(() => {
-    const newVersions: ImageVersions = {};
-    images.forEach((img) => {
-      if (img.status === 'complete' && img.url) {
-        // If we don't have this image type in versions yet, initialize it
-        if (!imageVersions[img.type]) {
-          newVersions[img.type] = {
-            versions: [
-              {
-                version: 1,
-                url: img.url,
-                timestamp: Date.now(),
-              },
-            ],
-            currentIndex: 0,
-          };
-        } else {
-          // Keep existing version history
-          newVersions[img.type] = imageVersions[img.type];
-        }
-      }
-    });
-
-    // Only update if there are changes
-    if (Object.keys(newVersions).length > 0) {
-      setImageVersions((prev) => ({ ...prev, ...newVersions }));
-    }
-  }, [images]);
 
   // Get sorted images based on custom order
   const sortedImages = useMemo(
@@ -182,57 +145,46 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
 
   // Get current version info for selected image
   const currentVersionInfo = useMemo(() => {
-    const versionData = imageVersions[selectedImageType];
+    const versionData = listingVersions?.[selectedImageType];
     if (!versionData || versionData.versions.length === 0) {
       return { currentVersion: 1, totalVersions: 1 };
     }
     return {
-      currentVersion: versionData.currentIndex + 1,
+      currentVersion: versionData.activeIndex + 1,
       totalVersions: versionData.versions.length,
     };
-  }, [imageVersions, selectedImageType]);
+  }, [listingVersions, selectedImageType]);
 
-  // Image URL with cache busting
+  // Image URL — use versioned URL if available, otherwise backend proxy
   const getImageUrl = useCallback(
     (imageType: string) => {
+      const versionData = listingVersions?.[imageType];
+      if (versionData && versionData.versions.length > 0) {
+        return versionData.versions[versionData.activeIndex].imageUrl;
+      }
+      // Fallback to backend proxy
       if (!sessionId) return '';
       const baseUrl = apiClient.getImageUrl(sessionId, imageType);
       const cacheKey = imageCacheKey[imageType];
       return cacheKey ? `${baseUrl}?t=${cacheKey}` : baseUrl;
     },
-    [sessionId, imageCacheKey]
+    [sessionId, imageCacheKey, listingVersions]
   );
 
 
   // Navigate to previous version
   const handlePreviousVersion = useCallback(() => {
-    setImageVersions((prev) => {
-      const current = prev[selectedImageType];
-      if (!current || current.currentIndex <= 0) return prev;
-      return {
-        ...prev,
-        [selectedImageType]: {
-          ...current,
-          currentIndex: current.currentIndex - 1,
-        },
-      };
-    });
-  }, [selectedImageType]);
+    const vd = listingVersions?.[selectedImageType];
+    if (!vd || vd.activeIndex <= 0) return;
+    onVersionChange?.(selectedImageType, vd.activeIndex - 1);
+  }, [selectedImageType, listingVersions, onVersionChange]);
 
   // Navigate to next version
   const handleNextVersion = useCallback(() => {
-    setImageVersions((prev) => {
-      const current = prev[selectedImageType];
-      if (!current || current.currentIndex >= current.versions.length - 1) return prev;
-      return {
-        ...prev,
-        [selectedImageType]: {
-          ...current,
-          currentIndex: current.currentIndex + 1,
-        },
-      };
-    });
-  }, [selectedImageType]);
+    const vd = listingVersions?.[selectedImageType];
+    if (!vd || vd.activeIndex >= vd.versions.length - 1) return;
+    onVersionChange?.(selectedImageType, vd.activeIndex + 1);
+  }, [selectedImageType, listingVersions, onVersionChange]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -300,55 +252,31 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
     setEditPanelOpen(true);
   }, []);
 
-  // Handle regenerate click - adds new version
+  // Handle regenerate click — open note panel
   const handleRegenerateClick = useCallback(
     (imageType: string) => {
-      onRegenerateSingle?.(imageType);
-
-      // Add a new version entry (will be updated when image completes)
-      setImageVersions((prev) => {
-        const current = prev[imageType] || { versions: [], currentIndex: 0 };
-        const newVersion: ImageVersion = {
-          version: current.versions.length + 1,
-          url: '', // Will be populated when generation completes
-          timestamp: Date.now(),
-        };
-        return {
-          ...prev,
-          [imageType]: {
-            versions: [...current.versions, newVersion],
-            currentIndex: current.versions.length, // Point to new version
-          },
-        };
-      });
-
-      setImageCacheKey((prev) => ({ ...prev, [imageType]: Date.now() }));
+      setRegenImageType(imageType);
+      setRegenNote('');
+      setRegenPanelOpen(true);
     },
-    [onRegenerateSingle]
+    []
   );
 
-  // Submit edit
+  // Submit regenerate with optional note
+  const handleRegenSubmit = useCallback(() => {
+    if (regenImageType) {
+      onRegenerateSingle?.(regenImageType, regenNote.trim() || undefined);
+      setImageCacheKey((prev) => ({ ...prev, [regenImageType]: Date.now() }));
+      setRegenPanelOpen(false);
+      setRegenImageType(null);
+      setRegenNote('');
+    }
+  }, [regenImageType, regenNote, onRegenerateSingle]);
+
+  // Submit edit — version management is now in HomePage
   const handleEditSubmit = useCallback(() => {
     if (editingImageType && editInstructions.trim().length >= 5) {
       onEditSingle?.(editingImageType, editInstructions.trim());
-
-      // Add a new version entry for the edit
-      setImageVersions((prev) => {
-        const current = prev[editingImageType] || { versions: [], currentIndex: 0 };
-        const newVersion: ImageVersion = {
-          version: current.versions.length + 1,
-          url: '',
-          timestamp: Date.now(),
-        };
-        return {
-          ...prev,
-          [editingImageType]: {
-            versions: [...current.versions, newVersion],
-            currentIndex: current.versions.length,
-          },
-        };
-      });
-
       setImageCacheKey((prev) => ({ ...prev, [editingImageType]: Date.now() }));
       setEditPanelOpen(false);
       setEditingImageType(null);
@@ -548,6 +476,20 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
     }
   }, [images, sessionId, productTitle]);
 
+  // Overlay for the main image viewer (shared across all layout modes)
+  const imageOverlay = selectedImage?.status === 'complete' ? (
+    <ImageActionOverlay
+      versionInfo={{ current: currentVersionInfo.currentVersion, total: currentVersionInfo.totalVersions }}
+      onPreviousVersion={handlePreviousVersion}
+      onNextVersion={handleNextVersion}
+      onRegenerate={() => handleRegenerateClick(selectedImageType)}
+      onEdit={() => handleEditClick(selectedImageType)}
+      onDownload={() => downloadImage(selectedImageType, IMAGE_LABELS[selectedImageType] || selectedImageType)}
+      onViewPrompt={() => handleViewPrompt(selectedImageType)}
+      isProcessing={isSelectedProcessing}
+    />
+  ) : undefined;
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
@@ -616,6 +558,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                         isPending={isSelectedPending}
                         accentColor={accentColor}
                         onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                        overlay={imageOverlay}
                       />
                     </div>
                     <div className="col-span-5 p-6 bg-white overflow-y-auto max-h-[600px]">
@@ -730,6 +673,13 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                   isPending={isSelectedPending}
                   accentColor={accentColor}
                   onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                  versionInfo={selectedImage?.status === 'complete' ? { current: currentVersionInfo.currentVersion, total: currentVersionInfo.totalVersions } : undefined}
+                  onPreviousVersion={handlePreviousVersion}
+                  onNextVersion={handleNextVersion}
+                  onRegenerate={selectedImage?.status === 'complete' ? () => handleRegenerateClick(selectedImageType) : undefined}
+                  onEdit={selectedImage?.status === 'complete' ? () => handleEditClick(selectedImageType) : undefined}
+                  onDownload={selectedImage?.status === 'complete' ? () => downloadImage(selectedImageType, IMAGE_LABELS[selectedImageType] || selectedImageType) : undefined}
+                  onViewPrompt={selectedImage?.status === 'complete' ? () => handleViewPrompt(selectedImageType) : undefined}
                 />
               </div>
 
@@ -771,6 +721,13 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 isPending={isSelectedPending}
                 accentColor={accentColor}
                 onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                versionInfo={selectedImage?.status === 'complete' ? { current: currentVersionInfo.currentVersion, total: currentVersionInfo.totalVersions } : undefined}
+                onPreviousVersion={handlePreviousVersion}
+                onNextVersion={handleNextVersion}
+                onRegenerate={selectedImage?.status === 'complete' ? () => handleRegenerateClick(selectedImageType) : undefined}
+                onEdit={selectedImage?.status === 'complete' ? () => handleEditClick(selectedImageType) : undefined}
+                onDownload={selectedImage?.status === 'complete' ? () => downloadImage(selectedImageType, IMAGE_LABELS[selectedImageType] || selectedImageType) : undefined}
+                onViewPrompt={selectedImage?.status === 'complete' ? () => handleViewPrompt(selectedImageType) : undefined}
               />
             </div>
 
@@ -819,27 +776,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
         )}
       </div>
 
-      {/* Version Navigator (below the preview) */}
-      {selectedImage?.status === 'complete' && (
-        <VersionNavigator
-          currentVersion={currentVersionInfo.currentVersion}
-          totalVersions={currentVersionInfo.totalVersions}
-          onPrevious={handlePreviousVersion}
-          onNext={handleNextVersion}
-          onEdit={() => handleEditClick(selectedImageType)}
-          onRegenerate={() => handleRegenerateClick(selectedImageType)}
-          isProcessing={isSelectedProcessing}
-        />
-      )}
-
-      {/* Quick Edit Bar */}
-      <QuickEditBar
-        images={sortedImages}
-        selectedType={selectedImageType}
-        onEdit={handleEditClick}
-        onRegenerate={handleRegenerateClick}
-        onViewPrompt={handleViewPrompt}
-      />
+      {/* Actions are now rendered directly on the main image via MainImageViewer */}
 
       {/* Edit Panel (Sheet) */}
       <Sheet open={editPanelOpen} onOpenChange={setEditPanelOpen}>
@@ -893,6 +830,60 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
               </button>
               <button
                 onClick={() => setEditPanelOpen(false)}
+                className="px-4 py-2 bg-slate-800 text-slate-300 font-medium rounded-lg hover:bg-slate-700 border border-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Regenerate Note Panel */}
+      <Sheet open={regenPanelOpen} onOpenChange={setRegenPanelOpen}>
+        <SheetContent className="bg-slate-900 border-slate-700">
+          <SheetHeader>
+            <SheetTitle className="text-white">
+              Regenerate {regenImageType ? IMAGE_LABELS[regenImageType] : 'Image'}
+            </SheetTitle>
+            <SheetDescription className="text-slate-400">
+              Optionally describe what you'd like different. Leave empty to regenerate freely.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {regenImageType && (
+              <div className="rounded-lg overflow-hidden border border-slate-700">
+                <img
+                  src={getImageUrl(regenImageType)}
+                  alt="Image to regenerate"
+                  className="w-full h-48 object-contain bg-white"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Feedback / Note <span className="text-slate-500">(optional)</span>
+              </label>
+              <textarea
+                value={regenNote}
+                onChange={(e) => setRegenNote(e.target.value)}
+                placeholder="e.g., 'Try a more minimal style' or 'Make it more vibrant and colorful'"
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-redd-500 focus:border-transparent resize-none"
+                rows={4}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={handleRegenSubmit}
+                className="flex-1 px-4 py-2 bg-redd-500 text-white font-medium rounded-lg hover:bg-redd-600 transition-colors"
+              >
+                Regenerate
+              </button>
+              <button
+                onClick={() => setRegenPanelOpen(false)}
                 className="px-4 py-2 bg-slate-800 text-slate-300 font-medium rounded-lg hover:bg-slate-700 border border-slate-700 transition-colors"
               >
                 Cancel

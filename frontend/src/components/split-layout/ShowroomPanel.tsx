@@ -5,7 +5,8 @@ import type { SessionImage, DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
 import { LivePreview, PreviewState } from '../live-preview/LivePreview';
 import { AmazonListingPreview } from '../amazon-preview';
-import { AplusSection, type AplusModule } from '../preview-slots/AplusSection';
+import { AplusSection, type AplusModule, type AplusViewportMode } from '../preview-slots/AplusSection';
+import type { ListingVersionState } from '@/pages/HomePage';
 
 interface ShowroomPanelProps {
   // Preview state
@@ -33,8 +34,21 @@ interface ShowroomPanelProps {
   aplusVisualScript?: import('@/api/types').AplusVisualScript | null;
   isGeneratingScript?: boolean;
   onGenerateAplusModule?: (moduleIndex: number) => void;
-  onRegenerateAplusModule?: (moduleIndex: number) => void;
+  onRegenerateAplusModule?: (moduleIndex: number, note?: string) => void;
   onGenerateAllAplus?: () => void;
+  onRegenerateScript?: () => void;
+  onAplusVersionChange?: (moduleIndex: number, versionIndex: number) => void;
+  onEditAplusModule?: (moduleIndex: number, editInstructions: string) => void;
+  aplusViewportMode?: AplusViewportMode;
+  onAplusViewportChange?: (mode: AplusViewportMode) => void;
+  onGenerateMobileModule?: (moduleIndex: number) => void;
+  onGenerateAllMobile?: () => void;
+  onRegenerateMobileModule?: (moduleIndex: number, note?: string) => void;
+  onEditMobileModule?: (moduleIndex: number, editInstructions: string) => void;
+
+  // Listing version tracking
+  listingVersions?: ListingVersionState;
+  onListingVersionChange?: (imageType: string, index: number) => void;
 
   // Callbacks
   onGenerateSingle?: (imageType: string) => void;
@@ -68,6 +82,17 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
   onGenerateAplusModule,
   onRegenerateAplusModule,
   onGenerateAllAplus,
+  onRegenerateScript,
+  onAplusVersionChange,
+  onEditAplusModule,
+  aplusViewportMode,
+  onAplusViewportChange,
+  onGenerateMobileModule,
+  onGenerateAllMobile,
+  onRegenerateMobileModule,
+  onEditMobileModule,
+  listingVersions,
+  onListingVersionChange,
   onGenerateSingle,
   onGenerateAll,
   onRegenerateSingle,
@@ -139,6 +164,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
                 onRegenerateSingle={onRegenerateSingle}
                 onEditSingle={onEditSingle}
                 onStartOver={onStartOver}
+                listingVersions={listingVersions}
+                onVersionChange={onListingVersionChange}
               />
             </div>
           </div>
@@ -160,6 +187,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
             onRegenerateSingle={onRegenerateSingle}
             onEditSingle={onEditSingle}
             onStartOver={onStartOver}
+            listingVersions={listingVersions}
+            onVersionChange={onListingVersionChange}
           />
 
           {/* A+ Content Section - Show when there are modules */}
@@ -175,6 +204,15 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
               onGenerateModule={onGenerateAplusModule}
               onRegenerateModule={onRegenerateAplusModule}
               onGenerateAll={onGenerateAllAplus}
+              onRegenerateScript={onRegenerateScript}
+              onVersionChange={onAplusVersionChange}
+              onEditModule={onEditAplusModule}
+              viewportMode={aplusViewportMode}
+              onViewportChange={onAplusViewportChange}
+              onGenerateMobileModule={onGenerateMobileModule}
+              onGenerateAllMobile={onGenerateAllMobile}
+              onRegenerateMobileModule={onRegenerateMobileModule}
+              onEditMobileModule={onEditMobileModule}
             />
           )}
         </div>

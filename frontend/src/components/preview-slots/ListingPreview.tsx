@@ -45,7 +45,7 @@ interface ListingPreviewProps {
   /** Called when user clicks to generate an A+ module */
   onGenerateAplusModule?: (moduleIndex: number) => void;
   /** Called when user clicks to regenerate an A+ module */
-  onRegenerateAplusModule?: (moduleIndex: number) => void;
+  onRegenerateAplusModule?: (moduleIndex: number, note?: string) => void;
   /** Whether we can start generating (has uploads + framework) */
   canGenerate?: boolean;
   /** Whether any generation is in progress */

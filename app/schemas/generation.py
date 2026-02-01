@@ -14,6 +14,12 @@ class ImageTypeEnum(str, Enum):
     LIFESTYLE = "lifestyle"
     COMPARISON = "comparison"
     STYLE_PREVIEW = "style_preview"
+    APLUS_0 = "aplus_0"
+    APLUS_1 = "aplus_1"
+    APLUS_2 = "aplus_2"
+    APLUS_3 = "aplus_3"
+    APLUS_4 = "aplus_4"
+    APLUS_5 = "aplus_5"
 
 
 class GenerationStatusEnum(str, Enum):

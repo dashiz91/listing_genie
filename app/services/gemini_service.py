@@ -101,14 +101,18 @@ class GeminiService:
 
         if named_images:
             # New path: interleave text labels with images, then prompt last
-            for label, path in named_images:
+            # Each item is (label, source) where source is a path string or PIL Image
+            for label, source in named_images:
                 try:
-                    img = _load_image_from_path(path)
+                    if isinstance(source, PILImage.Image):
+                        img = source
+                    else:
+                        img = _load_image_from_path(source)
                     contents.append(f"{label}:")
                     contents.append(img)
                 except Exception as e:
-                    logger.error(f"Error loading named image '{label}' from '{path}': {e}")
-                    raise ValueError(f"Failed to load named image '{label}': {path}")
+                    logger.error(f"Error loading named image '{label}' from '{source}': {e}")
+                    raise ValueError(f"Failed to load named image '{label}': {source}")
             contents.append(prompt)
         else:
             # Legacy path: prompt first, then unnamed images
@@ -168,8 +172,7 @@ class GeminiService:
                     config=types.GenerateContentConfig(
                         response_modalities=['Image'],
                         image_config=types.ImageConfig(
-                            aspect_ratio=aspect_ratio,
-                            image_size=image_size
+                            aspect_ratio=aspect_ratio
                         )
                     )
                 )
@@ -249,8 +252,7 @@ class GeminiService:
                     config=types.GenerateContentConfig(
                         response_modalities=['Image'],
                         image_config=types.ImageConfig(
-                            aspect_ratio=aspect_ratio,
-                            image_size=image_size
+                            aspect_ratio=aspect_ratio
                         )
                     )
                 )
@@ -345,8 +347,7 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
                     config=types.GenerateContentConfig(
                         response_modalities=['Image'],
                         image_config=types.ImageConfig(
-                            aspect_ratio=aspect_ratio,
-                            image_size=image_size
+                            aspect_ratio=aspect_ratio
                         )
                     )
                 )
@@ -432,8 +433,7 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
                     config=types.GenerateContentConfig(
                         response_modalities=['Image'],
                         image_config=types.ImageConfig(
-                            aspect_ratio=aspect_ratio,
-                            image_size=image_size
+                            aspect_ratio=aspect_ratio
                         )
                     )
                 )

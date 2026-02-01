@@ -3,8 +3,9 @@ Projects API Endpoints
 
 CRUD operations for user's generation sessions (projects).
 """
+import re
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -47,6 +48,13 @@ class ProjectListResponse(BaseModel):
     total_pages: int
 
 
+class ImageVersionDetail(BaseModel):
+    """Single version of a listing image"""
+    version: int
+    image_url: str
+    image_path: str
+
+
 class ProjectImageDetail(BaseModel):
     """Image detail for project view"""
     image_type: str
@@ -54,6 +62,14 @@ class ProjectImageDetail(BaseModel):
     storage_path: Optional[str] = None
     image_url: Optional[str] = None
     error_message: Optional[str] = None
+    versions: Optional[List[ImageVersionDetail]] = None
+
+
+class AplusModuleVersionDetail(BaseModel):
+    """Single version of an A+ module image"""
+    version: int
+    image_url: str
+    image_path: str
 
 
 class AplusModuleDetail(BaseModel):
@@ -62,6 +78,10 @@ class AplusModuleDetail(BaseModel):
     module_type: str
     image_url: Optional[str] = None
     image_path: Optional[str] = None
+    versions: Optional[List[AplusModuleVersionDetail]] = None
+    mobile_image_url: Optional[str] = None
+    mobile_image_path: Optional[str] = None
+    mobile_versions: Optional[List[AplusModuleVersionDetail]] = None
 
 
 class ProjectDetailResponse(BaseModel):
@@ -211,7 +231,38 @@ async def get_project_detail(
             detail="Project not found"
         )
 
-    # Build image details with signed URLs
+    # List ALL files in session folder once to build a version map
+    version_map: Dict[str, List[int]] = {}  # base_key -> sorted list of version numbers
+    try:
+        all_files = storage.client.storage.from_(storage.generated_bucket).list(session.id)
+        for f in all_files:
+            name = f.get("name", "")
+            # Match pattern: {base_key}_v{number}.png
+            m = re.match(r'^(.+)_v(\d+)\.png$', name)
+            if m:
+                base_key = m.group(1)
+                version_num = int(m.group(2))
+                version_map.setdefault(base_key, []).append(version_num)
+        # Sort each version list
+        for key in version_map:
+            version_map[key].sort()
+    except Exception as e:
+        logger.warning(f"Failed to list session files for version discovery: {e}")
+
+    # Helper to build version details for a given storage key
+    def _build_versions(base_key: str) -> List[ImageVersionDetail]:
+        versions = []
+        for v in version_map.get(base_key, []):
+            versioned_key = f"{base_key}_v{v}"
+            try:
+                v_url = storage.get_generated_url(session.id, versioned_key, expires_in=3600)
+                v_path = f"supabase://generated/{session.id}/{versioned_key}.png"
+                versions.append(ImageVersionDetail(version=v, image_url=v_url, image_path=v_path))
+            except Exception:
+                pass
+        return versions
+
+    # Build image details with signed URLs and versions
     images = []
     for img in session.images:
         image_url = None
@@ -225,12 +276,15 @@ async def get_project_detail(
             except Exception as e:
                 logger.warning(f"Failed to get URL for {img.image_type}: {e}")
 
+        img_versions = _build_versions(img.image_type.value) if img.status == GenerationStatusEnum.COMPLETE else []
+
         images.append(ProjectImageDetail(
             image_type=img.image_type.value,
             status=img.status.value,
             storage_path=img.storage_path,
             image_url=image_url,
             error_message=img.error_message,
+            versions=img_versions if img_versions else None,
         ))
 
     # Load DesignContext for product analysis
@@ -245,32 +299,73 @@ async def get_project_detail(
         if isinstance(pa, dict):
             product_analysis_summary = pa.get("summary") or pa.get("product_category", "")
 
-    # Load A+ modules — probe storage for existing A+ images
+    # Load A+ modules — use version_map + storage probing
     aplus_modules_list = None
-    # Determine slot count: from visual script if available, otherwise default 5
     aplus_slot_count = 0
     if session.aplus_visual_script:
         aplus_slot_count = len(session.aplus_visual_script.get("modules", []))
     if aplus_slot_count == 0:
-        # Probe default 5 slots even without a visual script
         aplus_slot_count = 5
 
     aplus_modules_list = []
     for i in range(aplus_slot_count):
         storage_key = f"aplus_full_image_{i}"
+        versions = _build_versions(storage_key)
+
+        # Get latest (unversioned) URL for backward compat
+        latest_url = None
+        latest_path = None
         try:
-            url = storage.get_generated_url(session.id, storage_key, expires_in=3600)
-            aplus_modules_list.append(AplusModuleDetail(
-                module_index=i,
-                module_type="full_image",
-                image_url=url,
-                image_path=f"supabase://generated/{session.id}/{storage_key}.png",
-            ))
+            latest_url = storage.get_generated_url(session.id, storage_key, expires_in=3600)
+            latest_path = f"supabase://generated/{session.id}/{storage_key}.png"
         except Exception:
-            # Module not generated yet — empty slot
+            pass
+
+        # Probe mobile versions - special handling for hero modules
+        mobile_url = None
+        mobile_path = None
+        mobile_versions = None
+
+        if i == 0:
+            # Module 0: use hero mobile image
+            mobile_key = "aplus_full_image_hero_mobile"
+            mobile_versions = _build_versions(mobile_key)
+            try:
+                mobile_url = storage.get_generated_url(session.id, mobile_key, expires_in=3600)
+                mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
+            except Exception:
+                pass
+        elif i == 1:
+            # Module 1: skip mobile probing (shares hero mobile with module 0)
+            pass
+        else:
+            # Modules 2+: standard individual mobile images
+            mobile_key = f"aplus_full_image_{i}_mobile"
+            mobile_versions = _build_versions(mobile_key)
+            try:
+                mobile_url = storage.get_generated_url(session.id, mobile_key, expires_in=3600)
+                mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
+            except Exception:
+                pass
+
+        if latest_url:
             aplus_modules_list.append(AplusModuleDetail(
                 module_index=i,
                 module_type="full_image",
+                image_url=latest_url,
+                image_path=latest_path,
+                versions=[AplusModuleVersionDetail(version=v.version, image_url=v.image_url, image_path=v.image_path) for v in versions] if versions else None,
+                mobile_image_url=mobile_url,
+                mobile_image_path=mobile_path,
+                mobile_versions=[AplusModuleVersionDetail(version=v.version, image_url=v.image_url, image_path=v.image_path) for v in mobile_versions] if mobile_versions else None,
+            ))
+        else:
+            aplus_modules_list.append(AplusModuleDetail(
+                module_index=i,
+                module_type="full_image",
+                mobile_image_url=mobile_url,
+                mobile_image_path=mobile_path,
+                mobile_versions=[AplusModuleVersionDetail(version=v.version, image_url=v.image_url, image_path=v.image_path) for v in mobile_versions] if mobile_versions else None,
             ))
 
     # Only return A+ data if at least one module has an image

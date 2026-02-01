@@ -121,6 +121,8 @@ export interface FrameworkGenerationRequest {
   style_reference_path?: string;
   // Number of frameworks/styles to generate (1-4, default 4)
   framework_count?: number;
+  // Skip AI preview generation — use the original style reference directly
+  skip_preview_generation?: boolean;
 }
 
 export interface FrameworkGenerationResponse {
@@ -332,6 +334,7 @@ export interface ProjectImageDetail {
   storage_path?: string;
   image_url?: string;
   error_message?: string;
+  versions?: Array<{ version: number; image_url: string; image_path: string }>;
 }
 
 export interface ProjectDetailResponse {
@@ -369,6 +372,10 @@ export interface ProjectDetailResponse {
     module_type: string;
     image_url?: string;
     image_path?: string;
+    versions?: Array<{ version: number; image_url: string; image_path: string }>;
+    mobile_image_url?: string;
+    mobile_image_path?: string;
+    mobile_versions?: Array<{ version: number; image_url: string; image_path: string }>;
   }>;
 }
 
@@ -386,6 +393,12 @@ export interface AplusModuleRequest {
   custom_instructions?: string;
 }
 
+export interface RefinedModule {
+  module_index: number;
+  image_path: string;
+  image_url: string;
+}
+
 export interface AplusModuleResponse {
   session_id: string;
   module_type: string;
@@ -397,16 +410,25 @@ export interface AplusModuleResponse {
   is_chained: boolean;
   generation_time_ms: number;
   prompt_text?: string;
+  refined_previous?: RefinedModule;
 }
 
 // A+ Art Director Visual Script
+export interface AplusRenderText {
+  headline: string | null;       // 2-5 word punchy headline (null for module 0)
+  body_copy: string | null;      // 1-2 sentence explanation (null for module 0)
+  spec_callouts?: string[];      // e.g. ["4,900 mAh", "12 MP"]
+  text_position: 'left' | 'right';  // Which side of the banner
+}
+
 export interface AplusVisualScriptModule {
   index: number;
   role: string;
   headline: string;
   mood: string;
-  scene_description?: string;  // 50-100 word scene description for canvas inpainting
-  generation_prompt?: string;  // Full pre-written prompt (new format)
+  scene_description?: string;    // For canvas continuity (required for hero pair 0+1)
+  render_text?: AplusRenderText; // Typography to render in the image
+  generation_prompt?: string;    // Full pre-written prompt (new format)
   // Legacy fields (optional for backward compat with old visual scripts)
   product_angle?: string;
   background_description?: string;
@@ -424,10 +446,35 @@ export interface AplusVisualScript {
   modules: AplusVisualScriptModule[];
 }
 
+// Hero Pair (modules 0+1 generated as one image, split in half)
+export interface HeroPairModuleResult {
+  image_path: string;
+  image_url: string;
+  prompt_text?: string;
+}
+
+export interface HeroPairResponse {
+  session_id: string;
+  module_0: HeroPairModuleResult;
+  module_1: HeroPairModuleResult;
+  generation_time_ms: number;
+}
+
 export interface AplusVisualScriptResponse {
   session_id: string;
   visual_script: AplusVisualScript;
   module_count: number;
+}
+
+// ============================================================================
+// Unified Image Version (shared by listings and A+ modules)
+// ============================================================================
+
+export interface ImageVersion {
+  imageUrl: string;
+  imagePath?: string;   // Supabase storage path (needed for A+ chaining)
+  promptText?: string;  // Cached prompt
+  timestamp?: number;   // Creation time
 }
 
 // A+ prompts use the same PromptHistory system as listing images.
@@ -439,4 +486,12 @@ export const APLUS_DIMENSIONS: Record<AplusModuleType, { width: number; height: 
   dual_image: { width: 650, height: 350 },
   four_image: { width: 300, height: 225 },
   comparison: { width: 200, height: 225 },
+};
+
+// A+ Mobile dimensions (4:3 ratio for mobile viewport)
+export const APLUS_MOBILE_DIMENSIONS: Record<AplusModuleType, { width: number; height: number }> = {
+  full_image: { width: 600, height: 450 },
+  dual_image: { width: 600, height: 450 },
+  four_image: { width: 600, height: 450 },
+  comparison: { width: 600, height: 450 },
 };

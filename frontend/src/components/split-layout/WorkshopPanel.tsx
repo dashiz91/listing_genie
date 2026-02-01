@@ -107,6 +107,10 @@ interface WorkshopPanelProps {
   canAnalyze?: boolean;
   canGenerate?: boolean;
 
+  // Style reference toggle
+  useOriginalStyleRef?: boolean;
+  onToggleOriginalStyleRef?: (value: boolean) => void;
+
   // UI Control
   expandedSections?: string[];
   onSectionToggle?: (section: string) => void;
@@ -134,12 +138,17 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
   isGenerating = false,
   canAnalyze = false,
   canGenerate = false,
+  useOriginalStyleRef = false,
+  onToggleOriginalStyleRef,
   expandedSections: controlledExpandedSections,
   onSectionToggle,
   className,
 }) => {
   // Internal expanded sections state (if not controlled)
   const [internalExpandedSections, setInternalExpandedSections] = useState<string[]>(['photos', 'product']);
+
+  // Framework prompt/details modal state
+  const [frameworkDetailIndex, setFrameworkDetailIndex] = useState<number | null>(null);
 
   // Use controlled or internal state
   const expandedSections = controlledExpandedSections || internalExpandedSections;
@@ -616,6 +625,36 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             )}
           </div>
 
+          {/* Use Original Style toggle - only when style reference is uploaded */}
+          {formData.styleReferencePreview && (
+            <button
+              onClick={() => onToggleOriginalStyleRef?.(!useOriginalStyleRef)}
+              className={cn(
+                'w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left',
+                useOriginalStyleRef
+                  ? 'bg-redd-500/10 border-redd-500/40'
+                  : 'bg-slate-700/30 border-slate-600 hover:border-slate-500'
+              )}
+            >
+              <div className={cn(
+                'w-9 h-5 rounded-full flex items-center transition-colors shrink-0',
+                useOriginalStyleRef ? 'bg-redd-500 justify-end' : 'bg-slate-600 justify-start'
+              )}>
+                <div className="w-4 h-4 bg-white rounded-full mx-0.5 shadow-sm" />
+              </div>
+              <div>
+                <p className={cn('text-xs font-medium', useOriginalStyleRef ? 'text-redd-400' : 'text-slate-400')}>
+                  Use exact style image
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  {useOriginalStyleRef
+                    ? 'Skip AI style preview — your image is the reference for all generations'
+                    : 'AI will generate a style preview first, then use it as reference'}
+                </p>
+              </div>
+            </button>
+          )}
+
           {/* Color Count */}
           <div>
             <label className="block text-sm text-slate-400 mb-1">Number of Colors</label>
@@ -819,18 +858,18 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             {/* Framework Cards (mini) - only show when not analyzing */}
             {!isAnalyzing && frameworks.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
-              {frameworks.map((framework) => {
+              {frameworks.map((framework, fwIndex) => {
                 const isSelected = selectedFramework?.framework_id === framework.framework_id;
                 return (
-                  <button
+                  <div
                     key={framework.framework_id}
-                    onClick={() => onSelectFramework(framework)}
                     className={cn(
-                      'relative rounded-lg border-2 overflow-hidden transition-all text-left',
+                      'group relative rounded-lg border-2 overflow-hidden transition-all text-left cursor-pointer',
                       isSelected
                         ? 'border-redd-500 ring-2 ring-redd-500/30'
                         : 'border-slate-600 hover:border-slate-500'
                     )}
+                    onClick={() => onSelectFramework(framework)}
                   >
                     {/* Preview image */}
                     <div className="aspect-square bg-slate-700 relative">
@@ -853,6 +892,29 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                           </svg>
                         </div>
                       )}
+                      {/* Hover overlay with action buttons */}
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setFrameworkDetailIndex(fwIndex); }}
+                          className="px-3 py-1.5 bg-white/90 hover:bg-white rounded-lg text-xs font-medium text-slate-800 flex items-center gap-1 transition-colors"
+                          title="View Prompt"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                          </svg>
+                          Prompt
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onAnalyze(); }}
+                          className="px-3 py-1.5 bg-white/90 hover:bg-white rounded-lg text-xs font-medium text-slate-800 flex items-center gap-1 transition-colors"
+                          title="Regenerate Styles"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Regenerate
+                        </button>
+                      </div>
                     </div>
                     {/* Framework name */}
                     <div className="p-2 bg-slate-800">
@@ -868,11 +930,119 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                         ))}
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
             )}
+
+            {/* Framework Detail Modal */}
+            {frameworkDetailIndex !== null && frameworks[frameworkDetailIndex] && (() => {
+              const fw = frameworks[frameworkDetailIndex];
+              return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setFrameworkDetailIndex(null)}>
+                  <div className="bg-slate-800 rounded-xl border border-slate-700 max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-4 border-b border-slate-700 sticky top-0 bg-slate-800 z-10">
+                      <h3 className="text-lg font-semibold text-white">{fw.framework_name}</h3>
+                      <button onClick={() => setFrameworkDetailIndex(null)} className="p-1 text-slate-400 hover:text-white transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="p-4 space-y-4">
+                      {/* Design Philosophy */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Design Philosophy</h4>
+                        <p className="text-sm text-slate-300 italic">"{fw.design_philosophy}"</p>
+                      </div>
+
+                      {/* Color Palette */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">Color Palette</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {fw.colors.map((color, i) => (
+                            <div key={i} className="flex items-center gap-2 bg-slate-700/50 rounded-lg px-2 py-1">
+                              <div className="w-5 h-5 rounded-full border border-slate-500" style={{ backgroundColor: color.hex }} />
+                              <div>
+                                <p className="text-xs text-white font-medium">{color.name}</p>
+                                <p className="text-[10px] text-slate-400">{color.hex} — {color.role}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Typography */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Typography</h4>
+                        <p className="text-sm text-slate-300">Headline: {fw.typography.headline_font}</p>
+                        {fw.typography.body_font && <p className="text-sm text-slate-300">Body: {fw.typography.body_font}</p>}
+                      </div>
+
+                      {/* Image Headlines */}
+                      {fw.image_copy && fw.image_copy.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">Headlines per Image</h4>
+                          <div className="space-y-1">
+                            {fw.image_copy.map((copy, i) => (
+                              <div key={i} className="text-sm">
+                                <span className="font-medium text-slate-200">
+                                  {copy.image_type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}:
+                                </span>{' '}
+                                <span className="text-slate-400">{copy.headline}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Visual Treatment */}
+                      {fw.visual_treatment && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">Visual Treatment</h4>
+                          <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                            <div><span className="text-slate-300 font-medium">Lighting:</span>{' '}<span className="text-slate-400">{fw.visual_treatment.lighting_style}</span></div>
+                            <div><span className="text-slate-300 font-medium">Background:</span>{' '}<span className="text-slate-400">{fw.visual_treatment.background_treatment}</span></div>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {fw.visual_treatment.mood_keywords.map((kw, i) => (
+                              <span key={i} className="px-2 py-0.5 bg-slate-700 rounded text-xs text-slate-300">{kw}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Layout */}
+                      {fw.layout?.whitespace_philosophy && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Layout Philosophy</h4>
+                          <p className="text-xs text-slate-300">{fw.layout.whitespace_philosophy}</p>
+                        </div>
+                      )}
+
+                      {/* Rationale */}
+                      {fw.rationale && (
+                        <div className="bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Why This Works</h4>
+                          <p className="text-xs text-slate-300">{fw.rationale}</p>
+                        </div>
+                      )}
+
+                      {/* Target Appeal */}
+                      {fw.target_appeal && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-400 uppercase mb-1">Target Appeal</h4>
+                          <p className="text-xs text-slate-300">{fw.target_appeal}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </CollapsibleSection>
       )}
@@ -922,33 +1092,54 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                   Analyzing Product...
                 </span>
               ) : (
-                `Preview ${formData.styleCount} Design Style${formData.styleCount > 1 ? 's' : ''}`
+                useOriginalStyleRef
+                  ? 'Analyze & Create Framework'
+                  : `Preview ${formData.styleCount} Design Style${formData.styleCount > 1 ? 's' : ''}`
               )}
             </button>
           </div>
         ) : (
-          // Generate button
-          <button
-            onClick={onGenerate}
-            disabled={!canGenerate || isGenerating}
-            className={cn(
-              'w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all',
-              canGenerate && !isGenerating
-                ? 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20'
-                : 'bg-slate-700 cursor-not-allowed'
-            )}
-          >
-            {isGenerating ? (
-              <span className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Generating Images...
-              </span>
-            ) : selectedFramework ? (
-              `Generate All 5 Images`
-            ) : (
-              'Select a Framework'
-            )}
-          </button>
+          <div className="space-y-2">
+            {/* Generate button */}
+            <button
+              onClick={onGenerate}
+              disabled={!canGenerate || isGenerating}
+              className={cn(
+                'w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all',
+                canGenerate && !isGenerating
+                  ? 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20'
+                  : 'bg-slate-700 cursor-not-allowed'
+              )}
+            >
+              {isGenerating ? (
+                <span className="flex items-center justify-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Generating Images...
+                </span>
+              ) : selectedFramework ? (
+                `Generate All 5 Images`
+              ) : (
+                'Select a Framework'
+              )}
+            </button>
+
+            {/* Re-plan Styles button */}
+            <button
+              onClick={onAnalyze}
+              disabled={isAnalyzing || isGenerating}
+              className={cn(
+                'w-full py-2.5 px-4 rounded-xl font-medium text-sm transition-all flex items-center justify-center gap-2',
+                isAnalyzing || isGenerating
+                  ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white border border-slate-600'
+              )}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              {isAnalyzing ? 'Re-planning...' : 'Re-plan Styles'}
+            </button>
+          </div>
         )}
 
         {/* Helper text */}

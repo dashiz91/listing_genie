@@ -31,6 +31,7 @@ class ImageTypeEnum(enum.Enum):
     APLUS_2 = "aplus_2"
     APLUS_3 = "aplus_3"
     APLUS_4 = "aplus_4"
+    APLUS_5 = "aplus_5"
 
 
 class IntentTypeEnum(enum.Enum):

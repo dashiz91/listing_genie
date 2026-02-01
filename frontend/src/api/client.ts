@@ -19,6 +19,7 @@ import type {
   AplusModuleRequest,
   AplusModuleResponse,
   AplusVisualScriptResponse,
+  HeroPairResponse,
 } from './types';
 
 const API_BASE = '/api';
@@ -248,6 +249,7 @@ class ApiClient {
     console.log('[API Client]   locked_colors:', payload.locked_colors);
     console.log('[API Client]   primary_color:', payload.primary_color);
     console.log('[API Client]   style_reference_path:', payload.style_reference_path);
+    console.log('[API Client]   skip_preview_generation:', payload.skip_preview_generation);
 
     const response = await this.client.post<FrameworkGenerationResponse>(
       '/generate/frameworks/analyze',
@@ -364,12 +366,28 @@ class ApiClient {
   }
 
   /**
+   * Generate the A+ hero pair (modules 0+1) as a single tall image split in half.
+   * Both halves come from the same image — guaranteed perfect alignment.
+   */
+  async generateAplusHeroPair(
+    sessionId: string,
+    customInstructions?: string
+  ): Promise<HeroPairResponse> {
+    const response = await this.client.post<HeroPairResponse>(
+      '/generate/aplus/hero-pair',
+      { session_id: sessionId, custom_instructions: customInstructions },
+      { timeout: 120000 }
+    );
+    return response.data;
+  }
+
+  /**
    * Generate Art Director visual script that plans the entire A+ section
    * as one unified visual narrative.
    */
   async generateAplusVisualScript(
     sessionId: string,
-    moduleCount: number = 5
+    moduleCount: number = 6
   ): Promise<AplusVisualScriptResponse> {
     const response = await this.client.post<AplusVisualScriptResponse>(
       '/generate/aplus/visual-script',
@@ -391,6 +409,69 @@ class ApiClient {
 
   // A+ prompts use the same system as listing images.
   // Use getImagePrompt(sessionId, 'aplus_0') through 'aplus_4' to retrieve them.
+
+  /**
+   * Generate a mobile-optimized version of an A+ module using Gemini edit API.
+   * Recomposes the desktop image (1464x600) into mobile format (600x450, 4:3).
+   */
+  async generateAplusMobile(
+    sessionId: string,
+    moduleIndex: number,
+    customInstructions?: string
+  ): Promise<{ image_path: string; image_url: string; module_index: number }> {
+    const response = await this.client.post(
+      '/generate/aplus/generate-mobile',
+      {
+        session_id: sessionId,
+        module_index: moduleIndex,
+        custom_instructions: customInstructions,
+      },
+      { timeout: 120000 }
+    );
+    return response.data;
+  }
+
+  /**
+   * Generate mobile versions for all A+ modules that have desktop images.
+   */
+  async generateAllAplusMobile(
+    sessionId: string
+  ): Promise<Array<{ module_index: number; image_path: string; image_url: string; status: string }>> {
+    const response = await this.client.post(
+      '/generate/aplus/generate-all-mobile',
+      { session_id: sessionId },
+      { timeout: 600000 }
+    );
+    return response.data;
+  }
+
+  /**
+   * Edit a mobile A+ module image with specific instructions.
+   */
+  async editAplusMobile(
+    sessionId: string,
+    moduleIndex: number,
+    editInstructions: string
+  ): Promise<{ image_path: string; image_url: string; module_index: number }> {
+    const response = await this.client.post(
+      '/generate/edit',
+      {
+        session_id: sessionId,
+        image_type: `aplus_${moduleIndex}`,
+        edit_instructions: editInstructions,
+        mobile: true,
+      },
+      { timeout: 180000 }
+    );
+    // Normalize response to match mobile format
+    return {
+      image_path: response.data.storage_path,
+      image_url: response.data.storage_path
+        ? `/api/images/file?path=${encodeURIComponent(response.data.storage_path)}`
+        : '',
+      module_index: moduleIndex,
+    };
+  }
 }
 
 export const apiClient = new ApiClient();

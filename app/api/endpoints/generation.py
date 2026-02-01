@@ -3,11 +3,13 @@ Image Generation API Endpoints
 
 MASTER Level: Now includes Principal Designer AI for dynamic framework generation.
 """
+import io
 import logging
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, Field
+from PIL import Image
 
 from app.core.auth import User, get_optional_user
 
@@ -261,12 +263,18 @@ class EditImageRequest(BaseModel):
         max_length=2000,
         description="Specific edit instructions (e.g., 'Change the headline to New Text')"
     )
+    mobile: bool = Field(
+        False,
+        description="If True, edit the mobile version of the A+ module"
+    )
 
 
 @router.post("/edit", response_model=SingleImageResponse)
 async def edit_single_image(
     request: EditImageRequest,
     service: GenerationService = Depends(get_generation_service),
+    gemini: GeminiService = Depends(get_gemini_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Edit an existing generated image with specific instructions.
@@ -284,6 +292,11 @@ async def edit_single_image(
     Use regenerate for:
     - "Try a completely different style"
     - "This doesn't look right, try again"
+
+    Mobile mode:
+    - Set mobile=True to edit the mobile version of an A+ module
+    - For A+ modules 0/1, edits the hero mobile image
+    - For A+ modules 2+, edits the individual mobile image
     """
     session = service.get_session_status(request.session_id)
 
@@ -291,6 +304,96 @@ async def edit_single_image(
         raise HTTPException(status_code=404, detail="Session not found")
 
     try:
+        # Handle mobile A+ edit separately
+        if request.mobile:
+            from app.services.image_utils import resize_for_aplus_module
+            import re
+
+            # Extract module index from image_type (e.g., "aplus_0" -> 0)
+            image_type_str = request.image_type.value
+            if not image_type_str.startswith("aplus_"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Mobile edit is only supported for A+ modules (image_type must start with 'aplus_')"
+                )
+
+            # Parse module index
+            try:
+                module_index = int(image_type_str.split("_")[1])
+            except (IndexError, ValueError):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid A+ image type format: {image_type_str}"
+                )
+
+            # Determine mobile key based on module index
+            if module_index in [0, 1]:
+                mobile_key = "aplus_full_image_hero_mobile"
+            else:
+                mobile_key = f"aplus_full_image_{module_index}_mobile"
+
+            # Build mobile image path
+            mobile_path = f"supabase://{storage.generated_bucket}/{request.session_id}/{mobile_key}.png"
+
+            # Verify mobile image exists
+            try:
+                storage.get_generated_url(request.session_id, mobile_key, expires_in=60)
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Mobile image doesn't exist for module {module_index}. Generate mobile version first."
+                )
+
+            logger.info(f"Editing mobile A+ module {module_index} with instructions: {request.edit_instructions}")
+
+            # Use Gemini edit API to modify mobile image
+            edited_image = await gemini.edit_image(
+                source_image_path=mobile_path,
+                edit_instructions=request.edit_instructions,
+                aspect_ratio="4:3",
+                max_retries=3,
+            )
+
+            if not edited_image:
+                raise HTTPException(status_code=500, detail="Mobile image edit failed")
+
+            # Resize to exact 600x450
+            edited_image = resize_for_aplus_module(edited_image, "full_image", mobile=True)
+
+            # Get version number for mobile track
+            mobile_version = 1
+            try:
+                all_files = storage.client.storage.from_(storage.generated_bucket).list(request.session_id)
+                for f in all_files:
+                    name = f.get("name", "")
+                    m = re.match(rf'^{re.escape(mobile_key)}_v(\d+)\.png$', name)
+                    if m:
+                        v = int(m.group(1))
+                        if v >= mobile_version:
+                            mobile_version = v + 1
+            except Exception:
+                pass
+
+            # Save with versioned copy
+            image_path = storage.save_generated_image_versioned(
+                request.session_id,
+                mobile_key,
+                edited_image,
+                mobile_version,
+            )
+
+            logger.info(f"Mobile A+ module {module_index} edited and saved: {image_path}")
+
+            # Return success response
+            return SingleImageResponse(
+                session_id=request.session_id,
+                image_type=request.image_type,
+                status="complete",
+                storage_path=image_path,
+                error_message=None,
+            )
+
+        # Standard desktop edit flow
         # Convert schema enum to DB enum
         db_image_type = DBImageType(request.image_type.value)
 
@@ -311,7 +414,10 @@ async def edit_single_image(
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Edit failed: {e}")
         raise HTTPException(status_code=500, detail=f"Edit failed: {str(e)}")
 
 
@@ -751,6 +857,11 @@ class FrameworkGenerationWithImageRequest(BaseModel):
         le=4,
         description="Number of design framework options to generate (1-4)"
     )
+    # Skip preview image generation — use the original style reference directly
+    skip_preview_generation: bool = Field(
+        default=False,
+        description="When true, skip generating AI preview images and use the style_reference_path as the preview"
+    )
 
 
 @router.post("/frameworks/analyze", response_model=FrameworkGenerationResponse)
@@ -758,6 +869,7 @@ async def analyze_and_generate_frameworks(
     request: FrameworkGenerationWithImageRequest,
     vision: VisionService = Depends(get_vision_service),
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_optional_user),
 ):
     """
     MASTER LEVEL: Analyze product image, generate design frameworks, and create preview images.
@@ -832,52 +944,77 @@ async def analyze_and_generate_frameworks(
             upload_path=request.upload_path,
             style_ids=[f"framework_{i+1}" for i in range(len(frameworks))],
         )
-        session = service.create_preview_session(preview_request)
+        session = service.create_preview_session(
+            preview_request,
+            user_id=user.id if user else None,
+        )
+        # Store additional form data on the session so it appears in projects
+        if user:
+            session.brand_name = request.brand_name
+            session.feature_2 = request.features[1] if request.features and len(request.features) > 1 else None
+            session.feature_3 = request.features[2] if request.features and len(request.features) > 2 else None
+            session.target_audience = request.target_audience
+            session.additional_upload_paths = request.additional_upload_paths or []
+            session.style_reference_path = request.style_reference_path
+            service.db.commit()
 
-        # Step 3: Generate preview images for all frameworks IN PARALLEL
-        import asyncio
-        from app.services.gemini_service import get_gemini_service
-        from app.dependencies import get_storage_service
+        # Step 3: Generate preview images (or skip if using original style ref)
+        logger.info(f"skip_preview_generation={request.skip_preview_generation}, style_reference_path={request.style_reference_path}")
+        if request.skip_preview_generation and request.style_reference_path:
+            # Use the original style reference image as the preview for all frameworks
+            logger.info("Skipping preview generation — using original style reference image")
+            from app.dependencies import get_storage_service
+            storage = get_storage_service()
+            # Build a preview URL from the style reference path
+            style_ref_url = f"/api/images/file?path={request.style_reference_path}"
+            for fw in frameworks:
+                fw['preview_url'] = style_ref_url
+                fw['preview_path'] = request.style_reference_path
+            frameworks_with_previews = frameworks
+        else:
+            import asyncio
+            from app.services.gemini_service import get_gemini_service
+            from app.dependencies import get_storage_service
 
-        gemini = get_gemini_service()
-        storage = get_storage_service()
+            gemini = get_gemini_service()
+            storage = get_storage_service()
 
-        async def generate_preview(i: int, framework: dict) -> dict:
-            """Generate a single preview image for a framework"""
-            try:
-                preview_prompt = vision.framework_to_prompt(framework, 'main')
-                preview_image = await gemini.generate_image(
-                    prompt=preview_prompt,
-                    reference_image_paths=[request.upload_path],
-                    aspect_ratio="1:1",
-                    max_retries=2,
-                )
-
-                if preview_image:
-                    storage_path = storage.save_generated_image(
-                        session_id=session.id,
-                        image_type=f"framework_preview_{i+1}",
-                        image=preview_image,
+            async def generate_preview(i: int, framework: dict) -> dict:
+                """Generate a single preview image for a framework"""
+                try:
+                    preview_prompt = vision.framework_to_prompt(framework, 'main')
+                    preview_image = await gemini.generate_image(
+                        prompt=preview_prompt,
+                        reference_image_paths=[request.upload_path],
+                        aspect_ratio="1:1",
+                        max_retries=2,
                     )
-                    framework['preview_url'] = f"/api/images/{session.id}/framework_preview_{i+1}"
-                    framework['preview_path'] = storage_path
-                    logger.info(f"Preview {i+1} generated successfully")
-                else:
+
+                    if preview_image:
+                        storage_path = storage.save_generated_image(
+                            session_id=session.id,
+                            image_type=f"framework_preview_{i+1}",
+                            image=preview_image,
+                        )
+                        framework['preview_url'] = f"/api/images/{session.id}/framework_preview_{i+1}"
+                        framework['preview_path'] = storage_path
+                        logger.info(f"Preview {i+1} generated successfully")
+                    else:
+                        framework['preview_url'] = None
+                        framework['preview_path'] = None
+                except Exception as e:
+                    logger.warning(f"Failed to generate preview for framework {i+1}: {e}")
                     framework['preview_url'] = None
                     framework['preview_path'] = None
-            except Exception as e:
-                logger.warning(f"Failed to generate preview for framework {i+1}: {e}")
-                framework['preview_url'] = None
-                framework['preview_path'] = None
-            return framework
+                return framework
 
-        # Generate all previews in parallel
-        num_frameworks = len(frameworks)
-        logger.info(f"Generating {num_frameworks} framework preview(s) in parallel...")
-        frameworks_with_previews = await asyncio.gather(
-            *[generate_preview(i, fw) for i, fw in enumerate(frameworks)]
-        )
-        logger.info(f"All {num_frameworks} preview(s) generated")
+            # Generate all previews in parallel
+            num_frameworks = len(frameworks)
+            logger.info(f"Generating {num_frameworks} framework preview(s) in parallel...")
+            frameworks_with_previews = await asyncio.gather(
+                *[generate_preview(i, fw) for i, fw in enumerate(frameworks)]
+            )
+            logger.info(f"All {num_frameworks} preview(s) generated")
 
         # Handle nested product_analysis structure
         product_analysis = result.get('product_analysis', {})
@@ -1104,6 +1241,12 @@ class AplusModuleRequest(BaseModel):
     custom_instructions: Optional[str] = Field(None, max_length=500)
 
 
+class RefinedModule(BaseModel):
+    """Info about a previous module that was refined during canvas extension"""
+    module_index: int
+    image_path: str
+    image_url: str
+
 class AplusModuleResponse(BaseModel):
     """Response from A+ module generation"""
     session_id: str
@@ -1116,12 +1259,13 @@ class AplusModuleResponse(BaseModel):
     is_chained: bool  # True if this used a previous module as reference
     generation_time_ms: int
     prompt_text: Optional[str] = None  # The prompt used for generation
+    refined_previous: Optional[RefinedModule] = None  # Previous module refined by canvas extension
 
 
 class AplusVisualScriptRequest(BaseModel):
     """Request to generate Art Director visual script"""
     session_id: str = Field(..., description="Session ID from listing generation")
-    module_count: int = Field(default=5, ge=1, le=7)
+    module_count: int = Field(default=6, ge=1, le=7)
 
 
 class AplusVisualScriptResponse(BaseModel):
@@ -1131,6 +1275,208 @@ class AplusVisualScriptResponse(BaseModel):
     module_count: int
 
 
+
+
+# ============== A+ Hero Pair Generation (Modules 0+1) ==============
+
+class HeroPairRequest(BaseModel):
+    """Request to generate hero pair (modules 0+1) as a single image split in half"""
+    session_id: str = Field(..., description="Session ID from listing generation")
+    custom_instructions: Optional[str] = Field(None, max_length=500)
+
+
+class HeroPairModuleResult(BaseModel):
+    """Result for one module of the hero pair"""
+    image_path: str
+    image_url: str
+    prompt_text: Optional[str] = None
+
+
+class HeroPairResponse(BaseModel):
+    """Response from hero pair generation"""
+    session_id: str
+    module_0: HeroPairModuleResult
+    module_1: HeroPairModuleResult
+    generation_time_ms: int
+
+
+@router.post("/aplus/hero-pair", response_model=HeroPairResponse)
+async def generate_aplus_hero_pair(
+    request: HeroPairRequest,
+    user: Optional[User] = Depends(get_optional_user),
+    gemini: GeminiService = Depends(get_gemini_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate the A+ hero pair (modules 0+1) as a single tall image, then split it in half.
+
+    This produces two perfectly aligned banners from one Gemini call — zero seam possible.
+    """
+    import time
+    from app.prompts.templates.aplus_modules import (
+        build_hero_pair_prompt, get_visual_script_prompt,
+        IMAGE_LABEL_PRODUCT, IMAGE_LABEL_STYLE,
+    )
+    from app.services.canvas_compositor import CanvasCompositor
+    from app.models.database import GenerationSession, DesignContext, ImageTypeEnum as DBImageTypeEnum
+
+    start_time = time.time()
+
+    try:
+        # Get session
+        session = db.query(GenerationSession).filter(
+            GenerationSession.id == request.session_id
+        ).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Auto-generate visual script if missing
+        visual_script = session.aplus_visual_script
+        if not visual_script:
+            logger.info("No visual script found, generating one for hero pair...")
+            import json as json_module
+            features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
+            framework = session.design_framework_json or {}
+            script_prompt = get_visual_script_prompt(
+                product_title=session.product_title,
+                brand_name=session.brand_name or "",
+                features=features,
+                target_audience=session.target_audience or "",
+                framework=framework,
+                module_count=6,
+            )
+            image_paths = []
+            if session.upload_path:
+                image_paths.append(session.upload_path)
+            if session.additional_upload_paths:
+                image_paths.extend(session.additional_upload_paths)
+
+            raw_text = await gemini.generate_text_with_images(
+                prompt=script_prompt,
+                image_paths=image_paths,
+                max_tokens=5000,
+                temperature=0.7,
+            )
+            clean_text = raw_text.strip()
+            if clean_text.startswith("```"):
+                clean_text = clean_text.split("\n", 1)[1] if "\n" in clean_text else clean_text[3:]
+                if clean_text.endswith("```"):
+                    clean_text = clean_text[:-3]
+                clean_text = clean_text.strip()
+            visual_script = json_module.loads(clean_text)
+            session.aplus_visual_script = visual_script
+            db.commit()
+
+        # Build the hero pair prompt
+        prompt = build_hero_pair_prompt(
+            visual_script=visual_script,
+            product_title=session.product_title,
+            brand_name=session.brand_name or "",
+            custom_instructions=request.custom_instructions or "",
+        )
+
+        # Assemble named images
+        named_images = []
+        if session.upload_path:
+            named_images.append((IMAGE_LABEL_PRODUCT, session.upload_path))
+        if session.style_reference_path:
+            named_images.append((IMAGE_LABEL_STYLE, session.style_reference_path))
+
+        logger.info(f"Generating hero pair with {len(named_images)} named images, prompt={len(prompt)} chars")
+
+        # Generate ONE tall image at 4:3
+        hero_image = await gemini.generate_image(
+            prompt=prompt,
+            named_images=named_images if named_images else None,
+            aspect_ratio="4:3",
+            image_size="1K",
+        )
+
+        if not hero_image:
+            raise HTTPException(status_code=500, detail="Hero pair image generation failed")
+
+        # Split at exact midpoint
+        compositor = CanvasCompositor()
+        top_module, bottom_module = compositor.split_hero_image(hero_image)
+
+        # Save prompt history for both modules with SAME version number (they're one image)
+        hero_version = 1
+        try:
+            from app.services.generation_service import GenerationService
+            from app.models.database import PromptHistory as PromptHistoryModel
+            gen_service = GenerationService(db=db, gemini=gemini, storage=storage)
+            design_ctx = gen_service.get_design_context(request.session_id)
+            if not design_ctx:
+                design_ctx = gen_service.create_design_context(session)
+
+            ref_images = []
+            if session.upload_path:
+                ref_images.append({"type": "primary", "path": session.upload_path})
+            if session.style_reference_path:
+                ref_images.append({"type": "style_reference", "path": session.style_reference_path})
+
+            # Compute a shared version: max of both prompt counts + 1
+            count_0 = db.query(PromptHistoryModel).filter(
+                PromptHistoryModel.context_id == design_ctx.id,
+                PromptHistoryModel.image_type == DBImageTypeEnum("aplus_0"),
+            ).count()
+            count_1 = db.query(PromptHistoryModel).filter(
+                PromptHistoryModel.context_id == design_ctx.id,
+                PromptHistoryModel.image_type == DBImageTypeEnum("aplus_1"),
+            ).count()
+            hero_version = max(count_0, count_1) + 1
+
+            for aplus_idx in [0, 1]:
+                ph = PromptHistoryModel(
+                    context_id=design_ctx.id,
+                    image_type=DBImageTypeEnum(f"aplus_{aplus_idx}"),
+                    version=hero_version,
+                    prompt_text=prompt,
+                    reference_image_paths=ref_images if ref_images else None,
+                )
+                db.add(ph)
+            db.commit()
+        except Exception as e:
+            logger.warning(f"Failed to save hero pair prompt history: {e}")
+
+        # Save both modules with the SAME version number
+        top_path = storage.save_generated_image_versioned(request.session_id, "aplus_full_image_0", top_module, hero_version)
+        bottom_path = storage.save_generated_image_versioned(request.session_id, "aplus_full_image_1", bottom_module, hero_version)
+
+        # Get URLs
+        try:
+            top_url = storage.get_generated_url(request.session_id, "aplus_full_image_0", expires_in=3600)
+        except Exception:
+            top_url = f"/api/images/file?path={top_path}"
+        try:
+            bottom_url = storage.get_generated_url(request.session_id, "aplus_full_image_1", expires_in=3600)
+        except Exception:
+            bottom_url = f"/api/images/file?path={bottom_path}"
+
+        generation_time_ms = int((time.time() - start_time) * 1000)
+        logger.info(f"Hero pair generated in {generation_time_ms}ms")
+
+        return HeroPairResponse(
+            session_id=request.session_id,
+            module_0=HeroPairModuleResult(
+                image_path=top_path,
+                image_url=top_url,
+                prompt_text=prompt,
+            ),
+            module_1=HeroPairModuleResult(
+                image_path=bottom_path,
+                image_url=bottom_url,
+                prompt_text=prompt,
+            ),
+            generation_time_ms=generation_time_ms,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Hero pair generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Hero pair generation failed: {str(e)}")
 
 
 @router.post("/aplus/generate", response_model=AplusModuleResponse)
@@ -1261,11 +1607,13 @@ async def generate_aplus_module(
         aspect_ratio = get_aspect_ratio_for_module(request.module_type.value)
 
         # === Canvas Extension Decision ===
-        # For modules 1+, check if we can use gradient canvas inpainting
-        # for seamless transitions (requires scene_description on both modules)
+        # For modules 2+, check if we can use gradient canvas inpainting
+        # for seamless transitions (requires scene_description on both modules).
+        # Modules 0 and 1 are the "hero pair" — they should be generated together
+        # via the /aplus/hero-pair endpoint, not via canvas extension.
         use_canvas_extension = False
         if (
-            request.module_index > 0
+            request.module_index > 1
             and request.previous_module_path
             and visual_script
         ):
@@ -1286,25 +1634,29 @@ async def generate_aplus_module(
         logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, chained={is_chained}, named_images={use_named_images}, canvas_ext={use_canvas_extension})")
 
         generated_image = None
+        refined_previous_info = None
 
         if use_canvas_extension:
-            # Canvas extension workflow: gradient canvas → generate (not edit!) → crop
-            # Key insight from docs: Gemini must receive the canvas as a REFERENCE IMAGE
-            # in a generation call, NOT as an edit source. Edit mode modifies globally;
-            # generation mode with canvas reference is what produces seamless fills.
+            # Canvas extension workflow:
+            # 1. Build gradient canvas from previous module
+            # 2. Send canvas + product photo + style ref + combined prompt to Gemini
+            # 3. Split result into two seamless modules
+            #
+            # Key: Gemini gets ALL context — the canvas to complete, the product to
+            # reference, the style to match, AND the Art Director's full creative brief
+            # (including typography instructions for the new module).
             compositor = CanvasCompositor()
             modules = visual_script.get("modules", [])
             prev_scene = modules[request.module_index - 1]["scene_description"]
             curr_scene = modules[request.module_index]["scene_description"]
 
-            # 1. Load previous module image
+            # 1. Load previous module image & create gradient canvas
             prev_image = _load_image_from_path(request.previous_module_path)
             logger.info(f"Loaded previous module image: {prev_image.size}")
 
-            # 2. Create gradient canvas (1464x1171, 5:4 ratio)
-            canvas = compositor.create_gradient_canvas(prev_image)
+            canvas = compositor.create_canvas(prev_image)
 
-            # 2b. Save canvas to storage for debugging
+            # 1b. Save canvas for debugging
             debug_canvas_path = storage.save_generated_image(
                 request.session_id,
                 f"debug_canvas_{request.module_index}",
@@ -1312,19 +1664,48 @@ async def generate_aplus_module(
             )
             logger.info(f"Debug canvas saved: {debug_canvas_path}")
 
-            # 3. Build inpainting prompt
-            inpaint_prompt = build_canvas_inpainting_prompt(
+            # 2. Build combined prompt: canvas inpainting context + Art Director's full brief
+            inpaint_context = build_canvas_inpainting_prompt(
                 previous_scene_description=prev_scene,
                 current_scene_description=curr_scene,
             )
 
-            # 4. Send canvas as REFERENCE IMAGE to generate call (NOT edit)
-            # The canvas is the image Gemini should "complete" — it sees the top
-            # portion as existing content and the blank bottom as space to fill.
-            # 4:3 is the proven ratio from the continuity technique doc.
-            completed_canvas = await gemini.generate_image_from_pil(
-                prompt=inpaint_prompt,
-                reference_image=canvas,
+            # Get Art Director's generation_prompt for this module (has typography, layout, etc.)
+            art_director_prompt = get_aplus_module_prompt(
+                visual_script=visual_script,
+                module_index=request.module_index,
+                custom_instructions=request.custom_instructions or "",
+            )
+
+            if art_director_prompt:
+                # Combine: inpainting instructions first, then Art Director's full brief
+                combined_prompt = (
+                    f"{inpaint_context}\n\n"
+                    f"═══ ART DIRECTOR'S BRIEF FOR THE NEW MODULE (bottom portion) ═══\n\n"
+                    f"{art_director_prompt}"
+                )
+            else:
+                combined_prompt = inpaint_context
+
+            # 3. Build named images: canvas FIRST, then product photo, style reference
+            canvas_named_images = []
+            canvas_named_images.append(("CANVAS_TO_COMPLETE", canvas))  # PIL Image directly
+            if session.upload_path:
+                canvas_named_images.append((IMAGE_LABEL_PRODUCT, session.upload_path))
+            if session.style_reference_path:
+                canvas_named_images.append((IMAGE_LABEL_STYLE, session.style_reference_path))
+
+            logger.info(
+                f"Canvas extension: sending {len(canvas_named_images)} named images "
+                f"(canvas + {len(canvas_named_images) - 1} references), "
+                f"prompt={len(combined_prompt)} chars"
+            )
+
+            # 4. Generate with named images (canvas + product + style) and combined prompt
+            # Uses 4:3 aspect ratio — proven ratio from continuity technique doc
+            completed_canvas = await gemini.generate_image(
+                prompt=combined_prompt,
+                named_images=canvas_named_images,
                 aspect_ratio="4:3",
                 image_size="1K",
             )
@@ -1352,10 +1733,20 @@ async def generate_aplus_module(
                     prev_filename,
                     top_module,
                 )
+                try:
+                    prev_url = storage.get_generated_url(request.session_id, prev_filename) if prev_path else ""
+                except Exception as url_err:
+                    logger.warning(f"Failed to get signed URL for refined previous, using proxy: {url_err}")
+                    prev_url = f"/api/images/file?path={prev_path}" if prev_path else ""
                 logger.info(f"Overwrote previous module {prev_module_idx} with refined version: {prev_path}")
+                refined_previous_info = RefinedModule(
+                    module_index=prev_module_idx,
+                    image_path=prev_path,
+                    image_url=prev_url,
+                )
 
-                # Override prompt for history — record the inpainting prompt
-                prompt = inpaint_prompt
+                # Record combined prompt for history
+                prompt = combined_prompt
             else:
                 logger.warning("Canvas extension failed, falling back to standard generation")
                 use_canvas_extension = False  # Fall through to standard path
@@ -1405,21 +1796,10 @@ async def generate_aplus_module(
             mobile=False
         )
 
-        # Save to storage
-        image_filename = f"aplus_{request.module_type.value}_{request.module_index}.png"
-        image_path = storage.save_generated_image(
-            request.session_id,
-            image_filename.replace(".png", ""),  # Storage adds extension
-            final_image
-        )
-
-        # Get signed URL
-        image_url = storage.get_generated_url(request.session_id, image_filename.replace(".png", ""), expires_in=3600)
-
         generation_time_ms = int((time.time() - start_time) * 1000)
 
-        # Save prompt to PromptHistory (same system as listing images)
-        # Include the ACTUAL reference images passed to generation
+        # Save prompt to PromptHistory first to get version number
+        module_version = 1
         try:
             from app.services.generation_service import GenerationService
             gen_service = GenerationService(db=db, gemini=gemini, storage=storage)
@@ -1432,11 +1812,14 @@ async def generate_aplus_module(
             # Build reference images list with types
             ref_images_for_history = []
             if use_canvas_extension:
-                # Canvas extension: only the gradient canvas was sent to Gemini
                 ref_images_for_history.append({
                     "type": "gradient_canvas",
                     "path": debug_canvas_path,
                 })
+                if session.upload_path:
+                    ref_images_for_history.append({"type": "primary", "path": session.upload_path})
+                if session.style_reference_path:
+                    ref_images_for_history.append({"type": "style_reference", "path": session.style_reference_path})
             else:
                 if session.upload_path:
                     ref_images_for_history.append({"type": "primary", "path": session.upload_path})
@@ -1450,14 +1833,27 @@ async def generate_aplus_module(
 
             # Map module_index to ImageTypeEnum (aplus_0 .. aplus_4)
             aplus_image_type = DBImageTypeEnum(f"aplus_{request.module_index}")
-            gen_service.store_prompt_in_history(
+            ph = gen_service.store_prompt_in_history(
                 context=design_ctx,
                 image_type=aplus_image_type,
                 prompt_text=prompt,
                 reference_image_paths=ref_images_for_history if ref_images_for_history else None,
             )
+            module_version = ph.version
         except Exception as e:
             logger.warning(f"Failed to save A+ prompt history: {e}")
+
+        # Save to storage with versioned copy
+        storage_key = f"aplus_{request.module_type.value}_{request.module_index}"
+        image_path = storage.save_generated_image_versioned(
+            request.session_id,
+            storage_key,
+            final_image,
+            module_version,
+        )
+
+        # Get signed URL
+        image_url = storage.get_generated_url(request.session_id, storage_key, expires_in=3600)
 
         logger.info(f"A+ module generated in {generation_time_ms}ms: {image_path}")
 
@@ -1472,6 +1868,7 @@ async def generate_aplus_module(
             is_chained=is_chained,
             generation_time_ms=generation_time_ms,
             prompt_text=prompt,
+            refined_previous=refined_previous_info,
         )
 
     except HTTPException:
@@ -1595,3 +1992,361 @@ async def get_aplus_visual_script(
 
     # A+ prompts are stored in the same PromptHistory system as listing images.
     # Use GET /generate/{session_id}/prompts/aplus_0 through aplus_4 to retrieve them.
+
+
+# ============== A+ Mobile Generation ==============
+
+class AplusMobileRequest(BaseModel):
+    """Request to generate a mobile-optimized version of an A+ module"""
+    session_id: str = Field(..., description="Session ID")
+    module_index: int = Field(..., ge=0, le=6, description="Which module to convert")
+    custom_instructions: Optional[str] = Field(None, max_length=500)
+
+
+class AplusMobileResponse(BaseModel):
+    """Response from mobile A+ generation"""
+    session_id: str
+    module_index: int
+    image_path: str
+    image_url: str
+
+
+class AplusAllMobileRequest(BaseModel):
+    """Request to generate mobile versions for all A+ modules"""
+    session_id: str = Field(..., description="Session ID")
+
+
+@router.post("/aplus/generate-mobile", response_model=AplusMobileResponse)
+async def generate_aplus_mobile(
+    request: AplusMobileRequest,
+    user: Optional[User] = Depends(get_optional_user),
+    gemini: GeminiService = Depends(get_gemini_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a mobile-optimized version (600x450, 4:3) of an A+ module
+    by using Gemini's edit API to intelligently recompose the desktop image.
+
+    Special handling for hero modules:
+    - module_index 0: Merges modules 0 and 1 into a single hero mobile image
+    - module_index 1: Returns existing hero mobile image from module 0
+    - module_index 2+: Standard individual mobile generation
+    """
+    from app.models.database import GenerationSession, DesignContext, PromptHistory as PromptHistoryModel, ImageTypeEnum as DBImageTypeEnum
+    from app.services.image_utils import resize_for_aplus_module
+    import re
+
+    try:
+        session = db.query(GenerationSession).filter(
+            GenerationSession.id == request.session_id
+        ).first()
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Special handling for module 1: return existing hero mobile
+        if request.module_index == 1:
+            hero_mobile_key = "aplus_full_image_hero_mobile"
+            try:
+                # Check if hero mobile exists
+                hero_mobile_url = storage.get_generated_url(request.session_id, hero_mobile_key, expires_in=3600)
+                hero_mobile_path = f"supabase://{storage.generated_bucket}/{request.session_id}/{hero_mobile_key}.png"
+
+                logger.info(f"Returning existing hero mobile image for module 1")
+                return AplusMobileResponse(
+                    session_id=request.session_id,
+                    module_index=request.module_index,
+                    image_path=hero_mobile_path,
+                    image_url=hero_mobile_url,
+                )
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Hero mobile image doesn't exist. Generate mobile for module 0 instead."
+                )
+
+        # Special handling for module 0: merge with module 1 into hero mobile
+        if request.module_index == 0:
+            # Load BOTH desktop hero images (modules 0 and 1)
+            desktop_key_0 = "aplus_full_image_0"
+            desktop_key_1 = "aplus_full_image_1"
+            desktop_path_0 = f"supabase://{storage.generated_bucket}/{request.session_id}/{desktop_key_0}.png"
+            desktop_path_1 = f"supabase://{storage.generated_bucket}/{request.session_id}/{desktop_key_1}.png"
+
+            # Verify both desktop images exist
+            try:
+                storage.get_generated_url(request.session_id, desktop_key_0, expires_in=60)
+                storage.get_generated_url(request.session_id, desktop_key_1, expires_in=60)
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Both hero desktop images (modules 0 and 1) must exist. Generate desktop first."
+                )
+
+            # Load and stack the images vertically
+            logger.info("Loading and stacking hero desktop images for mobile merge")
+            img0 = _load_image_from_path(desktop_path_0)
+            img1 = _load_image_from_path(desktop_path_1)
+
+            # Create combined image (stack vertically)
+            combined_width = max(img0.width, img1.width)
+            combined_height = img0.height + img1.height
+            combined = Image.new('RGB', (combined_width, combined_height))
+            combined.paste(img0, (0, 0))
+            combined.paste(img1, (0, img0.height))
+
+            # Save combined image temporarily
+            temp_key = "aplus_hero_combined_temp"
+            storage.save_generated_image_versioned(
+                request.session_id,
+                temp_key,
+                combined,
+                0,  # version 0 for temp file
+            )
+            temp_path = f"supabase://{storage.generated_bucket}/{request.session_id}/{temp_key}.png"
+
+            # Build hero-specific recomposition prompt
+            recompose_prompt = (
+                "Recompose this Amazon A+ Content hero banner for mobile viewing. "
+                "The original is two seamless desktop halves (top + bottom) stacked vertically. "
+                "Intelligently rearrange all content to fit a single 4:3 mobile image: "
+                "- Keep the product prominent and centered "
+                "- Reflow text and graphics to fit the mobile format "
+                "- Maintain the same visual style, colors, and brand identity "
+                "- Don't crop important elements — rearrange them "
+                "- Ensure text remains readable at mobile scale "
+                "- Preserve the seamless brand experience from the desktop hero "
+            )
+            if request.custom_instructions:
+                recompose_prompt += f"\nAdditional instructions: {request.custom_instructions}"
+
+            logger.info("Generating hero mobile from combined desktop images via edit API")
+
+            # Use Gemini edit to recompose the combined image
+            mobile_image = await gemini.edit_image(
+                source_image_path=temp_path,
+                edit_instructions=recompose_prompt,
+                aspect_ratio="4:3",
+                max_retries=3,
+            )
+
+            if not mobile_image:
+                raise HTTPException(status_code=500, detail="Hero mobile image generation failed")
+
+            # Resize to exact 600x450
+            mobile_image = resize_for_aplus_module(mobile_image, "full_image", mobile=True)
+
+            # Save as hero mobile (not module 0 mobile)
+            mobile_key = "aplus_full_image_hero_mobile"
+
+            # Get version number for hero mobile track
+            mobile_version = 1
+            try:
+                all_files = storage.client.storage.from_(storage.generated_bucket).list(request.session_id)
+                for f in all_files:
+                    name = f.get("name", "")
+                    m = re.match(rf'^{re.escape(mobile_key)}_v(\d+)\.png$', name)
+                    if m:
+                        v = int(m.group(1))
+                        if v >= mobile_version:
+                            mobile_version = v + 1
+            except Exception:
+                pass
+
+            # Save with versioned copy
+            image_path = storage.save_generated_image_versioned(
+                request.session_id,
+                mobile_key,
+                mobile_image,
+                mobile_version,
+            )
+
+            # Get URL
+            try:
+                image_url = storage.get_generated_url(request.session_id, mobile_key, expires_in=3600)
+            except Exception:
+                image_url = f"/api/images/file?path={image_path}"
+
+            # Store prompt history
+            try:
+                from app.services.generation_service import GenerationService
+                gen_service = GenerationService(db=db, gemini=gemini, storage=storage)
+                design_ctx = gen_service.get_design_context(request.session_id)
+                if design_ctx:
+                    gen_service.store_prompt_in_history(
+                        context=design_ctx,
+                        image_type=DBImageTypeEnum("aplus_0"),
+                        prompt_text=f"[HERO MOBILE MERGE] {recompose_prompt}",
+                        change_summary="Hero mobile recomposition from combined desktop images (modules 0+1)",
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to store hero mobile prompt history: {e}")
+
+            logger.info(f"Hero mobile image generated: {image_path}")
+
+            return AplusMobileResponse(
+                session_id=request.session_id,
+                module_index=request.module_index,
+                image_path=image_path,
+                image_url=image_url,
+            )
+
+        # Standard processing for modules 2+
+        desktop_key = f"aplus_full_image_{request.module_index}"
+        desktop_path = f"supabase://{storage.generated_bucket}/{request.session_id}/{desktop_key}.png"
+
+        # Verify desktop image exists
+        try:
+            storage.get_generated_url(request.session_id, desktop_key, expires_in=60)
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"No desktop image for module {request.module_index}. Generate desktop first.")
+
+        # Build recomposition prompt
+        recompose_prompt = (
+            "Recompose this Amazon A+ Content banner image for mobile viewing. "
+            "The original is a wide desktop banner (21:9 ratio). "
+            "Intelligently rearrange the content to fit a 4:3 mobile ratio: "
+            "- Keep the product prominent and centered "
+            "- Reflow text and graphics to fit the taller format "
+            "- Maintain the same visual style, colors, and brand identity "
+            "- Don't crop important elements — rearrange them "
+            "- Ensure text remains readable at mobile scale "
+        )
+        if request.custom_instructions:
+            recompose_prompt += f"\nAdditional instructions: {request.custom_instructions}"
+
+        logger.info(f"Generating mobile A+ module {request.module_index} via edit API")
+
+        # Use Gemini edit to recompose
+        mobile_image = await gemini.edit_image(
+            source_image_path=desktop_path,
+            edit_instructions=recompose_prompt,
+            aspect_ratio="4:3",
+            max_retries=3,
+        )
+
+        if not mobile_image:
+            raise HTTPException(status_code=500, detail="Mobile image generation failed")
+
+        # Resize to exact 600x450
+        mobile_image = resize_for_aplus_module(mobile_image, "full_image", mobile=True)
+
+        # Get version number for mobile track
+        mobile_key = f"aplus_full_image_{request.module_index}_mobile"
+        # Check existing mobile versions in storage
+        mobile_version = 1
+        try:
+            all_files = storage.client.storage.from_(storage.generated_bucket).list(request.session_id)
+            for f in all_files:
+                name = f.get("name", "")
+                m = re.match(rf'^{re.escape(mobile_key)}_v(\d+)\.png$', name)
+                if m:
+                    v = int(m.group(1))
+                    if v >= mobile_version:
+                        mobile_version = v + 1
+        except Exception:
+            pass
+
+        # Save with versioned copy
+        image_path = storage.save_generated_image_versioned(
+            request.session_id,
+            mobile_key,
+            mobile_image,
+            mobile_version,
+        )
+
+        # Get URL
+        try:
+            image_url = storage.get_generated_url(request.session_id, mobile_key, expires_in=3600)
+        except Exception:
+            image_url = f"/api/images/file?path={image_path}"
+
+        # Store prompt history
+        try:
+            from app.services.generation_service import GenerationService
+            gen_service = GenerationService(db=db, gemini=gemini, storage=storage)
+            design_ctx = gen_service.get_design_context(request.session_id)
+            if design_ctx:
+                gen_service.store_prompt_in_history(
+                    context=design_ctx,
+                    image_type=DBImageTypeEnum(f"aplus_{request.module_index}"),
+                    prompt_text=f"[MOBILE RECOMPOSE] {recompose_prompt}",
+                    change_summary="Mobile recomposition from desktop image",
+                )
+        except Exception as e:
+            logger.warning(f"Failed to store mobile prompt history: {e}")
+
+        logger.info(f"Mobile A+ module {request.module_index} generated: {image_path}")
+
+        return AplusMobileResponse(
+            session_id=request.session_id,
+            module_index=request.module_index,
+            image_path=image_path,
+            image_url=image_url,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Mobile A+ generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Mobile generation failed: {str(e)}")
+
+
+@router.post("/aplus/generate-all-mobile")
+async def generate_all_aplus_mobile(
+    request: AplusAllMobileRequest,
+    user: Optional[User] = Depends(get_optional_user),
+    gemini: GeminiService = Depends(get_gemini_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate mobile versions for all A+ modules that have desktop images.
+    Returns array of results.
+    """
+    from app.models.database import GenerationSession
+
+    session = db.query(GenerationSession).filter(
+        GenerationSession.id == request.session_id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Find all modules with desktop images
+    results = []
+    for i in range(7):  # up to 7 modules
+        desktop_key = f"aplus_full_image_{i}"
+        try:
+            storage.get_generated_url(request.session_id, desktop_key, expires_in=60)
+        except Exception:
+            continue  # No desktop image for this module
+
+        try:
+            # Generate mobile for this module
+            mobile_req = AplusMobileRequest(
+                session_id=request.session_id,
+                module_index=i,
+            )
+            result = await generate_aplus_mobile(
+                request=mobile_req,
+                user=user,
+                gemini=gemini,
+                storage=storage,
+                db=db,
+            )
+            results.append({
+                "module_index": i,
+                "image_path": result.image_path,
+                "image_url": result.image_url,
+                "status": "complete",
+            })
+        except Exception as e:
+            logger.error(f"Mobile generation failed for module {i}: {e}")
+            results.append({
+                "module_index": i,
+                "image_path": "",
+                "image_url": "",
+                "status": "failed",
+            })
+
+    return results

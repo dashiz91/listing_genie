@@ -11,9 +11,19 @@ import type {
   GenerationStatus,
   DesignFramework,
   AplusVisualScript,
+  ImageVersion,
 } from '../api/types';
-import type { AplusModule } from '../components/preview-slots/AplusSection';
+import type { AplusModule, AplusViewportMode } from '../components/preview-slots/AplusSection';
+import { getActiveImagePath } from '../components/preview-slots/AplusSection';
 import type { SlotStatus } from '../components/preview-slots/ImageSlot';
+
+// Listing image version tracking (uses unified ImageVersion)
+export interface ListingVersionState {
+  [imageType: string]: {
+    versions: ImageVersion[];
+    activeIndex: number;
+  };
+}
 
 // Helper to extract error message from various error formats
 const extractErrorMessage = (err: any, fallback: string): string => {
@@ -112,20 +122,33 @@ export const HomePage: React.FC = () => {
 
   // Uploaded paths (for API calls)
   const [logoPath, setLogoPath] = useState<string | null>(null);
+  const [originalStyleRefPath, setOriginalStyleRefPath] = useState<string | null>(null);
+  const [useOriginalStyleRef, setUseOriginalStyleRef] = useState(false);
 
-  // A+ Content modules state — default 5x full-width banners (1464x600)
+  // A+ Content modules state — default 6x full-width banners (1464x600)
   const [aplusModules, setAplusModules] = useState<AplusModule[]>(() => {
-    return Array.from({ length: 5 }, (_, i) => ({
+    return Array.from({ length: 6 }, (_, i) => ({
       id: `aplus-${i + 1}`,
       type: 'full_image' as const,
       index: i,
       status: 'ready' as SlotStatus,
+      versions: [] as ImageVersion[],
+      activeVersionIndex: 0,
+      mobileVersions: [] as ImageVersion[],
+      mobileActiveVersionIndex: 0,
+      mobileStatus: 'ready' as SlotStatus,
     }));
   });
 
   // A+ Art Director visual script state
   const [aplusVisualScript, setAplusVisualScript] = useState<AplusVisualScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+
+  // A+ viewport mode (desktop vs mobile)
+  const [aplusViewportMode, setAplusViewportMode] = useState<AplusViewportMode>('desktop');
+
+  // Listing image version tracking (lifted from AmazonListingPreview)
+  const [listingVersions, setListingVersions] = useState<ListingVersionState>({});
 
   // Load project from URL param (?project= or ?session=)
   useEffect(() => {
@@ -215,6 +238,25 @@ export const HomePage: React.FC = () => {
         }));
         setImages(sessionImages);
 
+        // Restore listing image versions
+        const restoredVersions: ListingVersionState = {};
+        for (const img of project.images) {
+          if (img.status === 'complete' && img.image_url) {
+            if (img.versions && img.versions.length > 0) {
+              restoredVersions[img.image_type] = {
+                versions: img.versions.map(v => ({ imageUrl: v.image_url, timestamp: Date.now() })),
+                activeIndex: img.versions.length - 1,
+              };
+            } else {
+              restoredVersions[img.image_type] = {
+                versions: [{ imageUrl: img.image_url, timestamp: Date.now() }],
+                activeIndex: 0,
+              };
+            }
+          }
+        }
+        setListingVersions(restoredVersions);
+
         // 7. Restore A+ Content state
         if (project.aplus_visual_script) {
           setAplusVisualScript(project.aplus_visual_script);
@@ -226,8 +268,23 @@ export const HomePage: React.FC = () => {
               type: (m.module_type || 'full_image') as 'full_image',
               index: m.module_index,
               status: (m.image_url ? 'complete' : 'ready') as SlotStatus,
-              imageUrl: m.image_url || undefined,
-              imagePath: m.image_path || undefined,
+              versions: m.versions && m.versions.length > 0
+                ? m.versions.map(v => ({ imageUrl: v.image_url, imagePath: v.image_path }))
+                : m.image_url && m.image_path
+                  ? [{ imageUrl: m.image_url, imagePath: m.image_path }]
+                  : [],
+              activeVersionIndex: m.versions && m.versions.length > 0
+                ? m.versions.length - 1
+                : 0,
+              mobileVersions: m.mobile_versions && m.mobile_versions.length > 0
+                ? m.mobile_versions.map(v => ({ imageUrl: v.image_url, imagePath: v.image_path }))
+                : m.mobile_image_url && m.mobile_image_path
+                  ? [{ imageUrl: m.mobile_image_url, imagePath: m.mobile_image_path }]
+                  : [],
+              mobileActiveVersionIndex: m.mobile_versions && m.mobile_versions.length > 0
+                ? m.mobile_versions.length - 1
+                : 0,
+              mobileStatus: (m.mobile_image_url ? 'complete' : 'ready') as SlotStatus,
             }))
           );
         }
@@ -279,6 +336,19 @@ export const HomePage: React.FC = () => {
         const response = await apiClient.getSessionImages(sessionId);
         setImages(response.images);
         setGenerationStatus(response.status);
+
+        // Capture version snapshots for newly completed images
+        response.images.forEach((img: SessionImage) => {
+          if (img.status === 'complete') {
+            setListingVersions(prev => {
+              if (prev[img.type]?.versions.length) return prev; // already captured
+              return { ...prev, [img.type]: {
+                versions: [{ imageUrl: apiClient.getImageUrl(sessionId, img.type) + `?t=${Date.now()}`, timestamp: Date.now() }],
+                activeIndex: 0,
+              }};
+            });
+          }
+        });
 
         if (response.status === 'complete' || response.status === 'partial' || response.status === 'failed') {
           setIsGenerating(false);
@@ -352,6 +422,10 @@ export const HomePage: React.FC = () => {
     setIsAnalyzing(true);
     setFrameworks([]);
     setSelectedFramework(null);
+    // Clear any previous session — analyze creates a preview session that can't be
+    // used for /generate/single (it only has STYLE_PREVIEW image records)
+    updateSessionId(null);
+    setSearchParams({}, { replace: true });
 
     try {
       // Upload logo if provided
@@ -372,6 +446,7 @@ export const HomePage: React.FC = () => {
         try {
           const styleUpload = await apiClient.uploadImage(formData.styleReferenceFile);
           uploadedStyleRefPath = styleUpload.file_path;
+          setOriginalStyleRefPath(styleUpload.file_path);
         } catch (err) {
           console.error('Style reference upload failed:', err);
         }
@@ -408,11 +483,17 @@ export const HomePage: React.FC = () => {
         locked_colors: lockedColors,
         style_reference_path: uploadedStyleRefPath,
         framework_count: formData.styleCount, // Number of styles to generate (1-4)
+        skip_preview_generation: useOriginalStyleRef,
       });
 
       setProductAnalysis(response.product_analysis);
       setProductAnalysisRaw(response.product_analysis_raw || null);
       setFrameworks(response.frameworks);
+
+      // Note: Do NOT store the analyze session in sessionIdRef — it's a preview session
+      // without image records for main/infographic/etc. ensureSession() would reuse it
+      // and /generate/single would fail with 400. The analyze session is saved in the DB
+      // so it still appears in projects.
 
       // Open framework section
       setExpandedSections((prev) => (prev.includes('framework') ? prev : [...prev, 'framework']));
@@ -422,7 +503,7 @@ export const HomePage: React.FC = () => {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [uploads, formData]);
+  }, [uploads, formData, useOriginalStyleRef, updateSessionId, setSearchParams]);
 
   // Handle framework select
   const handleSelectFramework = useCallback((framework: DesignFramework) => {
@@ -471,7 +552,7 @@ export const HomePage: React.FC = () => {
           brand_name: formData.brandName || undefined,
           brand_colors: formData.brandColors,
           logo_path: logoPath || undefined,
-          style_reference_path: selectedFramework.preview_path || undefined,
+          style_reference_path: (useOriginalStyleRef && originalStyleRefPath) ? originalStyleRefPath : (selectedFramework.preview_path || undefined),
           global_note: formData.globalNote || undefined,
         },
         selectedFramework,
@@ -501,13 +582,18 @@ export const HomePage: React.FC = () => {
       setError(extractErrorMessage(err, 'Failed to generate images. Please try again.'));
       setIsGenerating(false);
     }
-  }, [uploads, formData, selectedFramework, logoPath, productAnalysisRaw, setSearchParams]);
+  }, [uploads, formData, selectedFramework, logoPath, productAnalysisRaw, useOriginalStyleRef, originalStyleRefPath, setSearchParams]);
 
   // Helper: ensure a session exists (fast — create_only, no image generation)
   // Uses a mutex (ref) to prevent duplicate session creation when multiple slots are clicked concurrently
   const ensureSession = useCallback(async (): Promise<string> => {
-    // Already have a session
-    if (sessionIdRef.current) return sessionIdRef.current;
+    // Already have a generation session (not a preview-only session)
+    // A preview session only has style_preview image records, not main/infographic/etc.
+    // We detect this by checking if images state has listing image types
+    const hasListingImages = images.some((img) =>
+      ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'comparison'].includes(img.type)
+    );
+    if (sessionIdRef.current && hasListingImages) return sessionIdRef.current;
 
     // Another call is already creating the session — wait for it
     if (sessionCreatingRef.current) {
@@ -536,7 +622,7 @@ export const HomePage: React.FC = () => {
           brand_name: formData.brandName || undefined,
           brand_colors: formData.brandColors,
           logo_path: logoPath || undefined,
-          style_reference_path: selectedFramework!.preview_path || undefined,
+          style_reference_path: (useOriginalStyleRef && originalStyleRefPath) ? originalStyleRefPath : (selectedFramework!.preview_path || undefined),
           global_note: formData.globalNote || undefined,
         },
         selectedFramework!,
@@ -570,7 +656,7 @@ export const HomePage: React.FC = () => {
     } finally {
       sessionCreatingRef.current = null;
     }
-  }, [uploads, selectedFramework, formData, logoPath, productAnalysisRaw, updateSessionId, setSearchParams]);
+  }, [uploads, selectedFramework, formData, logoPath, productAnalysisRaw, useOriginalStyleRef, originalStyleRefPath, updateSessionId, setSearchParams, images]);
 
   // Handle generate single image (when clicking individual slot) — fire-and-forget, concurrent
   const handleGenerateSingle = useCallback(
@@ -602,6 +688,24 @@ export const HomePage: React.FC = () => {
               : img
           )
         );
+
+        // Capture version snapshot on completion
+        if (result.status === 'complete') {
+          const sid = sessionIdRef.current;
+          if (sid) {
+            setListingVersions(prev => {
+              const existing = prev[imageType];
+              // First generation — create version 1
+              if (!existing || existing.versions.length === 0) {
+                return { ...prev, [imageType]: {
+                  versions: [{ imageUrl: apiClient.getImageUrl(sid, imageType) + `?t=${Date.now()}`, timestamp: Date.now() }],
+                  activeIndex: 0,
+                }};
+              }
+              return prev;
+            });
+          }
+        }
       } catch (err: any) {
         console.error('Single image generation failed:', err);
         setImages((prev) =>
@@ -663,6 +767,18 @@ export const HomePage: React.FC = () => {
               : img
           )
         );
+
+        // Append new version on success
+        if (result.status === 'complete' && sessionId) {
+          setListingVersions(prev => {
+            const current = prev[imageType] || { versions: [], activeIndex: 0 };
+            const newVersions = [...current.versions, {
+              imageUrl: apiClient.getImageUrl(sessionId, imageType) + `?t=${Date.now()}`,
+              timestamp: Date.now(),
+            }];
+            return { ...prev, [imageType]: { versions: newVersions, activeIndex: newVersions.length - 1 } };
+          });
+        }
       } catch (err: any) {
         console.error('Single image regeneration failed:', err);
         setImages((prev) =>
@@ -699,6 +815,18 @@ export const HomePage: React.FC = () => {
               : img
           )
         );
+
+        // Append new version on success
+        if (result.status === 'complete' && sessionId) {
+          setListingVersions(prev => {
+            const current = prev[imageType] || { versions: [], activeIndex: 0 };
+            const newVersions = [...current.versions, {
+              imageUrl: apiClient.getImageUrl(sessionId, imageType) + `?t=${Date.now()}`,
+              timestamp: Date.now(),
+            }];
+            return { ...prev, [imageType]: { versions: newVersions, activeIndex: newVersions.length - 1 } };
+          });
+        }
       } catch (err: any) {
         console.error('Image edit failed:', err);
         setImages((prev) =>
@@ -717,7 +845,7 @@ export const HomePage: React.FC = () => {
 
     setIsGeneratingScript(true);
     try {
-      const response = await apiClient.generateAplusVisualScript(sid, 5);
+      const response = await apiClient.generateAplusVisualScript(sid, 6);
       setAplusVisualScript(response.visual_script);
       return response.visual_script;
     } catch (err: any) {
@@ -728,10 +856,124 @@ export const HomePage: React.FC = () => {
     }
   }, [aplusVisualScript]);
 
-  // Handle generate A+ module
-  const handleGenerateAplusModule = useCallback(
-    async (moduleIndex: number) => {
+  // Force-regenerate visual script (replaces existing one)
+  const regenerateVisualScript = useCallback(async () => {
+    if (!sessionId) return;
+    setIsGeneratingScript(true);
+    setAplusVisualScript(null);
+    try {
+      const response = await apiClient.generateAplusVisualScript(sessionId, 6);
+      setAplusVisualScript(response.visual_script);
+      // Adjust module count if needed, but preserve existing images/versions
+      const count = response.visual_script.modules?.length || 6;
+      setAplusModules((prev) => {
+        const updated: typeof prev = [];
+        for (let i = 0; i < count; i++) {
+          if (i < prev.length) {
+            // Keep existing module with its versions intact
+            updated.push(prev[i]);
+          } else {
+            // New slot
+            updated.push({
+              id: `aplus-${i + 1}`,
+              type: 'full_image' as const,
+              index: i,
+              status: 'ready' as SlotStatus,
+              versions: [],
+              activeVersionIndex: 0,
+              mobileVersions: [],
+              mobileActiveVersionIndex: 0,
+              mobileStatus: 'ready' as SlotStatus,
+            });
+          }
+        }
+        return updated;
+      });
+    } catch (err: any) {
+      console.error('Visual script regeneration failed:', err);
+    } finally {
+      setIsGeneratingScript(false);
+    }
+  }, [sessionId]);
+
+  // Handle generate hero pair (modules 0+1 as one image split in half)
+  const handleGenerateHeroPair = useCallback(
+    async (note?: string) => {
       if (!sessionId) return;
+
+      // Set both modules 0 and 1 to generating
+      setAplusModules((prev) =>
+        prev.map((m, idx) =>
+          idx === 0 || idx === 1 ? { ...m, status: 'generating' as SlotStatus } : m
+        )
+      );
+
+      try {
+        // Auto-generate visual script if missing
+        await ensureVisualScript(sessionId);
+
+        // Call hero pair endpoint — one Gemini call, split in half
+        const result = await apiClient.generateAplusHeroPair(sessionId, note);
+
+        // Update both modules with results
+        setAplusModules((prev) =>
+          prev.map((m, idx) => {
+            if (idx === 0) {
+              const newVersions = [...m.versions, {
+                imageUrl: result.module_0.image_url,
+                imagePath: result.module_0.image_path,
+                promptText: result.module_0.prompt_text,
+              }];
+              return {
+                ...m,
+                status: 'complete' as SlotStatus,
+                versions: newVersions,
+                activeVersionIndex: newVersions.length - 1,
+              };
+            }
+            if (idx === 1) {
+              const newVersions = [...m.versions, {
+                imageUrl: result.module_1.image_url,
+                imagePath: result.module_1.image_path,
+                promptText: result.module_1.prompt_text,
+              }];
+              return {
+                ...m,
+                status: 'complete' as SlotStatus,
+                versions: newVersions,
+                activeVersionIndex: newVersions.length - 1,
+              };
+            }
+            return m;
+          })
+        );
+      } catch (err: any) {
+        console.error('Hero pair generation failed:', err);
+        setAplusModules((prev) =>
+          prev.map((m, idx) =>
+            idx === 0 || idx === 1
+              ? {
+                  ...m,
+                  status: 'error' as SlotStatus,
+                  errorMessage: extractErrorMessage(err, 'Hero pair generation failed'),
+                }
+              : m
+          )
+        );
+      }
+    },
+    [sessionId, ensureVisualScript]
+  );
+
+  // Handle generate A+ module (for modules 2+)
+  const handleGenerateAplusModule = useCallback(
+    async (moduleIndex: number, note?: string) => {
+      if (!sessionId) return;
+
+      // Modules 0 and 1 are always generated together as a hero pair
+      if (moduleIndex <= 1) {
+        return handleGenerateHeroPair(note);
+      }
 
       const module = aplusModules[moduleIndex];
       if (!module) return;
@@ -749,7 +991,7 @@ export const HomePage: React.FC = () => {
 
         // Get previous module path for chaining (if not first module)
         const prevModule = moduleIndex > 0 ? aplusModules[moduleIndex - 1] : null;
-        const previousModulePath = prevModule?.imagePath;
+        const previousModulePath = prevModule ? getActiveImagePath(prevModule) : undefined;
 
         // Call API to generate A+ module
         const result = await apiClient.generateAplusModule({
@@ -757,21 +999,39 @@ export const HomePage: React.FC = () => {
           module_type: module.type,
           module_index: moduleIndex,
           previous_module_path: previousModulePath,
+          custom_instructions: note,
         });
 
-        // Update module with result
+        // Update module with result — add new version
+        // Also update previous module if canvas extension refined it
         setAplusModules((prev) =>
-          prev.map((m, idx) =>
-            idx === moduleIndex
-              ? {
-                  ...m,
-                  status: 'complete' as SlotStatus,
-                  imageUrl: result.image_url,
-                  imagePath: result.image_path,
-                  promptText: result.prompt_text,
-                }
-              : m
-          )
+          prev.map((m, idx) => {
+            if (idx === moduleIndex) {
+              const newVersions = [...m.versions, {
+                imageUrl: result.image_url,
+                imagePath: result.image_path,
+                promptText: result.prompt_text,
+              }];
+              return {
+                ...m,
+                status: 'complete' as SlotStatus,
+                versions: newVersions,
+                activeVersionIndex: newVersions.length - 1,
+              };
+            }
+            // Canvas extension refined the previous module — replace its active version
+            if (result.refined_previous && idx === result.refined_previous.module_index) {
+              const refined = result.refined_previous;
+              const updatedVersions = [...m.versions];
+              updatedVersions[m.activeVersionIndex] = {
+                ...updatedVersions[m.activeVersionIndex],
+                imageUrl: refined.image_url + `?t=${Date.now()}`,
+                imagePath: refined.image_path,
+              };
+              return { ...m, versions: updatedVersions };
+            }
+            return m;
+          })
         );
       } catch (err: any) {
         console.error('A+ module generation failed:', err);
@@ -788,23 +1048,67 @@ export const HomePage: React.FC = () => {
         );
       }
     },
-    [sessionId, aplusModules, ensureVisualScript]
+    [sessionId, aplusModules, ensureVisualScript, handleGenerateHeroPair]
   );
 
-  // Handle generate ALL A+ modules sequentially with Art Director
+  // Handle generate ALL A+ modules: hero pair first, then modules 2+ sequentially
   const handleGenerateAllAplus = useCallback(async () => {
     if (!sessionId) return;
 
     setIsGeneratingScript(true);
     try {
-      // Step 1: Generate visual script
+      // Step 1: Ensure visual script
       await ensureVisualScript(sessionId);
       setIsGeneratingScript(false);
 
-      // Step 2: Generate modules sequentially (0 → 4)
-      let prevPath: string | undefined;
-      for (let i = 0; i < aplusModules.length; i++) {
-        // Mark current as generating
+      // Step 2: Generate hero pair (modules 0+1 together)
+      setAplusModules((prev) =>
+        prev.map((m, idx) =>
+          idx === 0 || idx === 1 ? { ...m, status: 'generating' as SlotStatus } : m
+        )
+      );
+
+      let module1Path: string | undefined;
+      try {
+        const heroPairResult = await apiClient.generateAplusHeroPair(sessionId);
+        module1Path = heroPairResult.module_1.image_path;
+
+        setAplusModules((prev) =>
+          prev.map((m, idx) => {
+            if (idx === 0) {
+              const newVersions = [...m.versions, {
+                imageUrl: heroPairResult.module_0.image_url,
+                imagePath: heroPairResult.module_0.image_path,
+                promptText: heroPairResult.module_0.prompt_text,
+              }];
+              return { ...m, status: 'complete' as SlotStatus, versions: newVersions, activeVersionIndex: newVersions.length - 1 };
+            }
+            if (idx === 1) {
+              const newVersions = [...m.versions, {
+                imageUrl: heroPairResult.module_1.image_url,
+                imagePath: heroPairResult.module_1.image_path,
+                promptText: heroPairResult.module_1.prompt_text,
+              }];
+              return { ...m, status: 'complete' as SlotStatus, versions: newVersions, activeVersionIndex: newVersions.length - 1 };
+            }
+            return m;
+          })
+        );
+      } catch (err: any) {
+        console.error('Hero pair generation failed:', err);
+        setAplusModules((prev) =>
+          prev.map((m, idx) =>
+            idx === 0 || idx === 1
+              ? { ...m, status: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Hero pair generation failed') }
+              : m
+          )
+        );
+        return; // Stop on hero pair failure
+      }
+
+      // Step 3: Generate modules 2+ sequentially, using module 1's path as starting chain
+      let prevPath = module1Path;
+      for (let i = 2; i < aplusModules.length; i++) {
         setAplusModules((prev) =>
           prev.map((m, idx) =>
             idx === i ? { ...m, status: 'generating' as SlotStatus } : m
@@ -822,28 +1126,34 @@ export const HomePage: React.FC = () => {
           prevPath = result.image_path;
 
           setAplusModules((prev) =>
-            prev.map((m, idx) =>
-              idx === i
-                ? {
-                    ...m,
-                    status: 'complete' as SlotStatus,
-                    imageUrl: result.image_url,
-                    imagePath: result.image_path,
-                    promptText: result.prompt_text,
-                  }
-                : m
-            )
+            prev.map((m, idx) => {
+              if (idx === i) {
+                const newVersions = [...m.versions, {
+                  imageUrl: result.image_url,
+                  imagePath: result.image_path,
+                  promptText: result.prompt_text,
+                }];
+                return { ...m, status: 'complete' as SlotStatus, versions: newVersions, activeVersionIndex: newVersions.length - 1 };
+              }
+              if (result.refined_previous && idx === result.refined_previous.module_index) {
+                const refined = result.refined_previous;
+                const updatedVersions = [...m.versions];
+                updatedVersions[m.activeVersionIndex] = {
+                  ...updatedVersions[m.activeVersionIndex],
+                  imageUrl: refined.image_url + `?t=${Date.now()}`,
+                  imagePath: refined.image_path,
+                };
+                return { ...m, versions: updatedVersions };
+              }
+              return m;
+            })
           );
         } catch (err: any) {
           console.error(`A+ module ${i} generation failed:`, err);
           setAplusModules((prev) =>
             prev.map((m, idx) =>
               idx === i
-                ? {
-                    ...m,
-                    status: 'error' as SlotStatus,
-                    errorMessage: extractErrorMessage(err, 'A+ generation failed'),
-                  }
+                ? { ...m, status: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'A+ generation failed') }
                 : m
             )
           );
@@ -857,21 +1167,313 @@ export const HomePage: React.FC = () => {
   }, [sessionId, aplusModules, ensureVisualScript]);
 
   // Handle regenerate A+ module
+  // For modules 0 or 1: regenerate hero pair (both together)
+  // For modules 2+: regenerate individually
   const handleRegenerateAplusModule = useCallback(
-    async (moduleIndex: number) => {
-      // Reset module status and regenerate
-      setAplusModules((prev) =>
-        prev.map((m, idx) =>
-          idx === moduleIndex
-            ? { ...m, status: 'ready' as SlotStatus, imageUrl: undefined, imagePath: undefined, errorMessage: undefined }
-            : m
-        )
-      );
-      // Trigger generation
-      handleGenerateAplusModule(moduleIndex);
+    async (moduleIndex: number, note?: string) => {
+      if (moduleIndex <= 1) {
+        // Hero pair — regenerate both 0+1 together
+        setAplusModules((prev) =>
+          prev.map((m, idx) => {
+            if (idx === 0 || idx === 1) {
+              return { ...m, status: 'ready' as SlotStatus, errorMessage: undefined };
+            }
+            return m;
+          })
+        );
+        handleGenerateHeroPair(note);
+      } else {
+        setAplusModules((prev) =>
+          prev.map((m, idx) => {
+            if (idx === moduleIndex) {
+              return { ...m, status: 'ready' as SlotStatus, errorMessage: undefined };
+            }
+            return m;
+          })
+        );
+        handleGenerateAplusModule(moduleIndex, note);
+      }
     },
-    [handleGenerateAplusModule]
+    [handleGenerateAplusModule, handleGenerateHeroPair]
   );
+
+  // Handle A+ module version change (browsing through previous versions)
+  // Hero pair (modules 0+1) are linked — changing one changes both
+  const handleAplusVersionChange = useCallback(
+    (moduleIndex: number, versionIndex: number) => {
+      setAplusModules((prev) =>
+        prev.map((m, idx) => {
+          if (idx === moduleIndex) {
+            return { ...m, activeVersionIndex: versionIndex };
+          }
+          // Link hero pair: if changing 0 or 1, also change the other
+          if (moduleIndex <= 1 && idx <= 1 && idx !== moduleIndex) {
+            // Clamp to valid range for the sibling module
+            const clampedIndex = Math.min(versionIndex, m.versions.length - 1);
+            return { ...m, activeVersionIndex: Math.max(0, clampedIndex) };
+          }
+          return m;
+        })
+      );
+    },
+    []
+  );
+
+  // Handle edit A+ module
+  const handleEditAplusModule = useCallback(
+    async (moduleIndex: number, editInstructions: string) => {
+      const currentSessionId = sessionIdRef.current;
+      if (!currentSessionId) return;
+
+      // Mark generating
+      setAplusModules((prev) =>
+        prev.map((m, i) => (i === moduleIndex ? { ...m, status: 'generating' as SlotStatus } : m))
+      );
+
+      try {
+        const result = await apiClient.editSingleImage(currentSessionId, `aplus_${moduleIndex}`, editInstructions);
+
+        // Append new version, advance activeVersionIndex
+        setAplusModules((prev) =>
+          prev.map((m, i) => {
+            if (i !== moduleIndex) return m;
+            const newVersion: ImageVersion = {
+              imageUrl: result.storage_path
+                ? apiClient.getFileUrl(result.storage_path) + `&t=${Date.now()}`
+                : m.versions[m.activeVersionIndex]?.imageUrl || '',
+              imagePath: result.storage_path,
+              timestamp: Date.now(),
+            };
+            const newVersions = [...m.versions, newVersion];
+            return {
+              ...m,
+              status: (result.status === 'complete' ? 'complete' : 'error') as SlotStatus,
+              versions: result.status === 'complete' ? newVersions : m.versions,
+              activeVersionIndex: result.status === 'complete' ? newVersions.length - 1 : m.activeVersionIndex,
+              errorMessage: result.error_message,
+            };
+          })
+        );
+      } catch (err: any) {
+        console.error('A+ module edit failed:', err);
+        setAplusModules((prev) =>
+          prev.map((m, i) =>
+            i === moduleIndex
+              ? { ...m, status: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Edit failed') }
+              : m
+          )
+        );
+      }
+    },
+    []
+  );
+
+  // Handle generate mobile A+ module (recompose desktop → mobile 4:3)
+  const handleGenerateMobileModule = useCallback(
+    async (moduleIndex: number) => {
+      const currentSessionId = sessionIdRef.current;
+      if (!currentSessionId) return;
+
+      // Mark module mobile status as generating
+      setAplusModules((prev) =>
+        prev.map((m, i) => (i === moduleIndex ? { ...m, mobileStatus: 'generating' as SlotStatus } : m))
+      );
+
+      try {
+        const result = await apiClient.generateAplusMobile(currentSessionId, moduleIndex);
+
+        setAplusModules((prev) =>
+          prev.map((m, i) => {
+            if (i !== moduleIndex) return m;
+            const newVersion: ImageVersion = {
+              imageUrl: result.image_url,
+              imagePath: result.image_path,
+              timestamp: Date.now(),
+            };
+            const newMobileVersions = [...m.mobileVersions, newVersion];
+            return {
+              ...m,
+              mobileStatus: 'complete' as SlotStatus,
+              mobileVersions: newMobileVersions,
+              mobileActiveVersionIndex: newMobileVersions.length - 1,
+            };
+          })
+        );
+      } catch (err: any) {
+        console.error('Mobile A+ generation failed:', err);
+        setAplusModules((prev) =>
+          prev.map((m, i) =>
+            i === moduleIndex
+              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Mobile generation failed') }
+              : m
+          )
+        );
+      }
+    },
+    []
+  );
+
+  // Handle generate ALL mobile A+ modules (sequential)
+  const handleGenerateAllMobile = useCallback(async () => {
+    const currentSessionId = sessionIdRef.current;
+    if (!currentSessionId) return;
+
+    for (let i = 0; i < aplusModules.length; i++) {
+      const m = aplusModules[i];
+      // Only generate mobile for modules that have desktop images but no mobile
+      if (m.status !== 'complete' || m.versions.length === 0) continue;
+      if (m.mobileVersions.length > 0) continue;
+      if (i === 1) continue; // Hero mobile lives on module 0
+
+      // Set generating
+      setAplusModules((prev) =>
+        prev.map((mod, idx) => (idx === i ? { ...mod, mobileStatus: 'generating' as SlotStatus } : mod))
+      );
+
+      try {
+        const result = await apiClient.generateAplusMobile(currentSessionId, i);
+
+        setAplusModules((prev) =>
+          prev.map((mod, idx) => {
+            if (idx !== i) return mod;
+            const newVersion: ImageVersion = {
+              imageUrl: result.image_url,
+              imagePath: result.image_path,
+              timestamp: Date.now(),
+            };
+            const newMobileVersions = [...mod.mobileVersions, newVersion];
+            return {
+              ...mod,
+              mobileStatus: 'complete' as SlotStatus,
+              mobileVersions: newMobileVersions,
+              mobileActiveVersionIndex: newMobileVersions.length - 1,
+            };
+          })
+        );
+      } catch (err: any) {
+        console.error(`Mobile A+ module ${i} generation failed:`, err);
+        setAplusModules((prev) =>
+          prev.map((mod, idx) =>
+            idx === i
+              ? { ...mod, mobileStatus: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Mobile generation failed') }
+              : mod
+          )
+        );
+        // Continue to next module on error (don't break chain)
+      }
+    }
+  }, [aplusModules]);
+
+  // Handle regenerate mobile A+ module
+  const handleRegenerateMobileModule = useCallback(
+    async (moduleIndex: number, note?: string) => {
+      const currentSessionId = sessionIdRef.current;
+      if (!currentSessionId) return;
+
+      setAplusModules((prev) =>
+        prev.map((m, i) => (i === moduleIndex ? { ...m, mobileStatus: 'generating' as SlotStatus } : m))
+      );
+
+      try {
+        const result = await apiClient.generateAplusMobile(currentSessionId, moduleIndex, note);
+
+        setAplusModules((prev) =>
+          prev.map((m, i) => {
+            if (i !== moduleIndex) return m;
+            const newVersion: ImageVersion = {
+              imageUrl: result.image_url,
+              imagePath: result.image_path,
+              timestamp: Date.now(),
+            };
+            const newMobileVersions = [...m.mobileVersions, newVersion];
+            return {
+              ...m,
+              mobileStatus: 'complete' as SlotStatus,
+              mobileVersions: newMobileVersions,
+              mobileActiveVersionIndex: newMobileVersions.length - 1,
+            };
+          })
+        );
+      } catch (err: any) {
+        console.error('Mobile A+ regen failed:', err);
+        setAplusModules((prev) =>
+          prev.map((m, i) =>
+            i === moduleIndex
+              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Mobile regen failed') }
+              : m
+          )
+        );
+      }
+    },
+    []
+  );
+
+  // Handle edit mobile A+ module
+  const handleEditMobileModule = useCallback(
+    async (moduleIndex: number, editInstructions: string) => {
+      const currentSessionId = sessionIdRef.current;
+      if (!currentSessionId) return;
+
+      setAplusModules((prev) =>
+        prev.map((m, i) => (i === moduleIndex ? { ...m, mobileStatus: 'generating' as SlotStatus } : m))
+      );
+
+      try {
+        const result = await apiClient.editAplusMobile(currentSessionId, moduleIndex, editInstructions);
+
+        setAplusModules((prev) =>
+          prev.map((m, i) => {
+            if (i !== moduleIndex) return m;
+            const newVersion: ImageVersion = {
+              imageUrl: result.image_url,
+              imagePath: result.image_path,
+              timestamp: Date.now(),
+            };
+            const newMobileVersions = [...m.mobileVersions, newVersion];
+            return {
+              ...m,
+              mobileStatus: 'complete' as SlotStatus,
+              mobileVersions: newMobileVersions,
+              mobileActiveVersionIndex: newMobileVersions.length - 1,
+            };
+          })
+        );
+      } catch (err: any) {
+        console.error('Mobile A+ edit failed:', err);
+        setAplusModules((prev) =>
+          prev.map((m, i) =>
+            i === moduleIndex
+              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Mobile edit failed') }
+              : m
+          )
+        );
+      }
+    },
+    []
+  );
+
+  // Handle A+ viewport-aware version change
+  const handleAplusViewportVersionChange = useCallback(
+    (moduleIndex: number, versionIndex: number) => {
+      if (aplusViewportMode === 'mobile') {
+        setAplusModules((prev) =>
+          prev.map((m, idx) =>
+            idx === moduleIndex ? { ...m, mobileActiveVersionIndex: versionIndex } : m
+          )
+        );
+      } else {
+        handleAplusVersionChange(moduleIndex, versionIndex);
+      }
+    },
+    [aplusViewportMode, handleAplusVersionChange]
+  );
+
+  // Handle listing version navigation
+  const handleListingVersionChange = useCallback((imageType: string, index: number) => {
+    setListingVersions(prev => ({
+      ...prev, [imageType]: { ...prev[imageType], activeIndex: index }
+    }));
+  }, []);
 
   // Handle start over
   const handleStartOver = useCallback(() => {
@@ -887,21 +1489,31 @@ export const HomePage: React.FC = () => {
     setIsAnalyzing(false);
     setIsGenerating(false);
     setLogoPath(null);
+    setOriginalStyleRefPath(null);
+    setUseOriginalStyleRef(false);
     setError(null);
     setExpandedSections(['photos', 'product']);
     // Clear session from URL
     setSearchParams({}, { replace: true });
+    // Reset listing versions
+    setListingVersions({});
     // Reset A+ modules and visual script
     setAplusVisualScript(null);
     setIsGeneratingScript(false);
     setAplusModules(
-      Array.from({ length: 5 }, (_, i) => ({
+      Array.from({ length: 6 }, (_, i) => ({
         id: `aplus-${i + 1}`,
         type: 'full_image' as const,
         index: i,
         status: 'ready' as SlotStatus,
+        versions: [],
+        activeVersionIndex: 0,
+        mobileVersions: [],
+        mobileActiveVersionIndex: 0,
+        mobileStatus: 'ready' as SlotStatus,
       }))
     );
+    setAplusViewportMode('desktop');
   }, []);
 
   const isGeminiConfigured = health?.dependencies?.gemini === 'configured';
@@ -952,6 +1564,8 @@ export const HomePage: React.FC = () => {
             canGenerate={canGenerate}
             expandedSections={expandedSections}
             onSectionToggle={handleSectionToggle}
+            useOriginalStyleRef={useOriginalStyleRef}
+            onToggleOriginalStyleRef={setUseOriginalStyleRef}
           />
         }
         rightPanel={
@@ -972,6 +1586,17 @@ export const HomePage: React.FC = () => {
             onGenerateAplusModule={handleGenerateAplusModule}
             onRegenerateAplusModule={handleRegenerateAplusModule}
             onGenerateAllAplus={handleGenerateAllAplus}
+            onRegenerateScript={regenerateVisualScript}
+            onAplusVersionChange={handleAplusViewportVersionChange}
+            onEditAplusModule={handleEditAplusModule}
+            aplusViewportMode={aplusViewportMode}
+            onAplusViewportChange={setAplusViewportMode}
+            onGenerateMobileModule={handleGenerateMobileModule}
+            onGenerateAllMobile={handleGenerateAllMobile}
+            onRegenerateMobileModule={handleRegenerateMobileModule}
+            onEditMobileModule={handleEditMobileModule}
+            listingVersions={listingVersions}
+            onListingVersionChange={handleListingVersionChange}
             onGenerateSingle={handleGenerateSingle}
             onGenerateAll={handleGenerate}
             onRegenerateSingle={handleRegenerateSingle}

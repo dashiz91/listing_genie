@@ -1,10 +1,12 @@
 """
 Canvas Compositor for A+ Content Module Continuity
 
-Creates gradient-faded canvases from previous modules and crops results
-from Gemini inpainting to produce seamless inter-module transitions.
+Creates green-screen canvases from previous modules and crops results
+from Gemini generation to produce seamless inter-module transitions.
 
-Technique documented in: docs/gemini-image-continuity-technique.md
+Technique: Paste module N on top of a taller canvas, fill the bottom
+with solid bright green (#00FF00) as an obvious "fill this" marker.
+Gemini sees the green and knows exactly what area to complete.
 """
 from PIL import Image as PILImage
 from typing import Tuple
@@ -13,32 +15,30 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Canvas dimensions: 1464 wide, 4:3 ratio = 1464 x 1098
-# 4:3 is the proven ratio from the continuity technique doc
 CANVAS_WIDTH = 1464
 CANVAS_HEIGHT = 1098  # 1464 * 3/4 = 1098
 MODULE_HEIGHT = 600
-BLEND_ZONE = 80  # pixels of gradient fade
+
+# Bright green marker color — unmistakable "fill this" signal
+GREEN_SCREEN = (0, 255, 0)
 
 
 class CanvasCompositor:
-    """Creates gradient canvases and crops inpainted results for seamless A+ modules."""
+    """Creates green-screen canvases and splits completed results for seamless A+ modules."""
 
-    def create_gradient_canvas(
+    def create_canvas(
         self,
         previous_module: PILImage.Image,
-        blend_zone: int = BLEND_ZONE,
     ) -> PILImage.Image:
         """
-        Build a tall canvas with the previous module on top, gradient-fading
-        into a solid color fill below.
+        Build a tall canvas with the previous module on top and bright green below.
 
         Input:  1464x600 (previous module)
-        Output: 1464x1171 (5:4 ratio canvas for Gemini)
+        Output: 1464x1098 (4:3 ratio canvas for Gemini)
 
         Layout:
-          y=0   to y=(MODULE_HEIGHT - blend_zone - 1): Previous module unchanged
-          y=(MODULE_HEIGHT - blend_zone) to y=(MODULE_HEIGHT - 1): Gradient blend zone
-          y=MODULE_HEIGHT to y=(CANVAS_HEIGHT - 1): Solid fill (avg bottom-edge color)
+          y=0   to y=599:  Previous module (unchanged, hard cut)
+          y=600 to y=1097: Solid bright green (#00FF00)
         """
         # Ensure previous module is the right size
         if previous_module.size != (CANVAS_WIDTH, MODULE_HEIGHT):
@@ -46,33 +46,16 @@ class CanvasCompositor:
                 (CANVAS_WIDTH, MODULE_HEIGHT), PILImage.Resampling.LANCZOS
             )
 
-        # Sample average color from the bottom 5 rows of the previous module
-        bottom_color = self._average_bottom_color(previous_module, rows=5)
-        logger.info(f"Bottom edge average color: RGB{bottom_color}")
+        # Create canvas filled with bright green
+        canvas = PILImage.new("RGB", (CANVAS_WIDTH, CANVAS_HEIGHT), GREEN_SCREEN)
 
-        # Create canvas filled with that solid color
-        canvas = PILImage.new("RGB", (CANVAS_WIDTH, CANVAS_HEIGHT), bottom_color)
-
-        # Paste previous module at the top
+        # Paste previous module at the top — hard cut, no gradient
         canvas.paste(previous_module, (0, 0))
 
-        # Apply gradient blend over the last `blend_zone` pixels of the module
-        blend_start_y = MODULE_HEIGHT - blend_zone
-        for y_offset in range(blend_zone):
-            alpha = y_offset / blend_zone  # 0.0 at top of blend → 1.0 at bottom
-            canvas_y = blend_start_y + y_offset
-            for x in range(CANVAS_WIDTH):
-                orig_r, orig_g, orig_b = previous_module.getpixel((x, canvas_y))
-                blended = (
-                    int(orig_r * (1 - alpha) + bottom_color[0] * alpha),
-                    int(orig_g * (1 - alpha) + bottom_color[1] * alpha),
-                    int(orig_b * (1 - alpha) + bottom_color[2] * alpha),
-                )
-                canvas.putpixel((x, canvas_y), blended)
-
         logger.info(
-            f"Gradient canvas created: {canvas.size} "
-            f"(blend_zone={blend_zone}px, fill=RGB{bottom_color})"
+            f"Green-screen canvas created: {canvas.size} "
+            f"(module={CANVAS_WIDTH}x{MODULE_HEIGHT} on top, "
+            f"green fill below y={MODULE_HEIGHT})"
         )
         return canvas
 
@@ -120,24 +103,39 @@ class CanvasCompositor:
         )
         return top_module, bottom_module
 
-    @staticmethod
-    def _average_bottom_color(
-        image: PILImage.Image, rows: int = 5
-    ) -> Tuple[int, int, int]:
-        """Average RGB color of the bottom N rows of an image."""
+    def split_hero_image(
+        self,
+        image: PILImage.Image,
+    ) -> Tuple[PILImage.Image, PILImage.Image]:
+        """
+        Split a tall hero image exactly in half to create two seamless A+ modules.
+
+        Both halves come from the SAME image — guaranteed perfect alignment, zero seam.
+        Each half is resized to CANVAS_WIDTH × MODULE_HEIGHT (1464×600).
+
+        Input:  Single tall image (any size, ideally ~4:3 ratio)
+        Output: (top_module, bottom_module) both at CANVAS_WIDTH × MODULE_HEIGHT
+        """
         width, height = image.size
-        r_total, g_total, b_total = 0, 0, 0
-        pixel_count = width * rows
 
-        for y in range(height - rows, height):
-            for x in range(width):
-                r, g, b = image.getpixel((x, y))[:3]
-                r_total += r
-                g_total += g
-                b_total += b
-
-        return (
-            r_total // pixel_count,
-            g_total // pixel_count,
-            b_total // pixel_count,
+        logger.info(
+            f"split_hero_image: input={image.size}"
         )
+
+        # Resize the FULL image first to target width × double height,
+        # THEN split. This ensures the LANCZOS kernel at the seam has
+        # full context from both halves — no edge interpolation mismatch.
+        target_height = MODULE_HEIGHT * 2
+        full_resized = image.resize(
+            (CANVAS_WIDTH, target_height), PILImage.Resampling.LANCZOS
+        )
+
+        # Split at exact midpoint
+        top_module = full_resized.crop((0, 0, CANVAS_WIDTH, MODULE_HEIGHT))
+        bottom_module = full_resized.crop((0, MODULE_HEIGHT, CANVAS_WIDTH, target_height))
+
+        logger.info(
+            f"Hero split: full_resized={full_resized.size}, "
+            f"top={top_module.size}, bottom={bottom_module.size}"
+        )
+        return top_module, bottom_module

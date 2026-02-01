@@ -10,6 +10,15 @@ interface MainImageViewerProps {
   isPending?: boolean;
   accentColor?: string;
   onGenerate?: () => void;
+  overlay?: React.ReactNode;
+  // On-image action bar (coexists with zoom)
+  versionInfo?: { current: number; total: number };
+  onPreviousVersion?: () => void;
+  onNextVersion?: () => void;
+  onRegenerate?: () => void;
+  onEdit?: () => void;
+  onDownload?: () => void;
+  onViewPrompt?: () => void;
   className?: string;
 }
 
@@ -21,14 +30,31 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
   isPending = false,
   accentColor = '#C85A35',
   onGenerate,
+  overlay,
+  versionInfo,
+  onPreviousVersion,
+  onNextVersion,
+  onRegenerate,
+  onEdit,
+  onDownload,
+  onViewPrompt,
   className,
 }) => {
 
   const [isHovering, setIsHovering] = useState(false);
+  const [isOverActionBar, setIsOverActionBar] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [previousUrl, setPreviousUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const hasActions = !!(onRegenerate || onEdit || onDownload || onViewPrompt);
+  const hasVersions = versionInfo && versionInfo.total > 1;
+  const canGoLeft = versionInfo ? versionInfo.current > 1 : false;
+  const canGoRight = versionInfo ? versionInfo.current < versionInfo.total : false;
+
+  // Zoom only active when hovering image but NOT the action bar
+  const zoomActive = isHovering && !isOverActionBar;
 
   // Track image URL changes for crossfade effect
   useEffect(() => {
@@ -96,6 +122,16 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
           estimatedSeconds={12}
           className="rounded-lg overflow-hidden"
         />
+        {onRegenerate && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
+            <button
+              onClick={onRegenerate}
+              className="text-xs text-gray-400 hover:text-gray-600 underline bg-white/80 px-2 py-1 rounded transition-colors"
+            >
+              Stuck? Force retry
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -132,7 +168,7 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
         />
 
         {/* Zoom lens overlay (Amazon-style square) */}
-        {isHovering && (
+        {zoomActive && (
           <div
             className="absolute pointer-events-none border-2 border-redd-500/60 bg-redd-500/10 transition-opacity duration-150"
             style={{
@@ -144,8 +180,106 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
           />
         )}
 
+        {/* Action overlay (legacy — used in fullscreen) */}
+        {overlay}
+
+        {/* Version arrows on sides — always visible when multiple versions */}
+        {hasVersions && (
+          <>
+            <button
+              onClick={(e) => { e.stopPropagation(); canGoLeft && onPreviousVersion?.(); }}
+              onMouseEnter={() => setIsOverActionBar(true)}
+              onMouseLeave={() => setIsOverActionBar(false)}
+              className={cn(
+                "absolute z-20 left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center transition-opacity",
+                canGoLeft ? "hover:bg-black/70 opacity-80" : "opacity-30 cursor-default"
+              )}
+            >
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); canGoRight && onNextVersion?.(); }}
+              onMouseEnter={() => setIsOverActionBar(true)}
+              onMouseLeave={() => setIsOverActionBar(false)}
+              className={cn(
+                "absolute z-20 right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center transition-opacity",
+                canGoRight ? "hover:bg-black/70 opacity-80" : "opacity-30 cursor-default"
+              )}
+            >
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            {/* Version badge */}
+            <div className="absolute z-20 bottom-10 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-black/50 rounded-full">
+              <span className="text-xs text-white font-medium">
+                v{versionInfo.current}/{versionInfo.total}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Bottom action bar — appears on hover, compact so zoom still works above */}
+        {hasActions && isHovering && !isProcessing && (
+          <div
+            className="absolute z-20 bottom-0 inset-x-0 flex items-center justify-center gap-2 py-2 px-3 bg-gradient-to-t from-black/60 to-transparent"
+            onMouseEnter={() => setIsOverActionBar(true)}
+            onMouseLeave={() => setIsOverActionBar(false)}
+          >
+            {onRegenerate && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
+                className="px-3 py-1.5 bg-white/90 rounded-md text-xs font-medium text-gray-800 hover:bg-white transition-colors shadow flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Regenerate
+              </button>
+            )}
+            {onEdit && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                className="px-3 py-1.5 bg-white/90 rounded-md text-xs font-medium text-gray-800 hover:bg-white transition-colors shadow flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit
+              </button>
+            )}
+            {onDownload && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDownload(); }}
+                className="px-3 py-1.5 bg-white/90 rounded-md text-xs font-medium text-gray-800 hover:bg-white transition-colors shadow flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download
+              </button>
+            )}
+            {onViewPrompt && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onViewPrompt(); }}
+                className="px-3 py-1.5 bg-white/90 rounded-md text-xs font-medium text-gray-800 hover:bg-white transition-colors shadow flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Prompt
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Image type badge */}
-        <div className="absolute bottom-3 left-3 px-2 py-1 bg-slate-900/80 backdrop-blur-sm rounded text-xs text-white font-medium">
+        <div className={cn(
+          "absolute left-3 px-2 py-1 bg-slate-900/80 backdrop-blur-sm rounded text-xs text-white font-medium",
+          hasVersions ? "bottom-10" : "bottom-3"
+        )}>
           {imageLabel}
         </div>
 
@@ -166,7 +300,7 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
       </div>
 
       {/* Zoomed preview panel (appears on right when hovering) */}
-      {isHovering && (
+      {zoomActive && (
         <div
           className="absolute left-full top-0 ml-4 w-80 h-80 bg-white rounded-lg border border-slate-200 shadow-xl overflow-hidden z-10 hidden lg:block"
         >

@@ -1374,11 +1374,27 @@ Make it count.
                 if generated_image is None:
                     raise ValueError("No image returned from Gemini API")
 
-                # Save to storage
-                storage_path = self.storage.save_generated_image(
+                # Store prompt in history first to get version number
+                img_version = 1
+                if design_context:
+                    try:
+                        ph = self.store_prompt_in_history(
+                            context=design_context,
+                            image_type=image_type,
+                            prompt_text=prompt,  # The final prompt that was sent
+                            user_feedback=user_feedback,
+                            change_summary=change_summary,
+                        )
+                        img_version = ph.version
+                    except Exception as e:
+                        logger.warning(f"Failed to store prompt in history: {e}")
+
+                # Save to storage with versioned copy
+                storage_path = self.storage.save_generated_image_versioned(
                     session_id=session.id,
                     image_type=template_key,
                     image=generated_image,
+                    version=img_version,
                 )
 
                 # Update record - success!
@@ -1388,19 +1404,6 @@ Make it count.
                 image_record.retry_count = attempt
                 image_record.error_message = None
                 self.db.commit()
-
-                # Store prompt in history for future reference
-                if design_context:
-                    try:
-                        self.store_prompt_in_history(
-                            context=design_context,
-                            image_type=image_type,
-                            prompt_text=prompt,  # The final prompt that was sent
-                            user_feedback=user_feedback,
-                            change_summary=change_summary,
-                        )
-                    except Exception as e:
-                        logger.warning(f"Failed to store prompt in history: {e}")
 
                 logger.info(
                     f"Successfully generated {template_key} for session {session.id} "
@@ -1472,61 +1475,146 @@ Make it count.
             ImageResult with status and path
         """
         template_key = image_type.value
+        is_aplus = template_key.startswith("aplus_")
 
-        # Find the image record
+        # For A+ images: no ImageRecord, look up storage path directly
+        # For listing images: use ImageRecord
         image_record = None
-        for img in session.images:
-            if img.image_type == image_type:
-                image_record = img
-                break
+        existing_image_path = None
 
-        if not image_record:
-            raise ValueError(f"No image record found for type: {image_type}")
+        if is_aplus:
+            # Derive storage key: aplus_0 → aplus_full_image_0
+            aplus_idx = template_key.replace("aplus_", "")
+            storage_key = f"aplus_full_image_{aplus_idx}"
+            existing_image_path = f"supabase://{self.storage.generated_bucket}/{session.id}/{storage_key}.png"
+            # Verify image exists by trying to get URL
+            try:
+                self.storage.get_generated_url(session.id, storage_key, expires_in=60)
+            except Exception:
+                raise ValueError(f"No A+ image found for module {aplus_idx}")
+        else:
+            # Find the listing image record
+            for img in session.images:
+                if img.image_type == image_type:
+                    image_record = img
+                    break
 
-        # Validate image exists and is complete
-        if image_record.status != GenerationStatusEnum.COMPLETE:
-            raise ValueError(f"Cannot edit image - status is {image_record.status.value}, must be 'complete'")
+            if not image_record:
+                raise ValueError(f"No image record found for type: {image_type}")
 
-        if not image_record.storage_path:
-            raise ValueError("No existing image to edit - storage path is empty")
+            if image_record.status != GenerationStatusEnum.COMPLETE:
+                raise ValueError(f"Cannot edit image - status is {image_record.status.value}, must be 'complete'")
 
-        # The storage_path is already the full path to the generated image
-        existing_image_path = image_record.storage_path
+            if not image_record.storage_path:
+                raise ValueError("No existing image to edit - storage path is empty")
+
+            existing_image_path = image_record.storage_path
 
         logger.info(f"Editing {template_key} for session {session.id}")
         logger.info(f"Edit instructions: {edit_instructions[:100]}...")
 
-        # Mark as processing during edit
-        original_path = image_record.storage_path  # Save in case we need to revert
-        image_record.status = GenerationStatusEnum.PROCESSING
-        image_record.error_message = None
-        self.db.commit()
+        # Mark listing image as processing (A+ has no record to update)
+        original_path = existing_image_path
+        if image_record:
+            image_record.status = GenerationStatusEnum.PROCESSING
+            image_record.error_message = None
+            self.db.commit()
 
         try:
-            # Call Gemini to edit the image
+            # A+ modules use wider aspect ratio (1464x600 ≈ 21:9)
+            aspect_ratio = "21:9" if is_aplus else "1:1"
+
+            # Use AI Designer to enhance edit instructions with context
+            design_context = self.get_design_context(session.id)
+            enhanced_instructions = edit_instructions
+            change_summary = "Image edit"
+
+            if design_context:
+                try:
+                    latest_prompt = self.get_latest_prompt(design_context, image_type)
+                    original_prompt = latest_prompt.prompt_text if latest_prompt else None
+
+                    if original_prompt:
+                        from app.services.openai_vision_service import get_openai_vision_service
+                        vision_service = get_openai_vision_service()
+
+                        framework_dict = None
+                        if self._current_framework:
+                            framework_dict = self._current_framework.model_dump()
+                        elif session.design_framework_json:
+                            framework_dict = session.design_framework_json
+
+                        product_analysis_text = None
+                        if design_context.product_analysis:
+                            analysis = design_context.product_analysis
+                            if isinstance(analysis, dict):
+                                parts = []
+                                if analysis.get('what_i_see'):
+                                    parts.append(f"What I see: {analysis['what_i_see']}")
+                                if analysis.get('visual_characteristics'):
+                                    parts.append(f"Visual characteristics: {analysis['visual_characteristics']}")
+                                if analysis.get('product_category'):
+                                    parts.append(f"Category: {analysis['product_category']}")
+                                product_analysis_text = "\n".join(parts) if parts else str(analysis)
+                            else:
+                                product_analysis_text = str(analysis)
+
+                        logger.info(f"[EDIT] Using AI Designer to enhance edit instructions for {template_key}")
+                        enhancement = await vision_service.enhance_prompt_with_feedback(
+                            original_prompt=original_prompt,
+                            user_feedback=edit_instructions,
+                            image_type=template_key,
+                            framework=framework_dict,
+                            product_analysis=product_analysis_text,
+                        )
+                        enhanced_instructions = enhancement["enhanced_prompt"]
+                        change_summary = enhancement.get("interpretation", "AI-enhanced edit")
+                        logger.info(f"[EDIT] AI Designer interpretation: {change_summary}")
+                except Exception as e:
+                    logger.warning(f"[EDIT] AI enhancement failed, using raw instructions: {e}")
+
+            # Call Gemini to edit the image with enhanced instructions
             edited_image = await self.gemini.edit_image(
                 source_image_path=existing_image_path,
-                edit_instructions=edit_instructions,
-                aspect_ratio="1:1",
+                edit_instructions=enhanced_instructions,
+                aspect_ratio=aspect_ratio,
                 max_retries=3,
             )
 
             if edited_image is None:
                 raise ValueError("No image returned from Gemini edit API")
 
-            # Save edited image (this will overwrite or create new file)
-            storage_path = self.storage.save_generated_image(
+            # Store prompt in history to get version number
+            edit_version = 1
+            if design_context:
+                try:
+                    ph = self.store_prompt_in_history(
+                        context=design_context,
+                        image_type=image_type,
+                        prompt_text=f"[EDIT] {enhanced_instructions}",
+                        user_feedback=edit_instructions,
+                        change_summary=change_summary,
+                    )
+                    edit_version = ph.version
+                except Exception as e:
+                    logger.warning(f"Failed to store edit prompt in history: {e}")
+
+            # Save edited image with versioned copy
+            save_key = storage_key if is_aplus else template_key
+            storage_path = self.storage.save_generated_image_versioned(
                 session_id=session.id,
-                image_type=template_key,
+                image_type=save_key,
                 image=edited_image,
+                version=edit_version,
             )
 
-            # Update record - success!
-            image_record.storage_path = storage_path
-            image_record.status = GenerationStatusEnum.COMPLETE
-            image_record.completed_at = datetime.now(timezone.utc)
-            image_record.error_message = None
-            self.db.commit()
+            # Update listing image record (A+ has no record)
+            if image_record:
+                image_record.storage_path = storage_path
+                image_record.status = GenerationStatusEnum.COMPLETE
+                image_record.completed_at = datetime.now(timezone.utc)
+                image_record.error_message = None
+                self.db.commit()
 
             logger.info(f"Successfully edited {template_key} for session {session.id}")
 
@@ -1539,16 +1627,17 @@ Make it count.
         except Exception as e:
             logger.error(f"Edit failed for {template_key} (session: {session.id}): {e}")
 
-            # Revert to complete status with original path (image still exists)
-            image_record.status = GenerationStatusEnum.COMPLETE
-            image_record.storage_path = original_path
-            image_record.error_message = f"Edit failed: {str(e)}"
-            self.db.commit()
+            # Revert listing image to complete with original path
+            if image_record:
+                image_record.status = GenerationStatusEnum.COMPLETE
+                image_record.storage_path = original_path
+                image_record.error_message = f"Edit failed: {str(e)}"
+                self.db.commit()
 
             return ImageResult(
                 image_type=SchemaImageType(template_key),
                 status=SchemaStatus.FAILED,
-                storage_path=original_path,  # Return original path so UI still shows image
+                storage_path=original_path,
                 error_message=str(e),
             )
 

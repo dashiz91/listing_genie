@@ -128,6 +128,52 @@ class SupabaseStorageService:
         storage_path = f"supabase://{self.generated_bucket}/{filename}"
         return storage_path
 
+    def save_generated_image_versioned(
+        self,
+        session_id: str,
+        image_type: str,
+        image: Image.Image,
+        version: int,
+    ) -> str:
+        """
+        Save a versioned copy of a generated image alongside the latest copy.
+
+        Saves to:
+          - {session_id}/{image_type}_v{version}.png  (permanent versioned copy)
+          - {session_id}/{image_type}.png              (latest, backward compat)
+
+        Returns:
+            Storage path for the latest copy (supabase://bucket/path format)
+        """
+        output_buffer = BytesIO()
+        image.save(output_buffer, format='PNG', optimize=True)
+        png_bytes = output_buffer.getvalue()
+
+        # Save versioned copy (permanent)
+        versioned_filename = f"{session_id}/{image_type}_v{version}.png"
+        try:
+            self.client.storage.from_(self.generated_bucket).upload(
+                path=versioned_filename,
+                file=png_bytes,
+                file_options={"content-type": "image/png"}
+            )
+            logger.info(f"Saved versioned image: {versioned_filename}")
+        except Exception as e:
+            if "Duplicate" in str(e) or "already exists" in str(e).lower():
+                logger.info(f"Versioned file exists, updating: {versioned_filename}")
+                self.client.storage.from_(self.generated_bucket).update(
+                    path=versioned_filename,
+                    file=png_bytes,
+                    file_options={"content-type": "image/png"}
+                )
+            else:
+                logger.error(f"Failed to save versioned image: {e}")
+                raise
+
+        # Save/update latest copy (overwrites)
+        latest_path = self.save_generated_image(session_id, image_type, image)
+        return latest_path
+
     def get_upload_url(self, upload_id: str, expires_in: int = 3600) -> str:
         """
         Get a signed URL for an uploaded file.
