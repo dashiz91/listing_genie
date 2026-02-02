@@ -1,8 +1,18 @@
 # REDDAI.CO
 
-AI-powered Amazon listing image generator that creates professional product images for e-commerce sellers.
+AI-powered Amazon listing image generator that creates complete, visually cohesive product listings — 5 listing images + A+ Content modules (desktop & mobile) — from a single set of product photos.
 
 **Brand:** REDDAI.CO — Geometric fox logo, orange (#C85A35) + slate (#1A1D21) color palette.
+
+## What Makes This Different
+
+Unlike generic AI image wrappers, REDDAI uses a multi-stage Art Director pipeline:
+1. **Vision Analysis** — AI sees the product photos, understands category/features
+2. **Design Framework** — Creates a cohesive visual system (colors, typography, layout strategy)
+3. **Visual Script** — Plans each image's content, role, and how modules connect
+4. **Coordinated Generation** — Every image follows the script, not random generation
+5. **Canvas Continuity** — A+ modules use gradient inpainting so they stitch together seamlessly
+6. **Desktop + Mobile** — One-click transform per module, both variants side by side
 
 ## Architecture Overview
 
@@ -24,8 +34,10 @@ AI-powered Amazon listing image generator that creates professional product imag
 │       ├── components/split-layout/   # Split-screen experience  │
 │       ├── components/live-preview/   # Real-time preview        │
 │       ├── components/amazon-preview/ # Amazon listing mockup UI │
+│       ├── components/preview-slots/  # A+ module rendering      │
 │       ├── components/landing/        # Landing page sections    │
 │       ├── components/ui/             # shadcn/ui components     │
+│       ├── components/FocusImagePicker.tsx # Ref image selector  │
 │       ├── contexts/                  # Auth context (Supabase)  │
 │       ├── pages/LandingPage.tsx      # Marketing landing        │
 │       ├── pages/AuthPage.tsx         # Login/Signup             │
@@ -39,7 +51,13 @@ AI-powered Amazon listing image generator that creates professional product imag
 │       ├── api/endpoints/        # REST endpoints                │
 │       ├── core/auth.py          # Supabase JWT verification     │
 │       ├── services/             # Business logic                │
-│       ├── prompts/              # AI prompts                    │
+│       │   ├── generation_service.py      # Listing image orchestration    │
+│       │   ├── gemini_service.py          # Gemini API (generate/edit)     │
+│       │   ├── gemini_vision_service.py   # Vision analysis + frameworks   │
+│       │   ├── design_architect_service.py # Framework generation          │
+│       │   ├── image_utils.py             # Canvas compositor, resizing    │
+│       │   └── supabase_storage_service.py # Cloud storage                 │
+│       ├── prompts/              # AI prompts & templates        │
 │       └── models/               # SQLAlchemy models             │
 │                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
@@ -117,12 +135,13 @@ listing_genie/
 │   │       ├── lifestyle.py
 │   │       └── comparison.py
 │   ├── services/
-│   │   ├── generation_service.py     # Main orchestration logic
-│   │   ├── gemini_service.py         # Gemini image generation
-│   │   ├── gemini_vision_service.py  # Gemini vision analysis
+│   │   ├── generation_service.py     # Listing image orchestration
+│   │   ├── gemini_service.py         # Gemini API (generate/edit/text)
+│   │   ├── gemini_vision_service.py  # Vision analysis + framework gen
 │   │   ├── openai_vision_service.py  # OpenAI vision (backup)
 │   │   ├── vision_service.py         # Unified vision service
-│   │   ├── design_architect_service.py # Design framework service
+│   │   ├── design_architect_service.py # Framework generation
+│   │   ├── image_utils.py            # Canvas compositor, A+ resizing
 │   │   └── supabase_storage_service.py # Supabase Storage integration
 │   ├── config.py                     # App configuration
 │   ├── dependencies.py               # Dependency injection
@@ -163,10 +182,18 @@ listing_genie/
 │   │   │   │   ├── PreviewToolbar.tsx        # Device toggle, actions
 │   │   │   │   ├── QuickEditBar.tsx          # Edit/regen buttons
 │   │   │   │   └── CelebrationOverlay.tsx    # Success confetti
+│   │   │   ├── preview-slots/        # A+ Content module components
+│   │   │   │   ├── AplusSection.tsx         # Full A+ section with modules
+│   │   │   │   ├── ImageSlot.tsx            # Individual image slot
+│   │   │   │   └── index.ts
+│   │   │   ├── shared/               # Shared UI components
+│   │   │   │   └── ImageActionOverlay.tsx   # Hover action overlay
 │   │   │   ├── ui/                   # shadcn/ui components
 │   │   │   ├── ProtectedRoute.tsx    # Auth guard component
 │   │   │   ├── Layout.tsx            # App layout wrapper
 │   │   │   ├── ImageUploader.tsx     # Multi-image uploader
+│   │   │   ├── FocusImagePicker.tsx  # Reference image selector for edits
+│   │   │   ├── PromptModal.tsx       # View/copy generation prompts
 │   │   │   └── FrameworkSelector.tsx # Framework selection UI
 │   │   ├── contexts/
 │   │   │   └── AuthContext.tsx       # Supabase auth state
@@ -236,34 +263,62 @@ The generator uses an immersive split-screen layout where the Amazon listing pre
 - Protected routes on frontend
 - User sessions linked to generation sessions
 
-### Two-Step AI Generation Flow
+### Three-Stage AI Generation Flow
 
-**Step 1: Framework Analysis** (Gemini Vision)
-- AI analyzes product photos
-- Generates 4 unique design frameworks with different styles
+**Step 1: Framework Analysis** (gemini-3-flash-preview)
+- AI vision analyzes product photos (supports multiple uploads)
+- Generates up to 4 unique design frameworks with different styles
+- Each framework includes: color palette, typography, layout strategy, mood
 - Creates preview images for each framework
 - User selects their preferred framework
 
-**Step 2: Image Generation** (Gemini Image)
-- AI generates 5 detailed prompts specific to the selected framework
+**Step 2: Listing Image Generation** (gemini-3-pro-image-preview)
+- AI Art Director generates 5 detailed prompts specific to the product + framework
 - Creates 5 radically different listing images:
-  - **Main/Hero** - Clean product shot on white background
-  - **Infographic 1** - Technical features with callouts
-  - **Infographic 2** - Benefits grid with icons
-  - **Lifestyle** - Product in use with real person
-  - **Comparison** - Multiple uses or package contents
+  - **Main/Hero** — Clean product shot on white background
+  - **Infographic 1** — Technical features with callouts
+  - **Infographic 2** — Benefits grid with icons
+  - **Lifestyle** — Product in use with real person
+  - **Comparison** — Multiple uses or package contents
+- Named image references (product photos, style ref) sent with each generation
+
+**Step 3: A+ Content Generation** (gemini-3-pro-image-preview)
+- AI Art Director writes a complete visual script for 5-6 A+ modules
+- **Hero pair** — Modules 0+1 generated as one tall image, split at midpoint
+- **Subsequent modules** — Canvas continuity technique:
+  1. Takes bottom portion of previous module as gradient canvas
+  2. Sends canvas + product photo + style ref as named images
+  3. Gemini completes the canvas, maintaining visual flow
+  4. Result split into refined previous + new module (no visible seam)
+- **Mobile transforms** — Each desktop module can be recomposed to 4:3 mobile via edit API
+- Per-module versioning with full version history
+
+### Canvas Continuity Technique (Key Differentiator)
+Each A+ module is generated with visual context from its neighbor:
+```
+Module N (bottom 25%) → gradient fade → blank canvas
+                         ↓
+Gemini receives: [canvas_to_complete, product_photo, style_ref]
+                         ↓
+Output: tall 4:3 image split into:
+  - Top half → overwrites Module N (refined, seamless)
+  - Bottom half → Module N+1 (new content, continuous flow)
+```
+This ensures modules stitch together with invisible transitions.
 
 ### Color Mode System
-- **`ai_decides`** - Full creative freedom
-- **`suggest_primary`** - AI extracts colors from style reference
-- **`locked_palette`** - User locks exact hex colors
+- **`ai_decides`** — Full creative freedom
+- **`suggest_primary`** — AI extracts colors from style reference
+- **`locked_palette`** — User locks exact hex colors
 
 ### Style Reference
 Upload a style reference image and AI matches that visual style across all generated images.
 
-### Edit & Regenerate
+### Edit & Regenerate with Focus Images
 - **Edit**: Modify existing image while preserving layout
 - **Regenerate**: Generate completely new image with feedback
+- **Focus Image Picker**: When editing, user can select which reference images (product uploads, style ref, logo) to include as visual context. All off by default (pure text edit). "+" button allows ad-hoc reference image upload.
+- Focus images are inserted before the source image in the Gemini contents array so Gemini treats the source as the edit target.
 
 ### Amazon Preview Experience
 Results display as an authentic Amazon product listing mockup:
@@ -275,15 +330,24 @@ Results display as an authentic Amazon product listing mockup:
 - **Quick Edit Bar**: Fast access to edit/regenerate/view-prompt per image
 - **Export**: Download all images or export mockup as PNG
 
+### A+ Content Preview
+Below the listing images, a dedicated A+ section shows:
+- All modules in sequence (desktop or mobile viewport)
+- Per-module actions: generate, regenerate, edit, download, view prompt
+- Desktop/mobile viewport toggle
+- One-click "Generate All Mobile" to transform all desktop modules
+- Visual script regeneration
+
 ### Projects Management
 - **Projects Page**: View all saved generation sessions
 - **Project Cards**: Thumbnail preview, status, date
 - **Rename/Delete**: Manage saved projects
-- **Detail Modal**: View all 5 images from a project
+- **Detail Modal**: View all images from a project
 
 ### Cloud Storage (Supabase)
 - Uploads stored in `supabase://uploads/{uuid}.png`
 - Generated images in `supabase://generated/{session_id}/{image_type}.png`
+- Versioned images: `{image_type}_v{N}.png`
 - Images served via signed URLs (1-hour expiry)
 
 ## API Endpoints
@@ -296,10 +360,14 @@ DELETE /api/upload/{id}        Delete uploaded image
 
 ### Generation
 ```
-POST /api/generate/frameworks/analyze    Step 1: Analyze + frameworks
-POST /api/generate/frameworks/generate   Step 2: Generate 5 images
+POST /api/generate/frameworks/analyze    Step 1: Analyze + generate frameworks
+POST /api/generate/frameworks/generate   Step 2: Generate 5 listing images
 POST /api/generate/single                Regenerate single image
-POST /api/generate/edit                  Edit image
+POST /api/generate/edit                  Edit image (supports reference_image_paths)
+POST /api/generate/aplus/module          Generate single A+ module
+POST /api/generate/aplus/hero            Generate A+ hero pair (modules 0+1)
+POST /api/generate/aplus/mobile          Generate mobile version of A+ module
+POST /api/generate/aplus/script          Generate/regenerate A+ visual script
 GET  /api/generate/{session_id}          Get session status
 GET  /api/generate/{session_id}/prompts  Get all prompts
 ```
@@ -407,10 +475,17 @@ npm run dev
 - `frontend/src/pages/ProjectsPage.tsx` - Projects listing page
 - `app/api/endpoints/projects.py` - Projects CRUD API
 
+### A+ Content
+- `frontend/src/components/preview-slots/AplusSection.tsx` - A+ section with modules, edit panel, focus images
+- `app/api/endpoints/generation.py` - A+ endpoints (hero, module, mobile, script)
+- `app/services/image_utils.py` - Canvas compositor, gradient inpainting, A+ resizing
+
 ### Backend Services
-- `app/prompts/ai_designer.py` - All AI prompts
-- `app/services/generation_service.py` - Main orchestration
-- `app/services/gemini_service.py` - Image generation
+- `app/prompts/ai_designer.py` - All AI prompts (Art Director, visual script)
+- `app/services/generation_service.py` - Listing image orchestration
+- `app/services/gemini_service.py` - Gemini API (generate_image, edit_image, generate_text)
+- `app/services/gemini_vision_service.py` - Vision analysis + framework generation
+- `app/services/design_architect_service.py` - Framework text generation
 - `app/services/supabase_storage_service.py` - Cloud storage
 
 ## Supabase Setup
@@ -424,10 +499,39 @@ Create these buckets in Supabase Storage:
 - Enable Email provider in Supabase Auth settings
 - Disable email confirmation for development (optional)
 
-## Future Scope
+## AI Models & Cost
+
+| Model | Role | Cost |
+|-------|------|------|
+| `gemini-3-flash-preview` | Vision analysis, framework gen | ~$0.50/1M input, $3/1M output |
+| `gemini-2.0-flash` | Text generation (visual scripts, design architect) | ~$0.10/1M input, $0.40/1M output |
+| `gemini-3-pro-image-preview` | Image generation & editing | ~$0.134/image (1K), $0.0011/input image |
+
+**Estimated cost per full listing** (5 listing images + 4 framework previews + 6 A+ desktop + 6 A+ mobile):
+- ~21 image generations × $0.134 = ~$2.81
+- + vision/text calls ~$0.20
+- **Total: ~$3.00 per full listing generation** (before regenerations/edits)
+
+## Generation Flow Summary
+
+```
+User uploads photos + fills product info
+  → /frameworks/analyze (vision + 4 preview images)     ~4 calls
+  → User picks framework
+  → /frameworks/generate (5 listing images)              ~5 calls
+  → /aplus/script (visual script via text gen)           ~1 call
+  → /aplus/hero (hero pair, split into modules 0+1)      ~1 call
+  → /aplus/module × 4 (canvas continuity for 2-5)        ~4 calls
+  → /aplus/mobile × 6 (desktop→mobile transforms)        ~6 calls
+                                                    Total: ~21 image calls
+```
+
+## Future Scope / Roadmap
+- ASIN import (scrape Amazon listing to pre-fill product info)
+- Alt text generation per image (SEO)
+- Seller Central export (ZIP with correct filenames/sizes)
 - Credit-based pricing system (Stripe integration)
-- A+ Content (Enhanced Brand Content) images
+- More A+ section types (comparison tables, text+image)
 - Batch generation for multiple products
 - Social login (Google, GitHub)
-- Mobile app (React Native)
 - Team collaboration features
