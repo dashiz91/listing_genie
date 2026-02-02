@@ -128,7 +128,8 @@ class ApiClient {
   async regenerateSingleImage(
     sessionId: string,
     imageType: string,
-    note?: string
+    note?: string,
+    referenceImagePaths?: string[]
   ): Promise<{ status: string; image_type: string; storage_path?: string; error_message?: string }> {
     const response = await this.client.post(
       '/generate/single',
@@ -136,6 +137,7 @@ class ApiClient {
         session_id: sessionId,
         image_type: imageType,
         note: note,
+        reference_image_paths: referenceImagePaths || null,
       },
       { timeout: 180000 } // 3 minute timeout for single image
     );

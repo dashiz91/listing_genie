@@ -34,7 +34,7 @@ interface ShowroomPanelProps {
   aplusVisualScript?: import('@/api/types').AplusVisualScript | null;
   isGeneratingScript?: boolean;
   onGenerateAplusModule?: (moduleIndex: number) => void;
-  onRegenerateAplusModule?: (moduleIndex: number, note?: string) => void;
+  onRegenerateAplusModule?: (moduleIndex: number, note?: string, referenceImagePaths?: string[]) => void;
   onGenerateAllAplus?: () => void;
   onRegenerateScript?: () => void;
   onAplusVersionChange?: (moduleIndex: number, versionIndex: number) => void;
@@ -43,8 +43,9 @@ interface ShowroomPanelProps {
   onAplusViewportChange?: (mode: AplusViewportMode) => void;
   onGenerateMobileModule?: (moduleIndex: number) => void;
   onGenerateAllMobile?: () => void;
-  onRegenerateMobileModule?: (moduleIndex: number, note?: string) => void;
+  onRegenerateMobileModule?: (moduleIndex: number, note?: string, referenceImagePaths?: string[]) => void;
   onEditMobileModule?: (moduleIndex: number, editInstructions: string, referenceImagePaths?: string[]) => void;
+  onCancelAplusModule?: (moduleIndex: number, viewport: AplusViewportMode) => void;
 
   // Listing version tracking
   listingVersions?: ListingVersionState;
@@ -53,8 +54,9 @@ interface ShowroomPanelProps {
   // Callbacks
   onGenerateSingle?: (imageType: string) => void;
   onGenerateAll?: () => void;
-  onRegenerateSingle?: (imageType: string, note?: string) => void;
+  onRegenerateSingle?: (imageType: string, note?: string, referenceImagePaths?: string[]) => void;
   onEditSingle?: (imageType: string, instructions: string, referenceImagePaths?: string[]) => void;
+  onCancelGeneration?: (imageType: string) => void;
   availableReferenceImages?: import('@/api/types').ReferenceImage[];
   onRetry?: () => void;
   onStartOver?: () => void;
@@ -92,12 +94,14 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
   onGenerateAllMobile,
   onRegenerateMobileModule,
   onEditMobileModule,
+  onCancelAplusModule,
   listingVersions,
   onListingVersionChange,
   onGenerateSingle,
   onGenerateAll,
   onRegenerateSingle,
   onEditSingle,
+  onCancelGeneration,
   availableReferenceImages = [],
   onRetry,
   onStartOver,
@@ -165,6 +169,7 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
                 onRetry={onRetry}
                 onRegenerateSingle={onRegenerateSingle}
                 onEditSingle={onEditSingle}
+                onCancelGeneration={onCancelGeneration}
                 availableReferenceImages={availableReferenceImages}
                 onStartOver={onStartOver}
                 listingVersions={listingVersions}
@@ -218,6 +223,7 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
               onRegenerateMobileModule={onRegenerateMobileModule}
               onEditMobileModule={onEditMobileModule}
               availableReferenceImages={availableReferenceImages}
+              onCancelModule={onCancelAplusModule}
             />
           )}
         </div>

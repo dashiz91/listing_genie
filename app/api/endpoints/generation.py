@@ -231,8 +231,12 @@ async def generate_single_image(
         # Convert schema enum to DB enum
         db_image_type = DBImageType(request.image_type.value)
 
-        # Pass the optional note to generate_single_image
-        result = await service.generate_single_image(session, db_image_type, note=request.note)
+        # Pass the optional note and reference images to generate_single_image
+        result = await service.generate_single_image(
+            session, db_image_type,
+            note=request.note,
+            reference_image_paths=request.reference_image_paths,
+        )
 
         # Update session status based on image statuses
         service._update_session_status(session)
@@ -1398,7 +1402,8 @@ async def generate_aplus_hero_pair(
 
         logger.info(f"Generating hero pair with {len(named_images)} named images, prompt={len(prompt)} chars")
 
-        # Generate ONE tall image at 4:3
+        # Generate at 4:3 landscape (1200×896 at 1K). Target is 1464×1200 (1.22:1).
+        # 4:3 (1.33:1) is the closest available ratio — minimal distortion on resize.
         hero_image = await gemini.generate_image(
             prompt=prompt,
             named_images=named_images if named_images else None,

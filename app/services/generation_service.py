@@ -1160,6 +1160,7 @@ Make it count.
         image_type: ImageTypeEnum,
         note: Optional[str] = None,
         use_ai_enhancement: bool = True,
+        reference_image_paths: Optional[List[str]] = None,
     ) -> ImageResult:
         """
         Generate a single image type for a session with retry logic.
@@ -1298,34 +1299,42 @@ Make it count.
                 )
 
                 # Build reference image paths:
+                # If user provided custom reference_image_paths (focus images), use those instead
+                # Otherwise build from session data:
                 # 1. Product photo (always first - primary reference)
                 # 2. Additional product photos (for better AI context)
                 # 3. Style reference image (if provided - for all images)
                 # 4. Logo (only for non-main images)
-                reference_paths = [session.upload_path]
-
-                # Track image indices for style reference
-                current_index = 2  # Image 1 is primary product
-
-                # Add additional product images for better context
-                additional_count = 0
-                if session.additional_upload_paths:
-                    reference_paths.extend(session.additional_upload_paths)
-                    additional_count = len(session.additional_upload_paths)
-                    current_index += additional_count
-
-                # Add style reference image (applies to ALL images including main)
                 style_image_index = None
-                if session.style_reference_path:
-                    reference_paths.append(session.style_reference_path)
-                    style_image_index = current_index
-                    current_index += 1
-
-                # Only add logo for non-main images (main/hero should be clean)
                 logo_image_index = None
-                if session.logo_path and image_type != ImageTypeEnum.MAIN:
-                    reference_paths.append(session.logo_path)
-                    logo_image_index = current_index
+                additional_count = 0
+
+                if reference_image_paths:
+                    # User selected specific focus images — use only those
+                    reference_paths = list(reference_image_paths)
+                    logger.info(f"[GENERATION] Using {len(reference_paths)} user-selected focus images (overriding defaults)")
+                else:
+                    reference_paths = [session.upload_path]
+
+                    # Track image indices for style reference
+                    current_index = 2  # Image 1 is primary product
+
+                    # Add additional product images for better context
+                    if session.additional_upload_paths:
+                        reference_paths.extend(session.additional_upload_paths)
+                        additional_count = len(session.additional_upload_paths)
+                        current_index += additional_count
+
+                    # Add style reference image (applies to ALL images including main)
+                    if session.style_reference_path:
+                        reference_paths.append(session.style_reference_path)
+                        style_image_index = current_index
+                        current_index += 1
+
+                    # Only add logo for non-main images (main/hero should be clean)
+                    if session.logo_path and image_type != ImageTypeEnum.MAIN:
+                        reference_paths.append(session.logo_path)
+                        logo_image_index = current_index
 
                 # === COMPREHENSIVE REFERENCE IMAGE LOGGING ===
                 logger.info("=" * 80)
@@ -1391,12 +1400,25 @@ Make it count.
                 img_version = 1
                 if design_context:
                     try:
+                        # Build reference image metadata for prompt history
+                        ref_meta = []
+                        for i, rp in enumerate(reference_paths):
+                            label = "primary_product" if i == 0 else "reference"
+                            if style_image_index and i + 1 == style_image_index:
+                                label = "style_reference"
+                            elif logo_image_index and i + 1 == logo_image_index:
+                                label = "logo"
+                            elif i > 0 and i < 1 + additional_count:
+                                label = f"additional_product_{i}"
+                            ref_meta.append({"type": label, "path": rp})
+
                         ph = self.store_prompt_in_history(
                             context=design_context,
                             image_type=image_type,
                             prompt_text=prompt,  # The final prompt that was sent
                             user_feedback=user_feedback,
                             change_summary=change_summary,
+                            reference_image_paths=ref_meta if ref_meta else None,
                         )
                         img_version = ph.version
                     except Exception as e:
@@ -1603,12 +1625,19 @@ Make it count.
             edit_version = 1
             if design_context:
                 try:
+                    # Build reference image metadata for edit prompt history
+                    edit_ref_meta = [{"type": "source_image", "path": existing_image_path}]
+                    if reference_image_paths:
+                        for rp in reference_image_paths:
+                            edit_ref_meta.append({"type": "focus_reference", "path": rp})
+
                     ph = self.store_prompt_in_history(
                         context=design_context,
                         image_type=image_type,
                         prompt_text=f"[EDIT] {enhanced_instructions}",
                         user_feedback=edit_instructions,
                         change_summary=change_summary,
+                        reference_image_paths=edit_ref_meta,
                     )
                     edit_version = ph.version
                 except Exception as e:

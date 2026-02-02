@@ -46,8 +46,9 @@ interface AmazonListingPreviewProps {
 
   // Callbacks (preserve existing functionality)
   onRetry?: () => void;
-  onRegenerateSingle?: (imageType: string, note?: string) => void;
+  onRegenerateSingle?: (imageType: string, note?: string, referenceImagePaths?: string[]) => void;
   onEditSingle?: (imageType: string, instructions: string, referenceImagePaths?: string[]) => void;
+  onCancelGeneration?: (imageType: string) => void;
   availableReferenceImages?: ReferenceImage[];
   onStartOver?: () => void;
 
@@ -79,6 +80,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   onGenerateAll: _onGenerateAll, // Reserved for "Generate All" button
   onRegenerateSingle,
   onEditSingle,
+  onCancelGeneration,
   availableReferenceImages = [],
   onStartOver,
   listingVersions,
@@ -104,6 +106,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   const [regenPanelOpen, setRegenPanelOpen] = useState(false);
   const [regenImageType, setRegenImageType] = useState<string | null>(null);
   const [regenNote, setRegenNote] = useState('');
+  const regenFocusImages = useFocusImages();
 
   // Save to Projects state
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -263,6 +266,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
     (imageType: string) => {
       setRegenImageType(imageType);
       setRegenNote('');
+      regenFocusImages.reset();
       setRegenPanelOpen(true);
     },
     []
@@ -271,13 +275,15 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   // Submit regenerate with optional note
   const handleRegenSubmit = useCallback(() => {
     if (regenImageType) {
-      onRegenerateSingle?.(regenImageType, regenNote.trim() || undefined);
+      const refPaths = regenFocusImages.getSelectedPaths();
+      const refs = refPaths.length > 0 ? refPaths : undefined;
+      onRegenerateSingle?.(regenImageType, regenNote.trim() || undefined, refs);
       setImageCacheKey((prev) => ({ ...prev, [regenImageType]: Date.now() }));
       setRegenPanelOpen(false);
       setRegenImageType(null);
       setRegenNote('');
     }
-  }, [regenImageType, regenNote, onRegenerateSingle]);
+  }, [regenImageType, regenNote, onRegenerateSingle, regenFocusImages]);
 
   // Submit edit — version management is now in HomePage
   const handleEditSubmit = useCallback(() => {
@@ -567,6 +573,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                         isPending={isSelectedPending}
                         accentColor={accentColor}
                         onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                        onCancel={isSelectedProcessing && onCancelGeneration ? () => onCancelGeneration(selectedImageType) : undefined}
+                        onRegenerate={isSelectedProcessing ? () => handleRegenerateClick(selectedImageType) : undefined}
                         overlay={imageOverlay}
                       />
                     </div>
@@ -599,6 +607,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                       isPending={isSelectedPending}
                       accentColor={accentColor}
                       onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                      onCancel={isSelectedProcessing && onCancelGeneration ? () => onCancelGeneration(selectedImageType) : undefined}
+                      onRegenerate={isSelectedProcessing ? () => handleRegenerateClick(selectedImageType) : undefined}
                     />
                   </div>
                   <div className="flex gap-2 px-4 pb-4 overflow-x-auto bg-white">
@@ -613,7 +623,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                         )}
                       >
                         {image.status === 'complete' ? (
-                          <img src={getImageUrl(image.type)} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                          <img src={getImageUrl(image.type)} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         ) : (
                           <div className="w-full h-full bg-slate-100 flex items-center justify-center">
                             <span className="text-slate-400 text-xs">{index + 1}</span>
@@ -682,10 +692,11 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                   isPending={isSelectedPending}
                   accentColor={accentColor}
                   onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                  onCancel={isSelectedProcessing && onCancelGeneration ? () => onCancelGeneration(selectedImageType) : undefined}
                   versionInfo={selectedImage?.status === 'complete' ? { current: currentVersionInfo.currentVersion, total: currentVersionInfo.totalVersions } : undefined}
                   onPreviousVersion={handlePreviousVersion}
                   onNextVersion={handleNextVersion}
-                  onRegenerate={selectedImage?.status === 'complete' ? () => handleRegenerateClick(selectedImageType) : undefined}
+                  onRegenerate={selectedImage?.status === 'complete' || isSelectedProcessing ? () => handleRegenerateClick(selectedImageType) : undefined}
                   onEdit={selectedImage?.status === 'complete' ? () => handleEditClick(selectedImageType) : undefined}
                   onDownload={selectedImage?.status === 'complete' ? () => downloadImage(selectedImageType, IMAGE_LABELS[selectedImageType] || selectedImageType) : undefined}
                   onViewPrompt={selectedImage?.status === 'complete' ? () => handleViewPrompt(selectedImageType) : undefined}
@@ -730,10 +741,11 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 isPending={isSelectedPending}
                 accentColor={accentColor}
                 onGenerate={isSelectedPending && onGenerateSingle ? () => handleGenerateSingle(selectedImage?.type || 'main') : undefined}
+                onCancel={isSelectedProcessing && onCancelGeneration ? () => onCancelGeneration(selectedImageType) : undefined}
                 versionInfo={selectedImage?.status === 'complete' ? { current: currentVersionInfo.currentVersion, total: currentVersionInfo.totalVersions } : undefined}
                 onPreviousVersion={handlePreviousVersion}
                 onNextVersion={handleNextVersion}
-                onRegenerate={selectedImage?.status === 'complete' ? () => handleRegenerateClick(selectedImageType) : undefined}
+                onRegenerate={selectedImage?.status === 'complete' || isSelectedProcessing ? () => handleRegenerateClick(selectedImageType) : undefined}
                 onEdit={selectedImage?.status === 'complete' ? () => handleEditClick(selectedImageType) : undefined}
                 onDownload={selectedImage?.status === 'complete' ? () => downloadImage(selectedImageType, IMAGE_LABELS[selectedImageType] || selectedImageType) : undefined}
                 onViewPrompt={selectedImage?.status === 'complete' ? () => handleViewPrompt(selectedImageType) : undefined}
@@ -762,6 +774,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                         src={getImageUrl(image.type)}
                         alt={`Thumbnail ${index + 1}`}
                         className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                       />
                     ) : (
                       <div className="w-full h-full bg-slate-100 flex items-center justify-center">
@@ -896,6 +909,19 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 rows={4}
               />
             </div>
+
+            {/* Focus Images for regen */}
+            {availableReferenceImages && availableReferenceImages.length > 0 && (
+              <FocusImagePicker
+                availableImages={availableReferenceImages}
+                selectedPaths={regenFocusImages.selectedPaths}
+                onToggle={regenFocusImages.toggle}
+                extraFile={regenFocusImages.extraFile}
+                onExtraFile={regenFocusImages.addExtra}
+                onRemoveExtra={regenFocusImages.removeExtra}
+                variant="dark"
+              />
+            )}
 
             <div className="flex gap-3 pt-4">
               <button

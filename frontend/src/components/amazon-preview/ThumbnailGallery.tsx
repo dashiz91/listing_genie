@@ -116,6 +116,7 @@ const SortableThumbnail: React.FC<SortableThumbnailProps> = ({
           alt={image.label}
           className="w-full h-full object-cover"
           draggable={false}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
       ) : isProcessing ? (
         <div className="w-full h-full bg-slate-800 flex items-center justify-center">
@@ -281,6 +282,7 @@ export const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
                 src={getImageUrl(image.type)}
                 alt={image.label}
                 className="w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             ) : isProcessing ? (
               <div className="w-full h-full bg-slate-800 flex items-center justify-center">

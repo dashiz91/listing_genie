@@ -122,20 +122,20 @@ class CanvasCompositor:
             f"split_hero_image: input={image.size}"
         )
 
-        # Resize the FULL image first to target width × double height,
-        # THEN split. This ensures the LANCZOS kernel at the seam has
-        # full context from both halves — no edge interpolation mismatch.
-        target_height = MODULE_HEIGHT * 2
-        full_resized = image.resize(
-            (CANVAS_WIDTH, target_height), PILImage.Resampling.LANCZOS
-        )
+        # Resize full image to exactly CANVAS_WIDTH × (MODULE_HEIGHT * 2).
+        # Then split at the midpoint — zero content loss, pixel-perfect seam.
+        # Slight aspect ratio adjustment is invisible on AI-generated images
+        # and far better than cropping off 39% of the composition.
+        target_w = CANVAS_WIDTH
+        target_h = MODULE_HEIGHT * 2
+        full = image.resize((target_w, target_h), PILImage.Resampling.LANCZOS)
 
         # Split at exact midpoint
-        top_module = full_resized.crop((0, 0, CANVAS_WIDTH, MODULE_HEIGHT))
-        bottom_module = full_resized.crop((0, MODULE_HEIGHT, CANVAS_WIDTH, target_height))
+        top_module = full.crop((0, 0, target_w, MODULE_HEIGHT))
+        bottom_module = full.crop((0, MODULE_HEIGHT, target_w, target_h))
 
         logger.info(
-            f"Hero split: full_resized={full_resized.size}, "
+            f"Hero split: input={image.size}, resized={full.size}, "
             f"top={top_module.size}, bottom={bottom_module.size}"
         )
         return top_module, bottom_module

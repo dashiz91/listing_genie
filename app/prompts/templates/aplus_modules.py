@@ -438,8 +438,10 @@ CRITICAL RULES:
 """
 
 
-HERO_PAIR_PROMPT = """Generate a single tall image. This image will be split at the exact horizontal center
-into two seamless A+ Content banners (top half = Module 0, bottom half = Module 1).
+HERO_PAIR_PROMPT = """Generate ONE single tall portrait photograph — NOT two separate panels or compositions.
+This image will later be cropped into two halves, so it MUST look like one seamless photo from top to bottom.
+
+CRITICAL: Do NOT compose this as "top section" and "bottom section". Think of it as ONE tall editorial magazine photograph that happens to be cropped later. The viewer should NOT be able to tell where the crop line is.
 
 REFERENCE IMAGES:
 - PRODUCT_PHOTO: The actual product — honor its materials, proportions, and character.
@@ -450,11 +452,12 @@ REFERENCE IMAGES:
 {hero_pair_brief}
 
 ═══ COMPOSITION RULES (NON-NEGOTIABLE) ═══
-- The product MUST cross the horizontal midline — visible in BOTH halves when split
-- Background must be continuous from top to bottom (same color/gradient)
-- Typography only in the bottom half; top half is pure product photography
+- This is ONE continuous photograph, NOT two stacked panels
+- The product should be positioned so it naturally spans the vertical center of the image
+- Background must be one continuous color, gradient, or environment from top edge to bottom edge — no dividing lines, no color shifts at the midpoint
+- Place any brand name or product title text in the lower third only, integrated naturally into the scene
 - NEVER include website UI, Amazon navigation, search bars, or browser chrome
-- This must read as ONE continuous editorial photograph
+- Do NOT duplicate the product — show it ONCE, large, crossing through the center of the frame
 
 {custom_instructions_block}"""
 

@@ -327,6 +327,10 @@ class SingleImageRequest(BaseModel):
         max_length=2000,
         description="Optional note/instructions for this specific image regeneration"
     )
+    reference_image_paths: Optional[List[str]] = Field(
+        None,
+        description="Optional list of reference image paths to override default references"
+    )
 
 
 class SingleImageResponse(BaseModel):

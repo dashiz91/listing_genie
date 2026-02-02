@@ -19,6 +19,7 @@ interface MainImageViewerProps {
   onEdit?: () => void;
   onDownload?: () => void;
   onViewPrompt?: () => void;
+  onCancel?: () => void;
   className?: string;
 }
 
@@ -38,6 +39,7 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
   onEdit,
   onDownload,
   onViewPrompt,
+  onCancel,
   className,
 }) => {
 
@@ -45,7 +47,9 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
   const [isOverActionBar, setIsOverActionBar] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 50, y: 50 });
   const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const [isImageError, setIsImageError] = useState(false);
   const [previousUrl, setPreviousUrl] = useState<string | null>(null);
+  const [showStuckHint, setShowStuckHint] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const hasActions = !!(onRegenerate || onEdit || onDownload || onViewPrompt);
@@ -56,16 +60,33 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
   // Zoom only active when hovering image but NOT the action bar
   const zoomActive = isHovering && !isOverActionBar;
 
+  // Show cancel/retry actions after 5 seconds of processing
+  useEffect(() => {
+    if (!isProcessing) {
+      setShowStuckHint(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowStuckHint(true), 5000);
+    return () => clearTimeout(timer);
+  }, [isProcessing]);
+
   // Track image URL changes for crossfade effect
   useEffect(() => {
     if (imageUrl !== previousUrl) {
       setIsImageLoaded(false);
+      setIsImageError(false);
       setPreviousUrl(imageUrl);
     }
   }, [imageUrl, previousUrl]);
 
   const handleImageLoad = () => {
     setIsImageLoaded(true);
+    setIsImageError(false);
+  };
+
+  const handleImageError = () => {
+    setIsImageError(true);
+    setIsImageLoaded(false);
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -122,13 +143,13 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
           estimatedSeconds={12}
           className="rounded-lg overflow-hidden"
         />
-        {onRegenerate && (
+        {showStuckHint && onCancel && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
             <button
-              onClick={onRegenerate}
-              className="text-xs text-gray-400 hover:text-gray-600 underline bg-white/80 px-2 py-1 rounded transition-colors"
+              onClick={onCancel}
+              className="text-xs font-medium text-slate-700 bg-white/90 hover:bg-white px-3 py-1.5 rounded-md transition-colors shadow-sm border border-slate-300"
             >
-              Stuck? Force retry
+              Cancel
             </button>
           </div>
         )}
@@ -149,9 +170,29 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
         aria-label={imageLabel}
       >
         {/* Loading skeleton */}
-        {!isImageLoaded && (
+        {!isImageLoaded && !isImageError && (
           <div className="absolute inset-0 bg-slate-100 animate-pulse flex items-center justify-center">
             <div className="w-12 h-12 border-4 border-slate-300 border-t-redd-500 rounded-full animate-spin" />
+          </div>
+        )}
+
+        {/* Error state — image failed to load */}
+        {isImageError && (
+          <div className="absolute inset-0 bg-slate-50 flex flex-col items-center justify-center">
+            <svg className="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <p className="text-sm text-slate-400 font-medium">Image unavailable</p>
+            <p className="text-xs text-slate-300 mt-1">Signed URL may have expired</p>
+            {onRegenerate && (
+              <button
+                onClick={onRegenerate}
+                className="mt-3 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
+                style={{ backgroundColor: `${accentColor}15`, color: accentColor }}
+              >
+                Regenerate
+              </button>
+            )}
           </div>
         )}
 
@@ -165,6 +206,7 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
           )}
           draggable={false}
           onLoad={handleImageLoad}
+          onError={handleImageError}
         />
 
         {/* Zoom lens overlay (Amazon-style square) */}

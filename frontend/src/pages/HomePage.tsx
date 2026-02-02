@@ -746,7 +746,7 @@ export const HomePage: React.FC = () => {
 
   // Handle regenerate single
   const handleRegenerateSingle = useCallback(
-    async (imageType: string, note?: string) => {
+    async (imageType: string, note?: string, referenceImagePaths?: string[]) => {
       if (!sessionId) return;
 
       try {
@@ -754,7 +754,7 @@ export const HomePage: React.FC = () => {
           prev.map((img) => (img.type === imageType ? { ...img, status: 'processing' as const } : img))
         );
 
-        const result = await apiClient.regenerateSingleImage(sessionId, imageType, note);
+        const result = await apiClient.regenerateSingleImage(sessionId, imageType, note, referenceImagePaths);
 
         setImages((prev) =>
           prev.map((img) =>
@@ -790,6 +790,20 @@ export const HomePage: React.FC = () => {
       }
     },
     [sessionId]
+  );
+
+  // Handle cancel generation (client-side only — reverts status)
+  const handleCancelGeneration = useCallback(
+    (imageType: string) => {
+      setImages((prev) =>
+        prev.map((img) =>
+          img.type === imageType && img.status === 'processing'
+            ? { ...img, status: 'failed' as const, error: 'Cancelled by user' }
+            : img
+        )
+      );
+    },
+    []
   );
 
   // Handle edit single
@@ -1171,7 +1185,8 @@ export const HomePage: React.FC = () => {
   // For modules 0 or 1: regenerate hero pair (both together)
   // For modules 2+: regenerate individually
   const handleRegenerateAplusModule = useCallback(
-    async (moduleIndex: number, note?: string) => {
+    async (moduleIndex: number, note?: string, _referenceImagePaths?: string[]) => {
+      // TODO: pass referenceImagePaths through A+ generation pipeline
       if (moduleIndex <= 1) {
         // Hero pair — regenerate both 0+1 together
         setAplusModules((prev) =>
@@ -1367,7 +1382,8 @@ export const HomePage: React.FC = () => {
 
   // Handle regenerate mobile A+ module
   const handleRegenerateMobileModule = useCallback(
-    async (moduleIndex: number, note?: string) => {
+    async (moduleIndex: number, note?: string, _referenceImagePaths?: string[]) => {
+      // TODO: pass referenceImagePaths through mobile A+ generation pipeline
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) return;
 
@@ -1452,6 +1468,22 @@ export const HomePage: React.FC = () => {
     },
     []
   );
+
+  // Handle cancel A+ module generation (client-side, viewport-aware)
+  const handleCancelAplusModule = useCallback((moduleIndex: number, viewport: 'desktop' | 'mobile') => {
+    setAplusModules((prev) =>
+      prev.map((m, idx) => {
+        if (idx !== moduleIndex) return m;
+        if (viewport === 'mobile' && m.mobileStatus === 'generating') {
+          return { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: 'Cancelled by user' };
+        }
+        if (viewport === 'desktop' && m.status === 'generating') {
+          return { ...m, status: 'error' as SlotStatus, errorMessage: 'Cancelled by user' };
+        }
+        return m;
+      })
+    );
+  }, []);
 
   // Handle A+ viewport-aware version change
   const handleAplusViewportVersionChange = useCallback(
@@ -1626,12 +1658,14 @@ export const HomePage: React.FC = () => {
             onGenerateAllMobile={handleGenerateAllMobile}
             onRegenerateMobileModule={handleRegenerateMobileModule}
             onEditMobileModule={handleEditMobileModule}
+            onCancelAplusModule={handleCancelAplusModule}
             listingVersions={listingVersions}
             onListingVersionChange={handleListingVersionChange}
             onGenerateSingle={handleGenerateSingle}
             onGenerateAll={handleGenerate}
             onRegenerateSingle={handleRegenerateSingle}
             onEditSingle={handleEditSingle}
+            onCancelGeneration={handleCancelGeneration}
             availableReferenceImages={availableReferenceImages}
             onRetry={handleRetry}
             onStartOver={handleStartOver}
