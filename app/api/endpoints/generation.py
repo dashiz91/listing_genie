@@ -267,6 +267,10 @@ class EditImageRequest(BaseModel):
         False,
         description="If True, edit the mobile version of the A+ module"
     )
+    reference_image_paths: Optional[List[str]] = Field(
+        None,
+        description="Optional list of reference image paths to provide as visual context for the edit"
+    )
 
 
 @router.post("/edit", response_model=SingleImageResponse)
@@ -350,6 +354,7 @@ async def edit_single_image(
             edited_image = await gemini.edit_image(
                 source_image_path=mobile_path,
                 edit_instructions=request.edit_instructions,
+                reference_images=request.reference_image_paths,
                 aspect_ratio="4:3",
                 max_retries=3,
             )
@@ -401,7 +406,8 @@ async def edit_single_image(
         result = await service.edit_single_image(
             session,
             db_image_type,
-            edit_instructions=request.edit_instructions
+            edit_instructions=request.edit_instructions,
+            reference_image_paths=request.reference_image_paths,
         )
 
         return SingleImageResponse(

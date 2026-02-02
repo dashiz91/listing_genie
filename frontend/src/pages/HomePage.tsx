@@ -4,6 +4,7 @@ import { apiClient } from '../api/client';
 import { SplitScreenLayout, WorkshopPanel, ShowroomPanel } from '../components/split-layout';
 import type { WorkshopFormData } from '../components/split-layout';
 import type { UploadWithPreview } from '../components/ImageUploader';
+import type { ReferenceImage } from '../api/types';
 import type { PreviewState } from '../components/live-preview';
 import type {
   HealthResponse,
@@ -793,7 +794,7 @@ export const HomePage: React.FC = () => {
 
   // Handle edit single
   const handleEditSingle = useCallback(
-    async (imageType: string, editInstructions: string) => {
+    async (imageType: string, editInstructions: string, referenceImagePaths?: string[]) => {
       if (!sessionId) return;
 
       try {
@@ -801,7 +802,7 @@ export const HomePage: React.FC = () => {
           prev.map((img) => (img.type === imageType ? { ...img, status: 'processing' as const } : img))
         );
 
-        const result = await apiClient.editSingleImage(sessionId, imageType, editInstructions);
+        const result = await apiClient.editSingleImage(sessionId, imageType, editInstructions, referenceImagePaths);
 
         setImages((prev) =>
           prev.map((img) =>
@@ -1221,7 +1222,7 @@ export const HomePage: React.FC = () => {
 
   // Handle edit A+ module
   const handleEditAplusModule = useCallback(
-    async (moduleIndex: number, editInstructions: string) => {
+    async (moduleIndex: number, editInstructions: string, referenceImagePaths?: string[]) => {
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) return;
 
@@ -1231,7 +1232,7 @@ export const HomePage: React.FC = () => {
       );
 
       try {
-        const result = await apiClient.editSingleImage(currentSessionId, `aplus_${moduleIndex}`, editInstructions);
+        const result = await apiClient.editSingleImage(currentSessionId, `aplus_${moduleIndex}`, editInstructions, referenceImagePaths);
 
         // Append new version, advance activeVersionIndex
         setAplusModules((prev) =>
@@ -1410,7 +1411,7 @@ export const HomePage: React.FC = () => {
 
   // Handle edit mobile A+ module
   const handleEditMobileModule = useCallback(
-    async (moduleIndex: number, editInstructions: string) => {
+    async (moduleIndex: number, editInstructions: string, referenceImagePaths?: string[]) => {
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) return;
 
@@ -1419,7 +1420,7 @@ export const HomePage: React.FC = () => {
       );
 
       try {
-        const result = await apiClient.editAplusMobile(currentSessionId, moduleIndex, editInstructions);
+        const result = await apiClient.editAplusMobile(currentSessionId, moduleIndex, editInstructions, referenceImagePaths);
 
         setAplusModules((prev) =>
           prev.map((m, i) => {
@@ -1518,6 +1519,36 @@ export const HomePage: React.FC = () => {
 
   const isGeminiConfigured = health?.dependencies?.gemini === 'configured';
 
+  // Build available reference images for focus-image picker in edit panels
+  const availableReferenceImages = useMemo<ReferenceImage[]>(() => {
+    const refs: ReferenceImage[] = [];
+    uploads.forEach((u, i) => {
+      refs.push({
+        path: u.file_path,
+        url: u.preview_url,
+        label: i === 0 ? 'Product' : `Photo ${i + 1}`,
+      });
+    });
+    if (originalStyleRefPath) {
+      refs.push({
+        path: originalStyleRefPath,
+        url: apiClient.getFileUrl(originalStyleRefPath),
+        label: 'Style Ref',
+      });
+    } else if (formData.styleReferencePreview) {
+      // Style ref uploaded but path not yet stored — use preview as placeholder
+      // (the path gets set after framework analysis)
+    }
+    if (logoPath) {
+      refs.push({
+        path: logoPath,
+        url: apiClient.getFileUrl(logoPath),
+        label: 'Logo',
+      });
+    }
+    return refs;
+  }, [uploads, originalStyleRefPath, formData.styleReferencePreview, logoPath]);
+
   return (
     <div className="h-[calc(100vh-80px)]">
       {/* Health Status Warning */}
@@ -1601,6 +1632,7 @@ export const HomePage: React.FC = () => {
             onGenerateAll={handleGenerate}
             onRegenerateSingle={handleRegenerateSingle}
             onEditSingle={handleEditSingle}
+            availableReferenceImages={availableReferenceImages}
             onRetry={handleRetry}
             onStartOver={handleStartOver}
           />

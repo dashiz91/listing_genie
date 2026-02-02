@@ -20,6 +20,8 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { ImageActionOverlay } from '@/components/shared/ImageActionOverlay';
+import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker';
+import type { ReferenceImage } from '@/api/types';
 import type { ListingVersionState } from '@/pages/HomePage';
 
 type DeviceMode = 'desktop' | 'mobile';
@@ -45,7 +47,8 @@ interface AmazonListingPreviewProps {
   // Callbacks (preserve existing functionality)
   onRetry?: () => void;
   onRegenerateSingle?: (imageType: string, note?: string) => void;
-  onEditSingle?: (imageType: string, instructions: string) => void;
+  onEditSingle?: (imageType: string, instructions: string, referenceImagePaths?: string[]) => void;
+  availableReferenceImages?: ReferenceImage[];
   onStartOver?: () => void;
 
   // Version tracking (lifted to HomePage)
@@ -76,6 +79,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   onGenerateAll: _onGenerateAll, // Reserved for "Generate All" button
   onRegenerateSingle,
   onEditSingle,
+  availableReferenceImages = [],
   onStartOver,
   listingVersions,
   onVersionChange,
@@ -94,6 +98,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   const [editPanelOpen, setEditPanelOpen] = useState(false);
   const [editingImageType, setEditingImageType] = useState<string | null>(null);
   const [editInstructions, setEditInstructions] = useState('');
+  const focusImages = useFocusImages();
 
   // Regenerate note panel state
   const [regenPanelOpen, setRegenPanelOpen] = useState(false);
@@ -249,8 +254,9 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   const handleEditClick = useCallback((imageType: string) => {
     setEditingImageType(imageType);
     setEditInstructions('');
+    focusImages.reset();
     setEditPanelOpen(true);
-  }, []);
+  }, [focusImages]);
 
   // Handle regenerate click — open note panel
   const handleRegenerateClick = useCallback(
@@ -276,13 +282,16 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   // Submit edit — version management is now in HomePage
   const handleEditSubmit = useCallback(() => {
     if (editingImageType && editInstructions.trim().length >= 5) {
-      onEditSingle?.(editingImageType, editInstructions.trim());
+      const refPaths = focusImages.getSelectedPaths();
+      const refs = refPaths.length > 0 ? refPaths : undefined;
+      onEditSingle?.(editingImageType, editInstructions.trim(), refs);
       setImageCacheKey((prev) => ({ ...prev, [editingImageType]: Date.now() }));
       setEditPanelOpen(false);
       setEditingImageType(null);
       setEditInstructions('');
+      focusImages.reset();
     }
-  }, [editingImageType, editInstructions, onEditSingle]);
+  }, [editingImageType, editInstructions, onEditSingle, focusImages]);
 
   // Handle view prompt (dev mode)
   const handleViewPrompt = useCallback((imageType: string) => {
@@ -818,6 +827,19 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 Minimum 5 characters required
               </p>
             </div>
+
+            {/* Focus images — select which references to send with edit */}
+            {availableReferenceImages.length > 0 && (
+              <FocusImagePicker
+                availableImages={availableReferenceImages}
+                selectedPaths={focusImages.selectedPaths}
+                onToggle={focusImages.toggle}
+                extraFile={focusImages.extraFile}
+                onExtraFile={focusImages.addExtra}
+                onRemoveExtra={focusImages.removeExtra}
+                variant="dark"
+              />
+            )}
 
             {/* Action buttons */}
             <div className="flex gap-3 pt-4">

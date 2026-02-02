@@ -1,3 +1,10 @@
+/** A reference image available for focus-image selection during edits */
+export interface ReferenceImage {
+  path: string;   // supabase:// storage path
+  url: string;    // preview URL for display
+  label: string;  // short label (e.g., "Product 1", "Style Ref", "Logo")
+}
+
 export interface HealthResponse {
   status: string;
   service: string;

@@ -1453,6 +1453,7 @@ Make it count.
         session: GenerationSession,
         image_type: ImageTypeEnum,
         edit_instructions: str,
+        reference_image_paths: Optional[List[str]] = None,
     ) -> ImageResult:
         """
         Edit an existing generated image with specific instructions.
@@ -1577,6 +1578,7 @@ Make it count.
             edited_image = await self.gemini.edit_image(
                 source_image_path=existing_image_path,
                 edit_instructions=enhanced_instructions,
+                reference_images=reference_image_paths,
                 aspect_ratio=aspect_ratio,
                 max_retries=3,
             )

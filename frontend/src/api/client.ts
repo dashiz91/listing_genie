@@ -146,7 +146,8 @@ class ApiClient {
   async editSingleImage(
     sessionId: string,
     imageType: string,
-    editInstructions: string
+    editInstructions: string,
+    referenceImagePaths?: string[]
   ): Promise<{ status: string; image_type: string; storage_path?: string; error_message?: string }> {
     const response = await this.client.post(
       '/generate/edit',
@@ -154,6 +155,7 @@ class ApiClient {
         session_id: sessionId,
         image_type: imageType,
         edit_instructions: editInstructions,
+        reference_image_paths: referenceImagePaths || null,
       },
       { timeout: 180000 } // 3 minute timeout for edit
     );
@@ -451,7 +453,8 @@ class ApiClient {
   async editAplusMobile(
     sessionId: string,
     moduleIndex: number,
-    editInstructions: string
+    editInstructions: string,
+    referenceImagePaths?: string[]
   ): Promise<{ image_path: string; image_url: string; module_index: number }> {
     const response = await this.client.post(
       '/generate/edit',
@@ -460,6 +463,7 @@ class ApiClient {
         image_type: `aplus_${moduleIndex}`,
         edit_instructions: editInstructions,
         mobile: true,
+        reference_image_paths: referenceImagePaths || null,
       },
       { timeout: 180000 }
     );

@@ -279,6 +279,7 @@ class GeminiService:
         self,
         source_image_path: str,
         edit_instructions: str,
+        reference_images: Optional[List[str]] = None,
         aspect_ratio: str = "1:1",
         image_size: str = "1K",
         max_retries: int = 3
@@ -292,6 +293,7 @@ class GeminiService:
         Args:
             source_image_path: Path to the image to edit
             edit_instructions: What to change (e.g., "Change the headline to 'New Text'")
+            reference_images: Optional list of reference image paths to provide as visual context
             aspect_ratio: Output aspect ratio (should match source)
             image_size: Output resolution ("1K", "2K", "4K"). Default 1K for cost savings.
             max_retries: Number of retry attempts
@@ -303,13 +305,32 @@ class GeminiService:
             raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
 
         # Build edit-focused prompt
-        prompt = f"""Edit this image. {edit_instructions}
+        if reference_images:
+            prompt = f"""Edit this image. {edit_instructions}
+
+Reference images are provided as visual guides. Apply changes to the LAST image only.
+
+IMPORTANT: Keep all other elements exactly the same.
+Only modify what was specifically requested.
+Maintain the same style, colors, layout, composition, and any text/graphics not mentioned."""
+        else:
+            prompt = f"""Edit this image. {edit_instructions}
 
 IMPORTANT: Keep all other elements exactly the same.
 Only modify what was specifically requested.
 Maintain the same style, colors, layout, composition, and any text/graphics not mentioned."""
 
-        # Load the source image as the ONLY reference
+        # Load reference images first (if any)
+        loaded_refs = []
+        if reference_images:
+            for ref_path in reference_images:
+                try:
+                    ref_img = _load_image_from_path(ref_path)
+                    loaded_refs.append(ref_img)
+                except Exception as e:
+                    logger.warning(f"Failed to load reference image '{ref_path}' for edit: {e}")
+
+        # Load the source image
         try:
             source_image = _load_image_from_path(source_image_path)
             logger.info(f"Loaded source image for editing: {source_image.size}")
@@ -317,7 +338,8 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
             logger.error(f"Error loading source image '{source_image_path}': {e}")
             raise ValueError(f"Failed to load source image: {source_image_path}")
 
-        contents = [prompt, source_image]
+        # Build contents: prompt, then reference images, then source image (last)
+        contents = [prompt, *loaded_refs, source_image]
 
         # === COMPREHENSIVE GEMINI EDIT API LOGGING ===
         logger.info("=" * 80)
@@ -327,6 +349,10 @@ Maintain the same style, colors, layout, composition, and any text/graphics not 
         logger.info(f"[GEMINI EDIT] Image Size: {image_size}")
         logger.info(f"[GEMINI EDIT] Source Image: {source_image_path}")
         logger.info(f"[GEMINI EDIT] Source Image Size: {source_image.size}")
+        logger.info(f"[GEMINI EDIT] Reference Images: {len(loaded_refs)}")
+        if reference_images:
+            for i, ref_path in enumerate(reference_images):
+                logger.info(f"[GEMINI EDIT]   Ref {i+1}: {ref_path}")
         logger.info("-" * 40)
         logger.info("[GEMINI EDIT] EDIT INSTRUCTIONS:")
         logger.info(f"[GEMINI EDIT] {edit_instructions}")

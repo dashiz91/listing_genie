@@ -4,6 +4,7 @@ import type { AplusModuleType, ImageVersion } from '@/api/types';
 import { APLUS_DIMENSIONS, APLUS_MOBILE_DIMENSIONS } from '@/api/types';
 import { PromptModal } from '@/components/PromptModal';
 import { ImageActionOverlay } from '@/components/shared/ImageActionOverlay';
+import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker';
 import type { SlotStatus } from './ImageSlot';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -62,7 +63,7 @@ interface AplusSectionProps {
   onGenerateAll?: () => void;
   onRegenerateScript?: () => void;
   onVersionChange?: (moduleIndex: number, versionIndex: number) => void;
-  onEditModule?: (moduleIndex: number, editInstructions: string) => void;
+  onEditModule?: (moduleIndex: number, editInstructions: string, referenceImagePaths?: string[]) => void;
   isEnabled?: boolean;
   className?: string;
   // Mobile viewport support
@@ -71,7 +72,9 @@ interface AplusSectionProps {
   onGenerateMobileModule?: (moduleIndex: number) => void;
   onGenerateAllMobile?: () => void;
   onRegenerateMobileModule?: (moduleIndex: number, note?: string) => void;
-  onEditMobileModule?: (moduleIndex: number, editInstructions: string) => void;
+  onEditMobileModule?: (moduleIndex: number, editInstructions: string, referenceImagePaths?: string[]) => void;
+  // Focus images for edit
+  availableReferenceImages?: import('@/api/types').ReferenceImage[];
 }
 
 const MODULE_LABELS: Record<AplusModuleType, string> = {
@@ -102,10 +105,12 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
   onGenerateAllMobile,
   onRegenerateMobileModule,
   onEditMobileModule,
+  availableReferenceImages = [],
 }) => {
   const [promptModalIndex, setPromptModalIndex] = useState<number | null>(null);
   const [editingModuleIndex, setEditingModuleIndex] = useState<number | null>(null);
   const [editInstructions, setEditInstructions] = useState('');
+  const focusImages = useFocusImages();
   const [regenModuleIndex, setRegenModuleIndex] = useState<number | null>(null);
   const [regenNote, setRegenNote] = useState('');
   // Track refreshed URLs for modules whose signed URLs expired
@@ -379,7 +384,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                       onRegenerate={() => {
                         setRegenModuleIndex(idx); setRegenNote('');
                       }}
-                      onEdit={onEditModule || onEditMobileModule ? () => { setEditingModuleIndex(idx); setEditInstructions(''); } : undefined}
+                      onEdit={onEditModule || onEditMobileModule ? () => { setEditingModuleIndex(idx); setEditInstructions(''); focusImages.reset(); } : undefined}
                       onDownload={() => handleDownload(module, idx, viewportMode)}
                       onViewPrompt={sessionId ? () => setPromptModalIndex(idx) : undefined}
                       onMobileTransform={!isMobile && onGenerateMobileModule ? () => onGenerateMobileModule(idx) : undefined}
@@ -600,6 +605,20 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
               className="w-full h-28 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-redd-500/50 resize-none"
               autoFocus
             />
+
+            {/* Focus images — select which references to send with edit */}
+            {availableReferenceImages.length > 0 && (
+              <FocusImagePicker
+                availableImages={availableReferenceImages}
+                selectedPaths={focusImages.selectedPaths}
+                onToggle={focusImages.toggle}
+                extraFile={focusImages.extraFile}
+                onExtraFile={focusImages.addExtra}
+                onRemoveExtra={focusImages.removeExtra}
+                variant="light"
+              />
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => setEditingModuleIndex(null)}
@@ -610,13 +629,16 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
               <button
                 onClick={() => {
                   if (editInstructions.trim() && editingModuleIndex !== null) {
+                    const refPaths = focusImages.getSelectedPaths();
+                    const refs = refPaths.length > 0 ? refPaths : undefined;
                     if (isMobile) {
-                      onEditMobileModule?.(editingModuleIndex, editInstructions.trim());
+                      onEditMobileModule?.(editingModuleIndex, editInstructions.trim(), refs);
                     } else {
-                      onEditModule?.(editingModuleIndex, editInstructions.trim());
+                      onEditModule?.(editingModuleIndex, editInstructions.trim(), refs);
                     }
                     setEditingModuleIndex(null);
                     setEditInstructions('');
+                    focusImages.reset();
                   }
                 }}
                 disabled={!editInstructions.trim()}
