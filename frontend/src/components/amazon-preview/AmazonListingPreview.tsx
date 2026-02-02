@@ -938,6 +938,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
         <PromptModal
           sessionId={sessionId}
           imageType={showPromptModal}
+          version={listingVersions?.[showPromptModal] ? listingVersions[showPromptModal].activeIndex + 1 : undefined}
           title={`Prompt for ${showPromptModal.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}`}
           onClose={() => setShowPromptModal(null)}
         />

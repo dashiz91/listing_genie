@@ -170,10 +170,12 @@ class ApiClient {
     return response.data;
   }
 
-  // Get the latest prompt for a specific image type
-  async getImagePrompt(sessionId: string, imageType: string): Promise<PromptHistory> {
+  // Get a prompt for a specific image type, optionally by version number (1-based)
+  async getImagePrompt(sessionId: string, imageType: string, version?: number): Promise<PromptHistory> {
+    const params = version != null ? { version } : {};
     const response = await this.client.get<PromptHistory>(
-      `/generate/${sessionId}/prompts/${imageType}`
+      `/generate/${sessionId}/prompts/${imageType}`,
+      { params }
     );
     return response.data;
   }

@@ -302,6 +302,19 @@ class GenerationService:
             PromptHistory.image_type == image_type
         ).order_by(PromptHistory.version.desc()).first()
 
+    def get_prompt_by_version(
+        self,
+        context: DesignContext,
+        image_type: ImageTypeEnum,
+        version: int
+    ) -> Optional[PromptHistory]:
+        """Get a specific version's prompt for an image type"""
+        return self.db.query(PromptHistory).filter(
+            PromptHistory.context_id == context.id,
+            PromptHistory.image_type == image_type,
+            PromptHistory.version == version
+        ).first()
+
     def get_prompt_history(
         self,
         context: DesignContext,

@@ -519,6 +519,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
         <PromptModal
           sessionId={sessionId}
           imageType={`aplus_${promptModalIndex}`}
+          version={modules[promptModalIndex] ? getModuleActiveIndex(modules[promptModalIndex]) + 1 : undefined}
           title={`Module ${promptModalIndex + 1} Prompt${
             visualScript?.modules?.[promptModalIndex]?.role
               ? ` — ${visualScript.modules[promptModalIndex].role}`

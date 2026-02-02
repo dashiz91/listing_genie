@@ -9,6 +9,8 @@ interface PromptModalProps {
   imageType: string;
   /** Human-readable title shown in the header, e.g. "Main Image" or "Module 1 — Hero" */
   title: string;
+  /** Optional version number (1-based). If omitted, fetches the latest version. */
+  version?: number;
   /** Called when the modal should close */
   onClose: () => void;
 }
@@ -25,6 +27,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
   sessionId,
   imageType,
   title,
+  version,
   onClose,
 }) => {
   const [prompt, setPrompt] = useState<PromptHistory | null>(null);
@@ -39,7 +42,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const data = await apiClient.getImagePrompt(sessionId, imageType);
+        const data = await apiClient.getImagePrompt(sessionId, imageType, version);
         if (!cancelled) setPrompt(data);
       } catch {
         if (!cancelled) setError('No prompt found for this image.');
@@ -48,7 +51,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
       }
     })();
     return () => { cancelled = true; };
-  }, [sessionId, imageType]);
+  }, [sessionId, imageType, version]);
 
   // Close on Escape
   useEffect(() => {

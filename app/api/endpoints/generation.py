@@ -559,12 +559,16 @@ async def get_session_prompts(
 async def get_image_prompt(
     session_id: str,
     image_type: str,
+    version: Optional[int] = None,
     service: GenerationService = Depends(get_generation_service),
 ):
     """
-    Get the latest prompt for a specific image type.
+    Get a prompt for a specific image type.
 
-    Returns the most recent prompt used to generate this image,
+    Args:
+        version: Optional version number (1-based). If omitted, returns the latest version.
+
+    Returns the prompt used to generate this image version,
     including any user feedback and AI's interpretation of changes.
     """
     session = service.get_session_status(session_id)
@@ -580,9 +584,12 @@ async def get_image_prompt(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid image type: {image_type}")
 
-    latest = service.get_latest_prompt(context, db_image_type)
+    if version is not None:
+        latest = service.get_prompt_by_version(context, db_image_type, version)
+    else:
+        latest = service.get_latest_prompt(context, db_image_type)
     if not latest:
-        raise HTTPException(status_code=404, detail=f"No prompt found for image type: {image_type}")
+        raise HTTPException(status_code=404, detail=f"No prompt found for image type: {image_type}" + (f" version {version}" if version else ""))
 
     # Build reference images list
     # If the prompt has stored reference_image_paths (A+ modules), use those
