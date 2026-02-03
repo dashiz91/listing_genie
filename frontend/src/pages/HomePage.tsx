@@ -77,6 +77,7 @@ const initialFormData: WorkshopFormData = {
   colorPalette: [],
   globalNote: '',
   styleCount: 4, // Default to 4 style options
+  imageModel: 'gemini-3-pro-image-preview', // Default to Pro model
 };
 
 export const HomePage: React.FC = () => {
@@ -243,6 +244,7 @@ export const HomePage: React.FC = () => {
         const restoredVersions: ListingVersionState = {};
         for (const img of project.images) {
           if (img.status === 'complete' && img.image_url) {
+            console.log(`[VERSION DEBUG] ${img.image_type}: versions from API =`, img.versions);
             if (img.versions && img.versions.length > 0) {
               restoredVersions[img.image_type] = {
                 versions: img.versions.map(v => ({ imageUrl: v.image_url, timestamp: Date.now() })),
@@ -256,6 +258,7 @@ export const HomePage: React.FC = () => {
             }
           }
         }
+        console.log('[VERSION DEBUG] Restored listing versions:', restoredVersions);
         setListingVersions(restoredVersions);
 
         // 7. Restore A+ Content state
@@ -557,7 +560,10 @@ export const HomePage: React.FC = () => {
           global_note: formData.globalNote || undefined,
         },
         selectedFramework,
-        productAnalysisRaw || undefined
+        productAnalysisRaw || undefined,
+        undefined, // singleImageType
+        undefined, // createOnly
+        formData.imageModel // imageModel
       );
 
       updateSessionId(response.session_id);
@@ -629,7 +635,8 @@ export const HomePage: React.FC = () => {
         selectedFramework!,
         productAnalysisRaw || undefined,
         undefined,  // no singleImageType
-        true  // create_only — fast, no generation
+        true,  // create_only — fast, no generation
+        formData.imageModel  // imageModel
       );
 
       updateSessionId(response.session_id);
@@ -675,7 +682,7 @@ export const HomePage: React.FC = () => {
         const currentSessionId = await ensureSession();
 
         // Generate this single image via /single endpoint
-        const result = await apiClient.regenerateSingleImage(currentSessionId, imageType);
+        const result = await apiClient.regenerateSingleImage(currentSessionId, imageType, undefined, undefined, formData.imageModel);
 
         setImages((prev) =>
           prev.map((img) =>
@@ -718,7 +725,7 @@ export const HomePage: React.FC = () => {
         );
       }
     },
-    [uploads, selectedFramework, ensureSession]
+    [uploads, selectedFramework, ensureSession, formData.imageModel]
   );
 
   // Handle retry
@@ -747,6 +754,7 @@ export const HomePage: React.FC = () => {
   // Handle regenerate single
   const handleRegenerateSingle = useCallback(
     async (imageType: string, note?: string, referenceImagePaths?: string[]) => {
+      console.log('[HOMEPAGE REGEN] Called with:', { imageType, note, referenceImagePaths });
       if (!sessionId) return;
 
       try {
@@ -754,7 +762,8 @@ export const HomePage: React.FC = () => {
           prev.map((img) => (img.type === imageType ? { ...img, status: 'processing' as const } : img))
         );
 
-        const result = await apiClient.regenerateSingleImage(sessionId, imageType, note, referenceImagePaths);
+        console.log('[HOMEPAGE REGEN] Calling API with referenceImagePaths:', referenceImagePaths);
+        const result = await apiClient.regenerateSingleImage(sessionId, imageType, note, referenceImagePaths, formData.imageModel);
 
         setImages((prev) =>
           prev.map((img) =>
@@ -789,7 +798,7 @@ export const HomePage: React.FC = () => {
         );
       }
     },
-    [sessionId]
+    [sessionId, formData.imageModel]
   );
 
   // Handle cancel generation (client-side only — reverts status)
@@ -816,7 +825,7 @@ export const HomePage: React.FC = () => {
           prev.map((img) => (img.type === imageType ? { ...img, status: 'processing' as const } : img))
         );
 
-        const result = await apiClient.editSingleImage(sessionId, imageType, editInstructions, referenceImagePaths);
+        const result = await apiClient.editSingleImage(sessionId, imageType, editInstructions, referenceImagePaths, formData.imageModel);
 
         setImages((prev) =>
           prev.map((img) =>
@@ -851,7 +860,7 @@ export const HomePage: React.FC = () => {
         );
       }
     },
-    [sessionId]
+    [sessionId, formData.imageModel]
   );
 
   // Ensure visual script exists (auto-generate if missing)
@@ -913,7 +922,7 @@ export const HomePage: React.FC = () => {
 
   // Handle generate hero pair (modules 0+1 as one image split in half)
   const handleGenerateHeroPair = useCallback(
-    async (note?: string) => {
+    async (note?: string, referenceImagePaths?: string[]) => {
       if (!sessionId) return;
 
       // Set both modules 0 and 1 to generating
@@ -928,7 +937,7 @@ export const HomePage: React.FC = () => {
         await ensureVisualScript(sessionId);
 
         // Call hero pair endpoint — one Gemini call, split in half
-        const result = await apiClient.generateAplusHeroPair(sessionId, note);
+        const result = await apiClient.generateAplusHeroPair(sessionId, note, referenceImagePaths, formData.imageModel);
 
         // Update both modules with results
         setAplusModules((prev) =>
@@ -977,17 +986,17 @@ export const HomePage: React.FC = () => {
         );
       }
     },
-    [sessionId, ensureVisualScript]
+    [sessionId, ensureVisualScript, formData.imageModel]
   );
 
   // Handle generate A+ module (for modules 2+)
   const handleGenerateAplusModule = useCallback(
-    async (moduleIndex: number, note?: string) => {
+    async (moduleIndex: number, note?: string, referenceImagePaths?: string[]) => {
       if (!sessionId) return;
 
       // Modules 0 and 1 are always generated together as a hero pair
       if (moduleIndex <= 1) {
-        return handleGenerateHeroPair(note);
+        return handleGenerateHeroPair(note, referenceImagePaths);
       }
 
       const module = aplusModules[moduleIndex];
@@ -1015,6 +1024,8 @@ export const HomePage: React.FC = () => {
           module_index: moduleIndex,
           previous_module_path: previousModulePath,
           custom_instructions: note,
+          reference_image_paths: referenceImagePaths,
+          image_model: formData.imageModel,
         });
 
         // Update module with result — add new version
@@ -1063,7 +1074,7 @@ export const HomePage: React.FC = () => {
         );
       }
     },
-    [sessionId, aplusModules, ensureVisualScript, handleGenerateHeroPair]
+    [sessionId, aplusModules, ensureVisualScript, handleGenerateHeroPair, formData.imageModel]
   );
 
   // Handle generate ALL A+ modules: hero pair first, then modules 2+ sequentially
@@ -1085,7 +1096,7 @@ export const HomePage: React.FC = () => {
 
       let module1Path: string | undefined;
       try {
-        const heroPairResult = await apiClient.generateAplusHeroPair(sessionId);
+        const heroPairResult = await apiClient.generateAplusHeroPair(sessionId, undefined, undefined, formData.imageModel);
         module1Path = heroPairResult.module_1.image_path;
 
         setAplusModules((prev) =>
@@ -1136,6 +1147,7 @@ export const HomePage: React.FC = () => {
             module_type: 'full_image',
             module_index: i,
             previous_module_path: prevPath,
+            image_model: formData.imageModel,
           });
 
           prevPath = result.image_path;
@@ -1179,14 +1191,13 @@ export const HomePage: React.FC = () => {
       console.error('A+ generation failed:', err);
       setIsGeneratingScript(false);
     }
-  }, [sessionId, aplusModules, ensureVisualScript]);
+  }, [sessionId, aplusModules, ensureVisualScript, formData.imageModel]);
 
   // Handle regenerate A+ module
   // For modules 0 or 1: regenerate hero pair (both together)
   // For modules 2+: regenerate individually
   const handleRegenerateAplusModule = useCallback(
-    async (moduleIndex: number, note?: string, _referenceImagePaths?: string[]) => {
-      // TODO: pass referenceImagePaths through A+ generation pipeline
+    async (moduleIndex: number, note?: string, referenceImagePaths?: string[]) => {
       if (moduleIndex <= 1) {
         // Hero pair — regenerate both 0+1 together
         setAplusModules((prev) =>
@@ -1197,7 +1208,7 @@ export const HomePage: React.FC = () => {
             return m;
           })
         );
-        handleGenerateHeroPair(note);
+        handleGenerateHeroPair(note, referenceImagePaths);
       } else {
         setAplusModules((prev) =>
           prev.map((m, idx) => {
@@ -1207,7 +1218,7 @@ export const HomePage: React.FC = () => {
             return m;
           })
         );
-        handleGenerateAplusModule(moduleIndex, note);
+        handleGenerateAplusModule(moduleIndex, note, referenceImagePaths);
       }
     },
     [handleGenerateAplusModule, handleGenerateHeroPair]
@@ -1247,7 +1258,7 @@ export const HomePage: React.FC = () => {
       );
 
       try {
-        const result = await apiClient.editSingleImage(currentSessionId, `aplus_${moduleIndex}`, editInstructions, referenceImagePaths);
+        const result = await apiClient.editSingleImage(currentSessionId, `aplus_${moduleIndex}`, editInstructions, referenceImagePaths, formData.imageModel);
 
         // Append new version, advance activeVersionIndex
         setAplusModules((prev) =>
@@ -1281,7 +1292,7 @@ export const HomePage: React.FC = () => {
         );
       }
     },
-    []
+    [formData.imageModel]
   );
 
   // Handle generate mobile A+ module (recompose desktop → mobile 4:3)

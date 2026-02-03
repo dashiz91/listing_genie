@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import type { AplusModuleType, ImageVersion } from '@/api/types';
 import { APLUS_DIMENSIONS, APLUS_MOBILE_DIMENSIONS } from '@/api/types';
@@ -117,6 +117,29 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
   const [regenModuleIndex, setRegenModuleIndex] = useState<number | null>(null);
   const [regenNote, setRegenNote] = useState('');
   const regenFocusImages = useFocusImages();
+  // Augmented reference images: include previous module's image when editing/regenerating module 2+
+  const regenFocusAvailableImages = useMemo(() => {
+    if (regenModuleIndex === null || regenModuleIndex <= 1) return availableReferenceImages;
+    const prevModule = modules[regenModuleIndex - 1];
+    const prevVer = prevModule?.versions[prevModule.activeVersionIndex];
+    if (!prevVer?.imagePath || !prevVer?.imageUrl) return availableReferenceImages;
+    return [
+      { path: prevVer.imagePath, url: prevVer.imageUrl, label: `Module ${regenModuleIndex}` },
+      ...availableReferenceImages,
+    ];
+  }, [regenModuleIndex, modules, availableReferenceImages]);
+
+  const editFocusAvailableImages = useMemo(() => {
+    if (editingModuleIndex === null || editingModuleIndex <= 1) return availableReferenceImages;
+    const prevModule = modules[editingModuleIndex - 1];
+    const prevVer = prevModule?.versions[prevModule.activeVersionIndex];
+    if (!prevVer?.imagePath || !prevVer?.imageUrl) return availableReferenceImages;
+    return [
+      { path: prevVer.imagePath, url: prevVer.imageUrl, label: `Module ${editingModuleIndex}` },
+      ...availableReferenceImages,
+    ];
+  }, [editingModuleIndex, modules, availableReferenceImages]);
+
   // Track which modules have been generating for >5s (show cancel/retry hint)
   const [stuckModules, setStuckModules] = useState<Set<number>>(new Set());
   const genTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
@@ -590,9 +613,9 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
               autoFocus
             />
             {/* Focus Images for regen */}
-            {availableReferenceImages && availableReferenceImages.length > 0 && (
+            {regenFocusAvailableImages && regenFocusAvailableImages.length > 0 && (
               <FocusImagePicker
-                availableImages={availableReferenceImages}
+                availableImages={regenFocusAvailableImages}
                 selectedPaths={regenFocusImages.selectedPaths}
                 onToggle={regenFocusImages.toggle}
                 extraFile={regenFocusImages.extraFile}
@@ -658,9 +681,9 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
             />
 
             {/* Focus images — select which references to send with edit */}
-            {availableReferenceImages.length > 0 && (
+            {editFocusAvailableImages.length > 0 && (
               <FocusImagePicker
-                availableImages={availableReferenceImages}
+                availableImages={editFocusAvailableImages}
                 selectedPaths={focusImages.selectedPaths}
                 onToggle={focusImages.toggle}
                 extraFile={focusImages.extraFile}

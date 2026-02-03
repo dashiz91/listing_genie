@@ -22,7 +22,10 @@ import type {
   HeroPairResponse,
 } from './types';
 
-const API_BASE = '/api';
+// In production, use VITE_API_URL; in development, use relative /api (proxied by Vite)
+const API_BASE = import.meta.env.VITE_API_URL
+  ? `${import.meta.env.VITE_API_URL}/api`
+  : '/api';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -129,7 +132,8 @@ class ApiClient {
     sessionId: string,
     imageType: string,
     note?: string,
-    referenceImagePaths?: string[]
+    referenceImagePaths?: string[],
+    imageModel?: string
   ): Promise<{ status: string; image_type: string; storage_path?: string; error_message?: string }> {
     const response = await this.client.post(
       '/generate/single',
@@ -138,6 +142,7 @@ class ApiClient {
         image_type: imageType,
         note: note,
         reference_image_paths: referenceImagePaths || null,
+        image_model: imageModel || null,
       },
       { timeout: 180000 } // 3 minute timeout for single image
     );
@@ -149,7 +154,8 @@ class ApiClient {
     sessionId: string,
     imageType: string,
     editInstructions: string,
-    referenceImagePaths?: string[]
+    referenceImagePaths?: string[],
+    imageModel?: string
   ): Promise<{ status: string; image_type: string; storage_path?: string; error_message?: string }> {
     const response = await this.client.post(
       '/generate/edit',
@@ -158,6 +164,7 @@ class ApiClient {
         image_type: imageType,
         edit_instructions: editInstructions,
         reference_image_paths: referenceImagePaths || null,
+        image_model: imageModel || null,
       },
       { timeout: 180000 } // 3 minute timeout for edit
     );
@@ -274,7 +281,8 @@ class ApiClient {
     framework: DesignFramework,
     productAnalysis?: Record<string, unknown>,  // AI's analysis for regeneration context
     singleImageType?: string,  // Optional: generate only this image type (for clicking individual slots)
-    createOnly?: boolean  // Optional: just create session, no generation
+    createOnly?: boolean,  // Optional: just create session, no generation
+    imageModel?: string  // Optional: override AI model
   ): Promise<GenerationResponse> {
     // Build request payload, ensuring arrays are never undefined
     const payload: Record<string, unknown> = {
@@ -290,6 +298,8 @@ class ApiClient {
       global_note: request.global_note || null,
       // Include product_analysis for regeneration context
       product_analysis: productAnalysis || null,
+      // AI model override
+      image_model: imageModel || null,
     };
 
     // If single_image_type is provided, only generate that one image
@@ -366,7 +376,7 @@ class ApiClient {
     const response = await this.client.post<AplusModuleResponse>(
       '/generate/aplus/generate',
       request,
-      { timeout: 120000 } // 2 minute timeout per module
+      { timeout: 300000 } // 5 minute timeout per module (canvas continuity is slow)
     );
     return response.data;
   }
@@ -377,12 +387,19 @@ class ApiClient {
    */
   async generateAplusHeroPair(
     sessionId: string,
-    customInstructions?: string
+    customInstructions?: string,
+    referenceImagePaths?: string[],
+    imageModel?: string,
   ): Promise<HeroPairResponse> {
     const response = await this.client.post<HeroPairResponse>(
       '/generate/aplus/hero-pair',
-      { session_id: sessionId, custom_instructions: customInstructions },
-      { timeout: 120000 }
+      {
+        session_id: sessionId,
+        custom_instructions: customInstructions,
+        reference_image_paths: referenceImagePaths || null,
+        image_model: imageModel || null,
+      },
+      { timeout: 300000 } // 5 minute timeout for hero pair (tall image + split)
     );
     return response.data;
   }
@@ -432,7 +449,7 @@ class ApiClient {
         module_index: moduleIndex,
         custom_instructions: customInstructions,
       },
-      { timeout: 120000 }
+      { timeout: 300000 } // 5 minute timeout for mobile transform
     );
     return response.data;
   }

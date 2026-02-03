@@ -833,7 +833,8 @@ Brand Voice: {brand_voice}
 =====================================================================
                     CURRENT IMAGE CONTEXT
 =====================================================================
-Image Type: {image_type} (Image {image_number} of 5)
+Image Type: {image_type}
+{image_type_context}
 
 ORIGINAL PROMPT YOU WROTE:
 {original_prompt}
@@ -842,6 +843,11 @@ ORIGINAL PROMPT YOU WROTE:
                          USER FEEDBACK
 =====================================================================
 {user_feedback}
+
+=====================================================================
+                    STRUCTURAL RULES (DO NOT MODIFY)
+=====================================================================
+{structural_context}
 
 =====================================================================
                          YOUR TASK

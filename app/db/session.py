@@ -28,12 +28,16 @@ def init_db():
             conn.execute(text("ALTER TABLE generation_sessions ADD COLUMN aplus_visual_script JSON"))
             conn.commit()
 
-    # Add reference_image_paths to prompt_history
+    # Add new columns to prompt_history
     if "prompt_history" in inspector.get_table_names():
         ph_columns = [col["name"] for col in inspector.get_columns("prompt_history")]
         if "reference_image_paths" not in ph_columns:
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE prompt_history ADD COLUMN reference_image_paths JSON"))
+                conn.commit()
+        if "model_name" not in ph_columns:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE prompt_history ADD COLUMN model_name VARCHAR(100)"))
                 conn.commit()
 
 

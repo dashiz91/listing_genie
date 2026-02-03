@@ -83,11 +83,18 @@ export const PromptModal: React.FC<PromptModalProps> = ({
                 {title}
                 {prompt && ` (v${prompt.version})`}
               </h3>
-              {prompt?.created_at && (
-                <p className="text-xs text-slate-400">
-                  Generated: {new Date(prompt.created_at).toLocaleString()}
-                </p>
-              )}
+              <div className="flex items-center gap-2">
+                {prompt?.model_name && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-700 text-slate-300">
+                    {prompt.model_name}
+                  </span>
+                )}
+                {prompt?.created_at && (
+                  <span className="text-xs text-slate-400">
+                    Generated: {new Date(prompt.created_at).toLocaleString()}
+                  </span>
+                )}
+              </div>
             </div>
             <button
               onClick={onClose}

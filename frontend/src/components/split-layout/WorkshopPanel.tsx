@@ -78,6 +78,7 @@ export interface WorkshopFormData {
   colorPalette: string[];
   globalNote: string;
   styleCount: number; // Number of style frameworks to generate (1-4)
+  imageModel: string; // Gemini model for image generation
 }
 
 interface WorkshopPanelProps {
@@ -1099,7 +1100,21 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             </button>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
+            {/* AI Model Selector — shown when framework is selected, before generating */}
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs text-slate-400">AI Model</span>
+              <select
+                value={formData.imageModel}
+                onChange={(e) => onFormChange({ imageModel: e.target.value })}
+                disabled={isGenerating}
+                className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-white focus:ring-1 focus:ring-redd-500 focus:border-transparent disabled:opacity-50"
+              >
+                <option value="gemini-3-pro-image-preview">Pro — Best quality ($0.13/img)</option>
+                <option value="gemini-2.5-flash-image">Flash — 3x cheaper ($0.04/img)</option>
+              </select>
+            </div>
+
             {/* Generate button */}
             <button
               onClick={onGenerate}

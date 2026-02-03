@@ -5,6 +5,7 @@ Orchestrates prompt building, image generation, and storage with robust error ha
 import asyncio
 import logging
 from datetime import datetime, timezone
+from dataclasses import dataclass
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
@@ -248,6 +249,7 @@ class GenerationService:
         user_feedback: Optional[str] = None,
         change_summary: Optional[str] = None,
         reference_image_paths: Optional[List[Dict]] = None,
+        model_name: Optional[str] = None,
     ) -> PromptHistory:
         """
         Store a prompt in the history for future reference.
@@ -282,6 +284,7 @@ class GenerationService:
             user_feedback=user_feedback,
             change_summary=change_summary,
             reference_image_paths=reference_image_paths,
+            model_name=model_name,
         )
 
         self.db.add(history)
@@ -367,770 +370,18 @@ class GenerationService:
         image_type: ImageTypeEnum
     ) -> str:
         """
-        Build a RADICALLY DIFFERENT prompt for each image type using the design framework.
+        Build a prompt for the given image type using the design framework.
 
-        PRIORITY ORDER:
-        1. If GPT-4o generated detailed prompts exist in the framework, USE THEM DIRECTLY
-        2. If not, fall back to our template-based prompts
-
-        Each of the 5 Amazon listing images serves a COMPLETELY DIFFERENT PURPOSE:
-        1. MAIN: Pure product on white - NO text, NO graphics, CLEAN extraction
-        2. INFOGRAPHIC_1: Technical breakdown with callouts, arrows, dimensions
-        3. INFOGRAPHIC_2: Benefits/features with icons and organized layout
-        4. LIFESTYLE: Real person using product in natural environment
-        5. COMPARISON: Multiple use cases or trust-building elements
+        Delegates to prompt_builder module which handles priority logic
+        (GPT-4o generated prompts first, template fallback second).
         """
         if not self._current_framework:
             raise ValueError("No design framework available")
 
-        fw = self._current_framework
+        from app.services.prompt_builder import build_framework_prompt
+        return build_framework_prompt(session, image_type, self._current_framework)
 
-        # Map image type to image number (1-5)
-        image_type_map = {
-            ImageTypeEnum.MAIN: 1,
-            ImageTypeEnum.INFOGRAPHIC_1: 2,
-            ImageTypeEnum.INFOGRAPHIC_2: 3,
-            ImageTypeEnum.LIFESTYLE: 4,
-            ImageTypeEnum.COMPARISON: 5,
-        }
-        image_num = image_type_map.get(image_type, 1)
-
-        # PRIORITY 1: Check if GPT-4o generated prompts exist in the framework
-        if fw.generation_prompts:
-            for gen_prompt in fw.generation_prompts:
-                if gen_prompt.image_number == image_num:
-                    logger.info(f"Using GPT-4o generated prompt for {image_type.value} (image {image_num})")
-                    # Return the GPT-4o generated prompt directly!
-                    return gen_prompt.prompt
-
-        # PRIORITY 2: Fall back to template-based prompts
-        logger.info(f"No GPT-4o prompt found, using template for {image_type.value}")
-
-        # Get the specific copy for this image type
-        image_copy = None
-        for copy in fw.image_copy:
-            if copy.image_number == image_num:
-                image_copy = copy
-                break
-        if not image_copy and fw.image_copy:
-            image_copy = fw.image_copy[0]
-
-        # Dispatch to specialized template prompt builder
-        if image_type == ImageTypeEnum.MAIN:
-            return self._build_main_image_prompt(session, fw)
-        elif image_type == ImageTypeEnum.INFOGRAPHIC_1:
-            return self._build_infographic_1_prompt(session, fw, image_copy)
-        elif image_type == ImageTypeEnum.INFOGRAPHIC_2:
-            return self._build_infographic_2_prompt(session, fw, image_copy)
-        elif image_type == ImageTypeEnum.LIFESTYLE:
-            return self._build_lifestyle_prompt(session, fw, image_copy)
-        elif image_type == ImageTypeEnum.COMPARISON:
-            return self._build_comparison_prompt(session, fw, image_copy)
-        else:
-            return self._build_main_image_prompt(session, fw)
-
-    def _build_main_image_prompt(
-        self,
-        session: GenerationSession,
-        fw: DesignFramework
-    ) -> str:
-        """
-        Build prompt for MAIN/HERO image.
-
-        This is THE most important image - it's what shoppers see first.
-        Amazon REQUIRES: Pure white background, product only, NO text, NO graphics.
-        Think: Apple product photography level of clean extraction.
-        """
-        # Get product features for context
-        features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
-        features_str = ', '.join(features) if features else 'premium quality product'
-
-        prompt = f"""=== AMAZON MAIN LISTING IMAGE - HERO SHOT ===
-
-PRODUCT: {session.product_title}
-KEY FEATURES: {features_str}
-
-=== CRITICAL AMAZON REQUIREMENTS (MANDATORY) ===
-This is Image 1 of 5 - The MAIN HERO image that appears in search results.
-Amazon has STRICT requirements that MUST be followed:
-
-1. PURE WHITE BACKGROUND (#FFFFFF)
-   - The background MUST be completely white, no gradients, no off-white
-   - No shadows on the background (product shadow on white is OK if subtle)
-   - White must extend to all edges of the image
-
-2. PRODUCT ONLY - ABSOLUTELY NO TEXT
-   - NO headlines, NO captions, NO watermarks, NO logos
-   - NO call-to-action text, NO feature callouts
-   - NO brand names written in the image
-   - The ONLY element in the image is the product itself
-
-3. NO ADDITIONAL GRAPHICS
-   - NO icons, NO badges, NO stickers
-   - NO "Best Seller" labels or similar
-   - NO decorative elements whatsoever
-   - NO lifestyle props or accessories (unless part of the actual product)
-
-4. PRODUCT FILLS 85% OF FRAME
-   - The product should dominate the image
-   - Some white space around edges (but product is prominent)
-   - Product should be shown at its most flattering angle
-
-=== PHOTOGRAPHY STYLE ===
-Think: Apple product photography, high-end catalog, premium e-commerce
-
-LIGHTING:
-- Soft, diffused studio lighting from multiple angles
-- No harsh shadows - use fill lights to soften
-- Subtle product shadows allowed (grounds the product, adds dimension)
-- Even illumination across the entire product
-- Highlight the product's best features through strategic lighting
-
-ANGLE & COMPOSITION:
-- 3/4 view angle is often most flattering (shows depth)
-- Or straight-on hero shot if product is flat/simple
-- Center the product in the frame
-- Slight elevation can add gravitas
-- Show the full product - no cropping of important features
-
-PRODUCT PRESENTATION:
-- Product should look pristine, perfect condition
-- Show the product in its "hero state" - how it looks when brand new
-- If the product has multiple parts, show them arranged attractively
-- Any packaging should be removed unless packaging IS the product
-
-=== TECHNICAL SPECIFICATIONS ===
-- 1000x1000 pixel square format (Amazon standard)
-- High resolution, sharp focus on product
-- No motion blur, no depth of field effects that obscure product
-- True-to-life colors (accurate product representation)
-- Professional e-commerce product photography quality
-
-=== DESIGN CONTEXT (FOR CONSISTENCY) ===
-Framework: {fw.framework_name}
-Visual Mood: {', '.join(fw.visual_treatment.mood_keywords)}
-
-The product photography style should subtly reflect the premium, professional nature
-of the {fw.framework_name} design system while strictly adhering to Amazon requirements.
-
-=== FINAL OUTPUT ===
-Generate a PURE PRODUCT PHOTOGRAPHY image:
-- Pristine white background
-- Product as the sole hero
-- Zero text, zero graphics
-- Professional studio lighting
-- 85% frame fill
-- Ready for Amazon search results
-
-This image must STOP THE SCROLL when shoppers browse Amazon search results.
-It should communicate quality, professionalism, and trustworthiness through
-the product presentation alone - no text needed.
-"""
-        return prompt
-
-    def _build_infographic_1_prompt(
-        self,
-        session: GenerationSession,
-        fw: DesignFramework,
-        image_copy
-    ) -> str:
-        """
-        Build prompt for INFOGRAPHIC 1 - Technical Breakdown.
-
-        This image shows the TECHNICAL aspects of the product:
-        - Dimensions with measurement lines
-        - Materials callouts with arrows pointing to specific parts
-        - Exploded view showing components
-        - Technical specifications in clean callout boxes
-        """
-        features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
-
-        # Build color instructions
-        primary_color = fw.colors[0].hex if fw.colors else '#1a1a1a'
-        accent_color = fw.colors[1].hex if len(fw.colors) > 1 else '#4a90d9'
-
-        # Build callouts from features and image copy
-        callouts = []
-        if image_copy and image_copy.feature_callouts:
-            callouts = image_copy.feature_callouts
-        elif features:
-            callouts = features[:4]
-
-        callouts_str = '\n'.join([f"   - {c}" for c in callouts]) if callouts else "   - Premium Materials\n   - Quality Construction"
-
-        prompt = f"""=== AMAZON INFOGRAPHIC IMAGE 1 - TECHNICAL BREAKDOWN ===
-
-PRODUCT: {session.product_title}
-
-=== IMAGE PURPOSE ===
-This is Image 2 of 5 - The TECHNICAL INFOGRAPHIC.
-Purpose: Show customers the TECHNICAL DETAILS, MATERIALS, and SPECIFICATIONS.
-Think: Product engineering diagram meets clean marketing infographic.
-
-=== VISUAL COMPOSITION TYPE ===
-This is NOT a simple product photo with text overlay.
-This is a TECHNICAL BREAKDOWN with the following elements:
-
-1. CENTRAL PRODUCT IMAGE
-   - Product shown from an angle that reveals multiple components
-   - Could be: 3/4 view, exploded view, or cross-section view
-   - Product is still the hero but not filling entire frame
-   - Leave space around product for callouts
-
-2. CALLOUT LINES & ARROWS (MANDATORY)
-   - Clean, thin lines (2-3px) extending from product to text
-   - Lines should be straight with 90-degree bends (not curved)
-   - Arrow tips pointing TO specific product features
-   - Color: {accent_color} or white with subtle shadow
-   - Professional engineering drawing style
-
-3. FEATURE CALLOUT BOXES
-   - Small, clean text boxes at the end of each callout line
-   - Semi-transparent or solid background for readability
-   - Each box highlights ONE specific feature
-
-   CALLOUTS TO INCLUDE:
-{callouts_str}
-
-4. DIMENSION ANNOTATIONS (if applicable)
-   - Include measurement lines showing product size
-   - Use standard dimension notation: arrows on both ends
-   - Display key measurements (height, width, depth)
-   - Professional technical drawing style
-
-=== DESIGN SPECIFICATIONS ===
-COLOR PALETTE:
-- Primary text/elements: {primary_color}
-- Accent color (arrows, highlights): {accent_color}
-- Background: Clean gradient or subtle pattern (NOT pure white - distinguish from main image)
-- Recommended: Light gray to white gradient, or subtle brand color tint
-
-TYPOGRAPHY:
-- Font: {fw.typography.headline_font} or clean sans-serif
-- Callout text: Bold, legible at thumbnail size (14-18pt equivalent)
-- Use ALL CAPS for feature names, sentence case for descriptions
-- High contrast for readability
-
-LAYOUT:
-- Product centered or slightly left/right to balance callouts
-- Callouts distributed evenly around product
-- Visual flow guides eye from product to features
-- Whitespace between elements for clarity
-
-=== INFOGRAPHIC ELEMENTS STYLE ===
-DO include:
-- Technical callout lines with arrows
-- Small icons next to features (optional)
-- Dimension lines with measurements
-- Clean boxes/badges for feature text
-- Subtle background pattern or gradient
-
-DO NOT include:
-- Lifestyle elements or people
-- Busy or cluttered backgrounds
-- Decorative swirls or flourishes
-- Too many competing focal points
-- Text that overlaps the product
-
-=== VISUAL MOOD ===
-Framework: {fw.framework_name}
-Mood: {', '.join(fw.visual_treatment.mood_keywords)}
-
-This should feel: Technical, Informative, Premium, Professional, Trustworthy
-Think: High-end product specification sheet as a beautiful infographic
-
-=== TECHNICAL SPECIFICATIONS ===
-- 1000x1000 pixel square format
-- All text must be legible at 100x100px thumbnail
-- High contrast between text and background
-- Professional, clean, engineering-meets-marketing aesthetic
-
-=== FINAL OUTPUT ===
-Generate an INFOGRAPHIC-STYLE technical breakdown showing:
-- Product with space for callouts
-- 3-5 callout lines with arrows pointing to specific features
-- Feature text in clean boxes
-- Dimension annotations (if applicable)
-- Professional, technical, yet beautiful presentation
-
-This image should EDUCATE the customer about product specifications
-while maintaining visual appeal and brand consistency.
-"""
-        return prompt
-
-    def _build_infographic_2_prompt(
-        self,
-        session: GenerationSession,
-        fw: DesignFramework,
-        image_copy
-    ) -> str:
-        """
-        Build prompt for INFOGRAPHIC 2 - Benefits & Features Grid.
-
-        This image shows the BENEFITS in an organized, icon-driven layout:
-        - Feature icons with short descriptions
-        - Organized grid or list layout
-        - Benefit-focused messaging (what it does FOR the customer)
-        - Could include headline and supporting points
-        """
-        features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
-
-        # Build color palette
-        primary_color = fw.colors[0].hex if fw.colors else '#1a1a1a'
-        secondary_color = fw.colors[1].hex if len(fw.colors) > 1 else '#4a90d9'
-        accent_color = fw.colors[2].hex if len(fw.colors) > 2 else '#27ae60'
-
-        # Get headline if available
-        headline = image_copy.headline if image_copy else "Why Choose Our Product?"
-
-        # Build benefits list
-        benefits = []
-        if image_copy and image_copy.feature_callouts:
-            benefits = image_copy.feature_callouts
-        elif features:
-            benefits = features
-
-        benefits_str = '\n'.join([f"   {i+1}. {b}" for i, b in enumerate(benefits)]) if benefits else "   1. Premium Quality\n   2. Durable Design\n   3. Easy to Use"
-
-        prompt = f"""=== AMAZON INFOGRAPHIC IMAGE 2 - BENEFITS & FEATURES ===
-
-PRODUCT: {session.product_title}
-
-=== IMAGE PURPOSE ===
-This is Image 3 of 5 - The BENEFITS INFOGRAPHIC.
-Purpose: Show customers the KEY BENEFITS in an organized, scannable format.
-Think: Marketing flyer meets modern icon-driven design.
-
-=== VISUAL COMPOSITION TYPE ===
-This is a BENEFITS-FOCUSED INFOGRAPHIC with organized layout:
-
-1. HEADLINE (Top section)
-   - Bold, attention-grabbing headline
-   - Text: "{headline}"
-   - Font: {fw.typography.headline_font}, {fw.typography.headline_weight}
-   - Color: {primary_color}
-
-2. PRODUCT IMAGE (Center or Side)
-   - Product shown at medium size (not dominating like main image)
-   - Position: Center with benefits around it, OR left side with benefits on right
-   - Product should be clearly visible but not competing with benefit icons
-
-3. BENEFIT ICONS + TEXT (THE MAIN FEATURE)
-   - 3-5 benefit points with ICONS and short text
-
-   BENEFITS TO DISPLAY:
-{benefits_str}
-
-   ICON STYLE:
-   - Simple, flat icons (not 3D or overly detailed)
-   - Consistent style across all icons (all outline OR all filled)
-   - Size: Medium (visible at thumbnail)
-   - Color: {secondary_color} or {accent_color}
-
-   TEXT STYLE:
-   - Bold benefit name/headline
-   - Optional: 1-line description below
-   - High contrast for readability
-
-4. ORGANIZED LAYOUT
-   Options (choose most appropriate):
-   - GRID: 2x2 or 3x2 grid of icon+text blocks
-   - VERTICAL LIST: Icons stacked with text to the right
-   - CIRCULAR: Benefits arranged around central product
-   - BANNER: Horizontal rows of benefits
-
-=== DESIGN SPECIFICATIONS ===
-COLOR PALETTE:
-- Headlines: {primary_color}
-- Icons: {secondary_color} or {accent_color}
-- Background: Subtle gradient or clean solid (brand-aligned)
-- Text backgrounds: Optional subtle boxes for contrast
-
-TYPOGRAPHY:
-- Headline: {fw.typography.headline_font}, {fw.typography.headline_weight}
-- Benefit titles: Bold, {fw.typography.subhead_font}
-- Descriptions: Regular weight, good contrast
-
-LAYOUT PRINCIPLES:
-- Clear visual hierarchy: Headline > Product > Benefits
-- Even spacing between benefit blocks
-- Aligned icons and text (professional grid)
-- Breathing room (not cluttered)
-
-=== VISUAL STYLE ===
-Framework: {fw.framework_name}
-Brand Voice: {fw.brand_voice}
-Mood: {', '.join(fw.visual_treatment.mood_keywords)}
-
-STYLE GUIDE:
-- Modern, clean, organized
-- Scannable at a glance
-- Professional marketing quality
-- Consistent icon style throughout
-- Clear visual hierarchy
-
-DO include:
-- Simple, recognizable icons
-- Bold benefit headlines
-- Subtle supporting text
-- Professional layout grid
-- Product image (but not dominating)
-
-DO NOT include:
-- Photo collages
-- Busy backgrounds
-- Too many font styles
-- Cluttered layouts
-- Illegible small text
-
-=== TECHNICAL SPECIFICATIONS ===
-- 1000x1000 pixel square format
-- All text must be legible at 100x100px thumbnail
-- Icons should be recognizable at small sizes
-- High contrast for accessibility
-
-=== FINAL OUTPUT ===
-Generate a BENEFIT-FOCUSED infographic with:
-- Clear headline at top
-- Product image (center or side)
-- 3-5 benefit icons with short text
-- Organized grid or list layout
-- Professional, modern, marketing aesthetic
-
-This image should CONVINCE customers of the product's value
-through clear, scannable benefit communication.
-"""
-        return prompt
-
-    def _build_lifestyle_prompt(
-        self,
-        session: GenerationSession,
-        fw: DesignFramework,
-        image_copy
-    ) -> str:
-        """
-        Build prompt for LIFESTYLE image.
-
-        This image shows the product IN USE by a REAL PERSON:
-        - Authentic, natural setting
-        - Person actively using/enjoying the product
-        - Emotional connection - show the EXPERIENCE
-        - Makes the customer imagine themselves with the product
-        """
-        # Determine target audience context
-        audience = session.target_audience or "everyday consumers"
-
-        # Get mood keywords for atmosphere
-        mood = ', '.join(fw.visual_treatment.mood_keywords) if fw.visual_treatment.mood_keywords else 'natural, authentic, relatable'
-
-        # Headline (if we want text overlay - optional for lifestyle)
-        headline = image_copy.headline if image_copy else None
-
-        prompt = f"""=== AMAZON LIFESTYLE IMAGE - REAL PERSON IN REAL ENVIRONMENT ===
-
-PRODUCT: {session.product_title}
-TARGET AUDIENCE: {audience}
-
-=== IMAGE PURPOSE ===
-This is Image 4 of 5 - The LIFESTYLE IMAGE.
-Purpose: Show a REAL PERSON using the product in a REAL ENVIRONMENT.
-This creates EMOTIONAL CONNECTION and helps customers visualize ownership.
-Think: Magazine editorial, authentic photography, aspirational yet relatable.
-
-=== CRITICAL REQUIREMENTS ===
-This image MUST feature:
-
-1. A REAL HUMAN BEING (MANDATORY)
-   - NOT just the product alone
-   - NOT just hands holding the product
-   - A FULL or PARTIAL person visible in the image
-   - Person should be using/enjoying the product naturally
-
-2. AUTHENTIC ENVIRONMENT (MANDATORY)
-   - Real-world setting (home, office, outdoors, etc.)
-   - NOT a studio white background
-   - NOT an abstract or artificial setting
-   - Environment should match product use case
-
-3. NATURAL INTERACTION (MANDATORY)
-   - Person actively using or demonstrating the product
-   - Natural, candid pose (not stiff or posed)
-   - Shows the EXPERIENCE of using the product
-   - Product is clearly visible but person is primary subject
-
-=== PERSON SPECIFICATIONS ===
-Based on target audience ({audience}):
-
-DEMOGRAPHICS:
-- Select a person that represents or appeals to the target audience
-- Age, style, and appearance should resonate with likely buyers
-- Authentic, relatable, aspirational but not unrealistic
-
-EXPRESSION & POSE:
-- Natural, genuine expression (not forced smile)
-- Active engagement with product (using, examining, enjoying)
-- Body language suggests satisfaction/enjoyment
-- Candid feel, not overly posed
-
-CLOTHING & STYLING:
-- Appropriate to the environment and activity
-- Clean, tasteful, not distracting from product
-- Aligns with brand mood: {mood}
-
-=== ENVIRONMENT SPECIFICATIONS ===
-SETTING:
-- Choose a setting where this product would naturally be used
-- Examples based on product type:
-  * Kitchen product → Modern home kitchen
-  * Fitness product → Gym or outdoor exercise space
-  * Office product → Clean, well-lit workspace
-  * Beauty product → Bathroom or vanity area
-  * Outdoor product → Nature, park, backyard
-  * Tech product → Modern living room or office
-
-LIGHTING:
-- Natural lighting preferred (window light, golden hour, etc.)
-- Soft, flattering lighting on both person and product
-- {fw.visual_treatment.lighting_style}
-- Warm, inviting atmosphere
-
-BACKGROUND:
-- Real environment, slightly blurred (depth of field)
-- Not distracting but adds context
-- Complementary to brand colors when possible
-- Clean but lived-in feel
-
-=== PRODUCT VISIBILITY ===
-The product should be:
-- Clearly visible in the shot
-- Being actively used or held
-- NOT the primary focus (person is primary)
-- Naturally integrated into the scene
-- Visible enough to recognize what it is
-
-Product prominence: 30-40% of viewer attention
-Person prominence: 60-70% of viewer attention
-
-=== TEXT OVERLAY (OPTIONAL) ===
-{"Include this headline if it enhances the image: " + chr(34) + headline + chr(34) if headline else "Text overlay is OPTIONAL for lifestyle images. The image should tell the story visually."}
-
-If including text:
-- Keep it minimal (headline only, if anything)
-- Position where it doesn't obscure person or product
-- Use brand typography: {fw.typography.headline_font}
-
-=== PHOTOGRAPHY STYLE ===
-OVERALL AESTHETIC:
-- Editorial/magazine quality photography
-- Natural, candid feel (not stock photo fake)
-- Warm, inviting atmosphere
-- Professional but relatable
-- Aspirational without being unattainable
-
-TECHNICAL:
-- Shallow depth of field (subject in focus, background slightly soft)
-- Natural color grading (not over-processed)
-- Good composition following rule of thirds
-- Person positioned at 1/3 line, product visible
-
-MOOD:
-- {mood}
-- {fw.design_philosophy}
-
-=== VISUAL MOOD ===
-Framework: {fw.framework_name}
-Brand Voice: {fw.brand_voice}
-
-The image should feel:
-- Authentic and natural
-- Warm and inviting
-- Aspirational but achievable
-- Connected to real life
-
-=== TECHNICAL SPECIFICATIONS ===
-- 1000x1000 pixel square format
-- High resolution, professional photography quality
-- Natural color grading
-- Sharp focus on subject (person with product)
-
-=== FINAL OUTPUT ===
-Generate a LIFESTYLE PHOTOGRAPH featuring:
-- A real person actively using the product
-- Authentic, real-world environment
-- Natural lighting and candid feel
-- Editorial/magazine photography quality
-- Emotional connection that helps customers visualize ownership
-
-This image should make customers FEEL what it's like to own and use this product.
-It sells the EXPERIENCE, not just the item.
-"""
-        return prompt
-
-    def _build_comparison_prompt(
-        self,
-        session: GenerationSession,
-        fw: DesignFramework,
-        image_copy
-    ) -> str:
-        """
-        Build prompt for COMPARISON/CLOSING image.
-
-        This is the 5th image - it serves to CLOSE THE SALE with:
-        - Multiple use cases shown
-        - What's included (package contents)
-        - Trust elements (awards, certifications, guarantees)
-        - Comparison showing product advantages
-        - Or a final styled beauty shot
-        """
-        features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
-
-        # Build color palette
-        primary_color = fw.colors[0].hex if fw.colors else '#1a1a1a'
-        secondary_color = fw.colors[1].hex if len(fw.colors) > 1 else '#4a90d9'
-        accent_color = fw.colors[2].hex if len(fw.colors) > 2 else '#27ae60'
-
-        # Get CTA if available
-        cta = image_copy.cta if image_copy and image_copy.cta else "Order Now"
-        headline = image_copy.headline if image_copy else "Everything You Need"
-
-        prompt = f"""=== AMAZON FINAL IMAGE - COMPARISON/CLOSING IMAGE ===
-
-PRODUCT: {session.product_title}
-
-=== IMAGE PURPOSE ===
-This is Image 5 of 5 - The CLOSING IMAGE.
-Purpose: CLOSE THE SALE. This image should eliminate remaining objections
-and give the customer confidence to purchase.
-Think: The final push that converts browsers to buyers.
-
-=== COMPOSITION OPTIONS ===
-Choose ONE of these approaches based on what would best close the sale:
-
-OPTION A: MULTIPLE USE CASES
-- Show 2-4 scenarios where the product excels
-- Grid layout showing versatility
-- "Use it for X, Y, and Z" visual story
-- Demonstrates value through variety
-
-OPTION B: PACKAGE CONTENTS / WHAT'S INCLUDED
-- Show all items that come with purchase
-- Organized flatlay or arranged display
-- Clearly shows everything customer receives
-- "You get all of this" presentation
-
-OPTION C: TRUST & CREDIBILITY
-- Include trust badges, certifications, awards
-- Satisfaction guarantee badges
-- Star ratings or review snippets
-- "100% Satisfaction Guaranteed" messaging
-
-OPTION D: STYLED BEAUTY SHOT
-- Premium styled product photography
-- Complementary props that elevate perception
-- Aspirational setting (marble surface, greenery, etc.)
-- Editorial magazine quality presentation
-
-For this generation, create OPTION A or B (most common for Amazon).
-
-=== VISUAL COMPOSITION ===
-
-IF MULTIPLE USE CASES (Option A):
-- 2x2 grid or triptych layout
-- Each section shows a different use case
-- Consistent styling across all sections
-- Labels for each use case (optional)
-- Product visible in each scenario
-
-IF PACKAGE CONTENTS (Option B):
-- Clean flatlay arrangement
-- All items organized aesthetically
-- Main product as hero, accessories around it
-- Clear labeling of each item (optional)
-- Premium presentation of what's included
-
-=== DESIGN SPECIFICATIONS ===
-COLOR PALETTE:
-- Primary: {primary_color}
-- Secondary: {secondary_color}
-- Accent: {accent_color}
-- Background: Clean, premium (subtle gradient or solid)
-
-HEADLINE:
-- Text: "{headline}"
-- Position: Top or bottom of image
-- Font: {fw.typography.headline_font}, bold
-- Color: High contrast for readability
-
-OPTIONAL CTA:
-- Text: "{cta}"
-- Position: Bottom of image
-- Style: Button or badge format
-- Color: {accent_color} or contrasting
-
-LAYOUT:
-- Clear visual hierarchy
-- Organized, professional grid (if applicable)
-- Product(s) prominently featured
-- Text enhances but doesn't overwhelm
-
-=== VISUAL ELEMENTS ===
-DO include:
-- Product shown in multiple scenarios OR complete package
-- Clear, organized layout
-- Optional headline and CTA
-- Trust elements (if applicable)
-- Premium, professional styling
-
-OPTIONAL additions:
-- Satisfaction guarantee badge
-- "What's Included" label
-- Use case labels
-- Subtle icons representing benefits
-
-DO NOT include:
-- Cluttered or messy layouts
-- Low-quality graphics
-- Overwhelming amount of text
-- Disconnected visual elements
-
-=== BRAND ALIGNMENT ===
-Framework: {fw.framework_name}
-Brand Voice: {fw.brand_voice}
-Mood: {', '.join(fw.visual_treatment.mood_keywords)}
-
-Visual Treatment:
-- Lighting: {fw.visual_treatment.lighting_style}
-- Background: {fw.visual_treatment.background_treatment}
-- Overall feel: Premium, trustworthy, compelling
-
-=== CLOSING PSYCHOLOGY ===
-This image should address:
-1. "Is this product versatile enough?" → Show multiple uses
-2. "What exactly do I get?" → Show package contents
-3. "Can I trust this brand?" → Include trust elements
-4. "Is this really premium?" → Styled beauty presentation
-
-The image should make the customer think:
-"Yes, I need this. I'm confident in this purchase."
-
-=== TECHNICAL SPECIFICATIONS ===
-- 1000x1000 pixel square format
-- All text legible at 100x100px thumbnail
-- High contrast, clear visual hierarchy
-- Professional, e-commerce ready quality
-
-=== FINAL OUTPUT ===
-Generate a CLOSING/COMPARISON image that:
-- Shows multiple use cases OR package contents
-- Includes compelling headline
-- Features trust elements or premium styling
-- Maintains professional, organized layout
-- Creates confidence and urgency to purchase
-
-This image is the FINAL impression before the customer decides to buy.
-Make it count.
-"""
-        return prompt
+    # Template prompt builders moved to app/services/prompt_builder.py
 
     def _get_story_beat(self, image_num: int, story_arc) -> str:
         """Get the story beat for a specific image number"""
@@ -1161,6 +412,7 @@ Make it count.
         note: Optional[str] = None,
         use_ai_enhancement: bool = True,
         reference_image_paths: Optional[List[str]] = None,
+        model_override: Optional[str] = None,
     ) -> ImageResult:
         """
         Generate a single image type for a session with retry logic.
@@ -1174,6 +426,27 @@ Make it count.
         Returns:
             ImageResult with status and path
         """
+        # Apply model override if requested
+        original_model = self.gemini.model
+        if model_override:
+            self.gemini.model = model_override
+
+        try:
+            return await self._generate_single_image_impl(
+                session, image_type, note, use_ai_enhancement, reference_image_paths
+            )
+        finally:
+            self.gemini.model = original_model
+
+    async def _generate_single_image_impl(
+        self,
+        session: GenerationSession,
+        image_type: ImageTypeEnum,
+        note: Optional[str],
+        use_ai_enhancement: bool,
+        reference_image_paths: Optional[List[str]],
+    ) -> ImageResult:
+        """Internal implementation of generate_single_image."""
         # Load design framework from session if not already loaded (for regeneration)
         if session.design_framework_json and not self._current_framework:
             try:
@@ -1262,12 +535,14 @@ Make it count.
                         logger.info(f"[REGENERATION] Using stored product_analysis for context")
 
                     logger.info(f"Using AI Designer to enhance prompt for {template_key}")
+                    from app.services.prompt_builder import get_structural_context
                     enhancement = await vision_service.enhance_prompt_with_feedback(
                         original_prompt=original_prompt,
                         user_feedback=note,
                         image_type=template_key,
                         framework=framework_dict,
                         product_analysis=product_analysis_text,
+                        structural_context=get_structural_context(template_key),
                     )
 
                     base_prompt = enhancement["enhanced_prompt"]
@@ -1419,6 +694,7 @@ Make it count.
                             user_feedback=user_feedback,
                             change_summary=change_summary,
                             reference_image_paths=ref_meta if ref_meta else None,
+                            model_name=self.gemini.model,
                         )
                         img_version = ph.version
                     except Exception as e:
@@ -1489,6 +765,7 @@ Make it count.
         image_type: ImageTypeEnum,
         edit_instructions: str,
         reference_image_paths: Optional[List[str]] = None,
+        model_override: Optional[str] = None,
     ) -> ImageResult:
         """
         Edit an existing generated image with specific instructions.
@@ -1510,6 +787,26 @@ Make it count.
         Returns:
             ImageResult with status and path
         """
+        # Apply model override if requested
+        original_model = self.gemini.model
+        if model_override:
+            self.gemini.model = model_override
+
+        try:
+            return await self._edit_single_image_impl(
+                session, image_type, edit_instructions, reference_image_paths
+            )
+        finally:
+            self.gemini.model = original_model
+
+    async def _edit_single_image_impl(
+        self,
+        session: GenerationSession,
+        image_type: ImageTypeEnum,
+        edit_instructions: str,
+        reference_image_paths: Optional[List[str]],
+    ) -> ImageResult:
+        """Internal implementation of edit_single_image."""
         template_key = image_type.value
         is_aplus = template_key.startswith("aplus_")
 
@@ -1596,12 +893,14 @@ Make it count.
                                 product_analysis_text = str(analysis)
 
                         logger.info(f"[EDIT] Using AI Designer to enhance edit instructions for {template_key}")
+                        from app.services.prompt_builder import get_structural_context
                         enhancement = await vision_service.enhance_prompt_with_feedback(
                             original_prompt=original_prompt,
                             user_feedback=edit_instructions,
                             image_type=template_key,
                             framework=framework_dict,
                             product_analysis=product_analysis_text,
+                            structural_context=get_structural_context(template_key),
                         )
                         enhanced_instructions = enhancement["enhanced_prompt"]
                         change_summary = enhancement.get("interpretation", "AI-enhanced edit")
@@ -1638,6 +937,7 @@ Make it count.
                         user_feedback=edit_instructions,
                         change_summary=change_summary,
                         reference_image_paths=edit_ref_meta,
+                        model_name=self.gemini.model,
                     )
                     edit_version = ph.version
                 except Exception as e:
@@ -1688,6 +988,7 @@ Make it count.
     async def generate_all_images(
         self,
         session: GenerationSession,
+        model_override: Optional[str] = None,
     ) -> List[ImageResult]:
         """
         Generate all 5 image types for a session.
@@ -1717,7 +1018,7 @@ Make it count.
         results = []
         for i, image_type in enumerate(self.IMAGE_TYPES):
             logger.info(f"Generating image {i+1}/5: {image_type.value}")
-            result = await self.generate_single_image(session, image_type)
+            result = await self.generate_single_image(session, image_type, model_override=model_override)
             results.append(result)
             # Commit after each image so frontend can poll and see progress
             self.db.commit()
@@ -2050,3 +1351,238 @@ Make it count.
 
         logger.info(f"Selected style {style_id} for session {session_id}")
         return session
+
+    # ========================================================================
+    # Unified execute() pipeline — replaces direct Gemini calls in endpoints
+    # ========================================================================
+
+    async def execute(self, ctx: "GenerationContext") -> "GenerationResult":
+        """
+        Unified generation pipeline for ALL image operations.
+
+        Handles: generate, edit, mobile_transform, canvas_extension.
+        Post-processes: hero split, canvas split, A+ resize, as-is.
+        Saves with versioning and stores prompt history.
+
+        Args:
+            ctx: GenerationContext with all operation details
+
+        Returns:
+            GenerationResult with paths, URLs, and version info
+        """
+        from app.services.generation_utils import (
+            GenerationContext, get_next_version, ensure_design_context,
+        )
+        from app.services.image_utils import resize_for_aplus_module
+        from app.services.canvas_compositor import CanvasCompositor
+
+        raw_image = None
+        refined_previous = None
+
+        # Apply model override if requested, restore after generation
+        original_model = self.gemini.model
+        if ctx.model_override:
+            self.gemini.model = ctx.model_override
+        ctx.model_name = self.gemini.model
+
+        # Step 1: Call Gemini based on operation type
+        if ctx.operation == "edit" or ctx.operation == "mobile_transform":
+            raw_image = await self.gemini.edit_image(
+                source_image_path=ctx.source_image_path,
+                edit_instructions=ctx.prompt,
+                reference_images=ctx.reference_images.unnamed_paths if ctx.reference_images.unnamed_paths else None,
+                aspect_ratio=ctx.aspect_ratio,
+                max_retries=3,
+            )
+        elif ctx.operation == "canvas_extension":
+            raw_image = await self.gemini.generate_image(
+                prompt=ctx.prompt,
+                named_images=ctx.reference_images.named_images if ctx.reference_images.named_images else None,
+                aspect_ratio=ctx.aspect_ratio,
+                image_size=ctx.image_size,
+            )
+        else:  # "generate"
+            if ctx.reference_images.named_images:
+                raw_image = await self.gemini.generate_image(
+                    prompt=ctx.prompt,
+                    named_images=ctx.reference_images.named_images,
+                    aspect_ratio=ctx.aspect_ratio,
+                    image_size=ctx.image_size,
+                )
+            else:
+                raw_image = await self.gemini.generate_image(
+                    prompt=ctx.prompt,
+                    reference_image_paths=ctx.reference_images.unnamed_paths if ctx.reference_images.unnamed_paths else None,
+                    aspect_ratio=ctx.aspect_ratio,
+                    image_size=ctx.image_size,
+                )
+
+        # Restore original model after generation
+        self.gemini.model = original_model
+
+        if raw_image is None:
+            raise ValueError(f"Generation failed: no image returned for {ctx.image_type}")
+
+        # Step 2: Post-process based on image type
+        result_images = {}  # key -> PIL.Image
+
+        if ctx.image_type == "aplus_hero":
+            # Hero pair: split at midpoint into modules 0 and 1
+            compositor = CanvasCompositor()
+            top, bottom = compositor.split_hero_image(raw_image)
+            result_images["aplus_full_image_0"] = top
+            result_images["aplus_full_image_1"] = bottom
+
+        elif ctx.operation == "canvas_extension":
+            # Canvas: split into refined previous + new module
+            compositor = CanvasCompositor()
+            top, bottom = compositor.split_canvas_output(raw_image)
+            prev_idx = ctx.module_index - 1
+            result_images[f"aplus_full_image_{prev_idx}"] = top
+            result_images[ctx.storage_key or f"aplus_full_image_{ctx.module_index}"] = bottom
+            # Track refined previous for response
+            refined_previous = (prev_idx, top)
+
+        elif ctx.target_dimensions:
+            # A+ module or mobile: resize to target
+            is_mobile = ctx.operation == "mobile_transform" or (ctx.target_dimensions == (600, 450))
+            resized = resize_for_aplus_module(
+                raw_image,
+                "full_image",
+                mobile=is_mobile,
+            )
+            key = ctx.storage_key or ctx.image_type
+            result_images[key] = resized
+
+        else:
+            # Listing image or other: save as-is
+            key = ctx.storage_key or ctx.image_type
+            result_images[key] = raw_image
+
+        # Step 3: Save with versioning and prompt history
+        saved = {}  # key -> (path, url, version)
+
+        # Get or create design context for prompt history
+        design_ctx = None
+        try:
+            design_ctx = ensure_design_context(
+                self.db, ctx.session, gemini=self.gemini, storage=self.storage,
+            )
+        except Exception as e:
+            logger.warning(f"Could not get design context: {e}")
+
+        for key, image in result_images.items():
+            # Determine version
+            if ctx.image_type == "aplus_hero" and design_ctx:
+                # Hero pair: compute shared version across modules 0 and 1
+                count_0 = self.db.query(PromptHistory).filter(
+                    PromptHistory.context_id == design_ctx.id,
+                    PromptHistory.image_type == ImageTypeEnum("aplus_0"),
+                ).count()
+                count_1 = self.db.query(PromptHistory).filter(
+                    PromptHistory.context_id == design_ctx.id,
+                    PromptHistory.image_type == ImageTypeEnum("aplus_1"),
+                ).count()
+                version = max(count_0, count_1) + 1
+            else:
+                version = get_next_version(self.storage, ctx.session.id, key)
+
+            # Save image
+            path = self.storage.save_generated_image_versioned(
+                ctx.session.id, key, image, version,
+            )
+
+            # Get URL
+            try:
+                url = self.storage.get_generated_url(ctx.session.id, key, expires_in=3600)
+            except Exception:
+                url = f"/api/images/file?path={path}"
+
+            saved[key] = (path, url, version)
+
+        # Step 4: Store prompt history
+        if design_ctx:
+            try:
+                if ctx.image_type == "aplus_hero":
+                    # Store for both modules 0 and 1
+                    version = list(saved.values())[0][2] if saved else 1
+                    for aplus_idx in [0, 1]:
+                        ph = PromptHistory(
+                            context_id=design_ctx.id,
+                            image_type=ImageTypeEnum(f"aplus_{aplus_idx}"),
+                            version=version,
+                            prompt_text=ctx.prompt,
+                            reference_image_paths=ctx.reference_images.history_meta or None,
+                            user_feedback=ctx.user_feedback,
+                            change_summary=ctx.change_summary,
+                            model_name=ctx.model_name,
+                        )
+                        self.db.add(ph)
+                    self.db.commit()
+                else:
+                    # Single image type
+                    img_type_enum = ImageTypeEnum(ctx.image_type) if not ctx.image_type.startswith("aplus_hero") else ImageTypeEnum("aplus_0")
+                    prompt_prefix = ""
+                    if ctx.operation == "edit":
+                        prompt_prefix = "[EDIT] "
+                    elif ctx.operation == "mobile_transform":
+                        prompt_prefix = "[MOBILE RECOMPOSE] "
+
+                    self.store_prompt_in_history(
+                        context=design_ctx,
+                        image_type=img_type_enum,
+                        prompt_text=f"{prompt_prefix}{ctx.prompt}",
+                        user_feedback=ctx.user_feedback,
+                        change_summary=ctx.change_summary,
+                        reference_image_paths=ctx.reference_images.history_meta or None,
+                        model_name=ctx.model_name,
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to store prompt history in execute(): {e}")
+
+        # Build result
+        from app.services.generation_utils import GenerationContext as _GC  # avoid circular
+
+        # Primary result is the main image (or first if hero)
+        if ctx.image_type == "aplus_hero":
+            return GenerationResult(
+                saved=saved,
+                refined_previous_index=None,
+            )
+        elif refined_previous:
+            prev_idx, _ = refined_previous
+            prev_key = f"aplus_full_image_{prev_idx}"
+            return GenerationResult(
+                saved=saved,
+                refined_previous_index=prev_idx,
+                refined_previous_path=saved[prev_key][0] if prev_key in saved else None,
+                refined_previous_url=saved[prev_key][1] if prev_key in saved else None,
+            )
+        else:
+            return GenerationResult(saved=saved)
+
+
+@dataclass
+class GenerationResult:
+    """Result from GenerationService.execute()"""
+    saved: Dict[str, tuple]  # key -> (path, url, version)
+    refined_previous_index: Optional[int] = None
+    refined_previous_path: Optional[str] = None
+    refined_previous_url: Optional[str] = None
+
+    @property
+    def primary_key(self) -> str:
+        """Get the primary storage key (first one)"""
+        return next(iter(self.saved))
+
+    @property
+    def primary_path(self) -> str:
+        return self.saved[self.primary_key][0]
+
+    @property
+    def primary_url(self) -> str:
+        return self.saved[self.primary_key][1]
+
+    @property
+    def primary_version(self) -> int:
+        return self.saved[self.primary_key][2]

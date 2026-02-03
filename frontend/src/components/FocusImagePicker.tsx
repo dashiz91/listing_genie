@@ -172,10 +172,16 @@ export function useFocusImages() {
   const [extraFile, setExtraFile] = useState<{ file: File; preview: string } | null>(null);
 
   const toggle = (path: string) => {
+    console.log('[FOCUS DEBUG] toggle called with path:', path);
     setSelectedPaths((prev) => {
       const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
+      if (next.has(path)) {
+        next.delete(path);
+        console.log('[FOCUS DEBUG] Removed path, new size:', next.size);
+      } else {
+        next.add(path);
+        console.log('[FOCUS DEBUG] Added path, new size:', next.size);
+      }
       return next;
     });
   };

@@ -276,7 +276,10 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   const handleRegenSubmit = useCallback(() => {
     if (regenImageType) {
       const refPaths = regenFocusImages.getSelectedPaths();
+      console.log('[REGEN DEBUG] selectedPaths Set:', regenFocusImages.selectedPaths);
+      console.log('[REGEN DEBUG] getSelectedPaths():', refPaths);
       const refs = refPaths.length > 0 ? refPaths : undefined;
+      console.log('[REGEN DEBUG] Sending refs:', refs);
       onRegenerateSingle?.(regenImageType, regenNote.trim() || undefined, refs);
       setImageCacheKey((prev) => ({ ...prev, [regenImageType]: Date.now() }));
       setRegenPanelOpen(false);

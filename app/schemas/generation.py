@@ -331,6 +331,7 @@ class SingleImageRequest(BaseModel):
         None,
         description="Optional list of reference image paths to override default references"
     )
+    image_model: Optional[str] = Field(None, description="Override Gemini model for this generation")
 
 
 class SingleImageResponse(BaseModel):
@@ -346,3 +347,271 @@ class SelectStyleRequest(BaseModel):
     """Request to select a style for final generation"""
     session_id: str
     style_id: str
+
+
+# ============================================================================
+# Color Mode
+# ============================================================================
+
+class ColorMode(str, Enum):
+    """How colors should be determined by AI Designer"""
+    AI_DECIDES = "ai_decides"           # AI picks all colors based on product
+    SUGGEST_PRIMARY = "suggest_primary"  # User suggests primary, AI builds palette
+    LOCKED_PALETTE = "locked_palette"    # User locks exact colors, AI must use them
+
+
+# ============================================================================
+# Framework Generation Schemas
+# ============================================================================
+
+class FrameworkGenerationRequest(BaseModel):
+    """Request to generate design frameworks using Principal Designer AI"""
+    product_title: str = Field(..., min_length=1, max_length=200)
+    brand_name: Optional[str] = Field(None, max_length=100)
+    features: List[str] = Field(default_factory=list, max_length=3)
+    target_audience: Optional[str] = Field(None, max_length=200)
+    primary_color: Optional[str] = Field(
+        None,
+        pattern=r"^#[0-9A-Fa-f]{6}$",
+        description="Optional preferred primary color (hex)"
+    )
+
+
+class FrameworkGenerationResponse(BaseModel):
+    """Response with 4 AI-generated design frameworks with preview images"""
+    session_id: str
+    product_analysis: str
+    product_analysis_raw: Optional[dict] = None
+    frameworks: list
+    generation_notes: str
+
+
+class FrameworkGenerationWithImageRequest(BaseModel):
+    """Request with upload path for framework generation"""
+    product_title: str = Field(..., min_length=1, max_length=200)
+    upload_path: str = Field(..., description="Path to uploaded primary product image")
+    additional_upload_paths: List[str] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Additional product images (up to 4) for better AI context"
+    )
+    brand_name: Optional[str] = Field(None, max_length=100)
+    features: List[str] = Field(default_factory=list, max_length=3)
+    target_audience: Optional[str] = Field(None, max_length=200)
+    primary_color: Optional[str] = Field(
+        None,
+        pattern=r"^#[0-9A-Fa-f]{6}$",
+        description="Optional preferred primary color (hex)"
+    )
+    style_reference_path: Optional[str] = Field(
+        None,
+        description="Path to style reference image - AI extracts colors and style from this"
+    )
+    color_mode: ColorMode = Field(
+        default=ColorMode.AI_DECIDES,
+        description="How colors should be determined: AI_DECIDES (default), SUGGEST_PRIMARY, or LOCKED_PALETTE"
+    )
+    locked_colors: List[str] = Field(
+        default_factory=list,
+        max_length=6,
+        description="Hex colors to lock when color_mode is LOCKED_PALETTE (e.g., ['#FF5733', '#2E86AB'])"
+    )
+    framework_count: int = Field(
+        default=4,
+        ge=1,
+        le=4,
+        description="Number of design framework options to generate (1-4)"
+    )
+    skip_preview_generation: bool = Field(
+        default=False,
+        description="When true, skip generating AI preview images and use the style_reference_path as the preview"
+    )
+
+
+class GenerateWithFrameworkRequest(BaseModel):
+    """Request to generate images with a selected framework"""
+    product_title: str = Field(..., min_length=1, max_length=200)
+    upload_path: str = Field(..., description="Path to primary product image")
+    additional_upload_paths: List[str] = Field(
+        default_factory=list,
+        max_length=4,
+        description="Additional product images for better AI context"
+    )
+    framework: dict = Field(..., description="The selected design framework")
+    brand_name: Optional[str] = Field(None, max_length=100)
+    features: List[str] = Field(default_factory=list, max_length=3)
+    target_audience: Optional[str] = Field(None, max_length=200)
+    logo_path: Optional[str] = Field(None, description="Path to logo image")
+    style_reference_path: Optional[str] = Field(None, description="Path to style reference (preview image)")
+    global_note: Optional[str] = Field(None, max_length=2000, description="Global instructions for all images")
+    product_analysis: Optional[dict] = Field(None, description="AI's product analysis from framework generation")
+    single_image_type: Optional[str] = Field(None, description="If provided, only generate this image type (main, infographic_1, etc.)")
+    create_only: bool = Field(False, description="If true, create session but skip image generation")
+    image_model: Optional[str] = Field(None, description="Override Gemini model (e.g. gemini-2.5-flash-preview-image-generation)")
+
+
+# ============================================================================
+# Prompt History
+# ============================================================================
+
+class PromptHistoryResponse(BaseModel):
+    """Response with prompt history for an image"""
+    image_type: str
+    version: int
+    prompt_text: str
+    user_feedback: Optional[str] = None
+    change_summary: Optional[str] = None
+    model_name: Optional[str] = None
+    created_at: str
+    reference_images: List[dict] = []
+    designer_context: Optional[dict] = None
+
+
+# ============================================================================
+# Edit Image
+# ============================================================================
+
+class EditImageRequest(BaseModel):
+    """Request to edit an existing generated image"""
+    session_id: str
+    image_type: ImageTypeEnum
+    edit_instructions: str = Field(
+        ...,
+        min_length=5,
+        max_length=2000,
+        description="Specific edit instructions (e.g., 'Change the headline to New Text')"
+    )
+    mobile: bool = Field(
+        False,
+        description="If True, edit the mobile version of the A+ module"
+    )
+    reference_image_paths: Optional[List[str]] = Field(
+        None,
+        description="Optional list of reference image paths to provide as visual context for the edit"
+    )
+    image_model: Optional[str] = Field(
+        None,
+        description="Optional AI model override for this edit (e.g., 'gemini-2.5-flash-preview-image-generation')"
+    )
+
+
+# ============================================================================
+# A+ Content Module Generation
+# ============================================================================
+
+class AplusModuleType(str, Enum):
+    """Types of A+ Content modules"""
+    FULL_IMAGE = "full_image"
+    DUAL_IMAGE = "dual_image"
+    FOUR_IMAGE = "four_image"
+    COMPARISON = "comparison"
+
+
+class AplusModuleRequest(BaseModel):
+    """Request to generate a single A+ Content module"""
+    session_id: str = Field(..., description="Session ID from listing generation")
+    module_type: AplusModuleType = Field(default=AplusModuleType.FULL_IMAGE)
+    module_index: int = Field(..., ge=0, le=6, description="Position in A+ section (0=first/top)")
+    previous_module_path: Optional[str] = Field(
+        None,
+        description="Path to the previous module's image for visual continuity chaining"
+    )
+    custom_instructions: Optional[str] = Field(None, max_length=500)
+    reference_image_paths: Optional[List[str]] = Field(
+        None,
+        description="Focus reference image paths (overrides default product/style images)"
+    )
+    image_model: Optional[str] = Field(None, description="Override Gemini model for this generation")
+
+
+class RefinedModule(BaseModel):
+    """Info about a previous module that was refined during canvas extension"""
+    module_index: int
+    image_path: str
+    image_url: str
+
+
+class AplusModuleResponse(BaseModel):
+    """Response from A+ module generation"""
+    session_id: str
+    module_type: str
+    module_index: int
+    image_path: str
+    image_url: str
+    width: int
+    height: int
+    is_chained: bool
+    generation_time_ms: int
+    prompt_text: Optional[str] = None
+    refined_previous: Optional[RefinedModule] = None
+
+
+# ============================================================================
+# A+ Visual Script
+# ============================================================================
+
+class AplusVisualScriptRequest(BaseModel):
+    """Request to generate Art Director visual script"""
+    session_id: str = Field(..., description="Session ID from listing generation")
+    module_count: int = Field(default=6, ge=1, le=7)
+
+
+class AplusVisualScriptResponse(BaseModel):
+    """Response with the visual script"""
+    session_id: str
+    visual_script: dict
+    module_count: int
+
+
+# ============================================================================
+# A+ Hero Pair Generation
+# ============================================================================
+
+class HeroPairRequest(BaseModel):
+    """Request to generate hero pair (modules 0+1) as a single image split in half"""
+    session_id: str = Field(..., description="Session ID from listing generation")
+    custom_instructions: Optional[str] = Field(None, max_length=500)
+    reference_image_paths: Optional[List[str]] = Field(
+        None,
+        description="Focus reference image paths (overrides default product/style images)"
+    )
+    image_model: Optional[str] = Field(None, description="Override Gemini model for this generation")
+
+
+class HeroPairModuleResult(BaseModel):
+    """Result for one module of the hero pair"""
+    image_path: str
+    image_url: str
+    prompt_text: Optional[str] = None
+
+
+class HeroPairResponse(BaseModel):
+    """Response from hero pair generation"""
+    session_id: str
+    module_0: HeroPairModuleResult
+    module_1: HeroPairModuleResult
+    generation_time_ms: int
+
+
+# ============================================================================
+# A+ Mobile Generation
+# ============================================================================
+
+class AplusMobileRequest(BaseModel):
+    """Request to generate a mobile-optimized version of an A+ module"""
+    session_id: str = Field(..., description="Session ID")
+    module_index: int = Field(..., ge=0, le=6, description="Which module to convert")
+    custom_instructions: Optional[str] = Field(None, max_length=500)
+
+
+class AplusMobileResponse(BaseModel):
+    """Response from mobile A+ generation"""
+    session_id: str
+    module_index: int
+    image_path: str
+    image_url: str
+
+
+class AplusAllMobileRequest(BaseModel):
+    """Request to generate mobile versions for all A+ modules"""
+    session_id: str = Field(..., description="Session ID")

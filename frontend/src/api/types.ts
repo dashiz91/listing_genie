@@ -173,12 +173,15 @@ export interface GenerationRequest {
   color_palette?: string[];
   // Global note/instructions applied to all image generations
   global_note?: string;
+  // AI model override for image generation
+  image_model?: string;
 }
 
 export interface RegenerateSingleRequest {
   session_id: string;
   image_type: ImageType;
   note?: string;  // Optional note/instructions for this specific regeneration
+  image_model?: string;  // AI model override
 }
 
 export interface StylePreset {
@@ -280,6 +283,7 @@ export interface PromptHistory {
   prompt_text: string;
   user_feedback?: string;
   change_summary?: string;
+  model_name?: string;
   created_at: string;
   // Reference images used for generation
   reference_images: Array<{
@@ -398,6 +402,8 @@ export interface AplusModuleRequest {
   module_index: number;  // Position in A+ section (0 = first/top)
   previous_module_path?: string;  // For visual continuity chaining
   custom_instructions?: string;
+  reference_image_paths?: string[];  // Focus reference images (overrides default product/style)
+  image_model?: string;  // AI model override
 }
 
 export interface RefinedModule {

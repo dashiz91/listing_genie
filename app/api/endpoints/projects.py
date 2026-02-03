@@ -234,9 +234,11 @@ async def get_project_detail(
     # List ALL files in session folder once to build a version map
     version_map: Dict[str, List[int]] = {}  # base_key -> sorted list of version numbers
     try:
-        all_files = storage.client.storage.from_(storage.generated_bucket).list(session.id)
+        all_files = storage.client.storage.from_(storage.generated_bucket).list(session.id, {"limit": 1000})
+        logger.info(f"[VERSION DEBUG] Session {session.id}: Found {len(all_files)} files in storage")
         for f in all_files:
             name = f.get("name", "")
+            logger.info(f"[VERSION DEBUG]   File: {name}")
             # Match pattern: {base_key}_v{number}.png
             m = re.match(r'^(.+)_v(\d+)\.png$', name)
             if m:
@@ -246,6 +248,7 @@ async def get_project_detail(
         # Sort each version list
         for key in version_map:
             version_map[key].sort()
+        logger.info(f"[VERSION DEBUG] Version map: {version_map}")
     except Exception as e:
         logger.warning(f"Failed to list session files for version discovery: {e}")
 

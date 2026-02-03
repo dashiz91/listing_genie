@@ -206,6 +206,9 @@ class PromptHistory(Base):
     # What changed from previous version (AI's interpretation)
     change_summary = Column(Text, nullable=True)
 
+    # Which model generated this image (e.g. "gemini-3-pro-image-preview")
+    model_name = Column(String(100), nullable=True)
+
     # Timestamps
     created_at = Column(DateTime, default=func.now())
 

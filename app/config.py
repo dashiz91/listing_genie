@@ -14,7 +14,16 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
 
     # CORS
-    cors_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+    cors_origins: List[str] = [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://reddstudio.ai",
+        "https://www.reddstudio.ai",
+    ]
+
+    # Account lockdown - comma-separated list of allowed emails
+    # Empty = allow all (for when credits system is ready)
+    allowed_emails: str = ""  # e.g., "robertoxma@hotmail.com,another@email.com"
 
     # Gemini (Story 2.1)
     gemini_api_key: str = ""
