@@ -1,8 +1,9 @@
-# REDDAI.CO
+# REDDSTUDIO.AI
 
 AI-powered Amazon listing image generator that creates complete, visually cohesive product listings — 5 listing images + A+ Content modules (desktop & mobile) — from a single set of product photos.
 
-**Brand:** REDDAI.CO — Geometric fox logo, orange (#C85A35) + slate (#1A1D21) color palette.
+**Brand:** REDDSTUDIO — Geometric fox logo, orange (#C85A35) + slate (#1A1D21) color palette.
+**Live:** https://reddstudio.ai
 
 ## What Makes This Different
 
@@ -18,7 +19,7 @@ Unlike generic AI image wrappers, REDDAI uses a multi-stage Art Director pipelin
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         REDDAI.CO                                │
+│                       REDDSTUDIO.AI                              │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │   ROUTES                                                        │
@@ -84,7 +85,7 @@ All new UI should follow the design system to maintain visual consistency.
 
 ### Backend (Python/FastAPI)
 - **Framework**: FastAPI with uvicorn
-- **Database**: SQLite with SQLAlchemy ORM
+- **Database**: PostgreSQL (prod/staging) / SQLite (local) with SQLAlchemy ORM
 - **AI Services**:
   - `gemini-3-flash-preview` - Vision analysis & prompt generation
   - `gemini-3-pro-image-preview` - Image generation
@@ -442,6 +443,282 @@ npm run dev
 - Projects: http://localhost:5173/app/projects (requires login)
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
+
+---
+
+## DEPLOYMENT RULES (READ FIRST)
+
+```
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  NEVER DEPLOY DIRECTLY TO PRODUCTION                                          ║
+║                                                                               ║
+║  ALL changes MUST go through staging first:                                   ║
+║    1. Push to develop branch                                                  ║
+║    2. Test on staging.reddstudio.ai                                           ║
+║    3. Get user approval                                                       ║
+║    4. Only then merge to main                                                 ║
+║                                                                               ║
+║  Breaking this rule risks breaking production for real users.                 ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+```
+
+**Why this matters:**
+- Production has real user data and active sessions
+- Staging has separate database - safe to break
+- Users test on staging before approving changes
+- No "hotfixes" to prod - always go through staging
+
+**Emergency exception:** Only if production is completely down AND staging is also down, you may hotfix `main` directly. Document why in the commit message.
+
+---
+
+## Deployment & Environments
+
+### Environment Overview
+
+| Environment | Frontend | Backend | Database | Branch |
+|-------------|----------|---------|----------|--------|
+| **Production** | `reddstudio.ai` | Railway (`reddstudio-backend`) | Supabase Prod PostgreSQL | `main` |
+| **Staging** | `staging.reddstudio.ai` | Railway (`reddstudio-staging-backend`) | Supabase Staging PostgreSQL | `develop` |
+| **Local** | `localhost:5173` | `localhost:8000` | SQLite | any |
+
+### Infrastructure
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      PRODUCTION                                  │
+├─────────────────────────────────────────────────────────────────┤
+│  Vercel (Frontend)          Railway (Backend)                   │
+│  ├── reddstudio.ai          ├── reddstudio-backend              │
+│  └── www.reddstudio.ai      └── PostgreSQL (Supabase Pooler)    │
+│                                                                 │
+│  Supabase (qkosgwvqczfjnkdmcumb)                                │
+│  ├── Auth (JWKS verification)                                   │
+│  ├── Storage (uploads, generated buckets)                       │
+│  └── PostgreSQL (via Supavisor pooler)                          │
+├─────────────────────────────────────────────────────────────────┤
+│                       STAGING                                    │
+├─────────────────────────────────────────────────────────────────┤
+│  Vercel (Frontend)          Railway (Backend)                   │
+│  └── staging.reddstudio.ai  └── reddstudio-staging-backend      │
+│                                                                 │
+│  Supabase (ovjexeavaaajxrmqpxle)                                │
+│  ├── Auth (separate user pool)                                  │
+│  ├── Storage (uploads, generated buckets)                       │
+│  └── PostgreSQL (via Supavisor pooler)                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Development Workflow
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Feature    │     │   Staging    │     │  Production  │
+│   Branch     │────▶│   (develop)  │────▶│    (main)    │
+└──────────────┘     └──────────────┘     └──────────────┘
+      │                    │                     │
+      │                    ▼                     ▼
+      │              Auto-deploy           Auto-deploy
+      │              to staging            to production
+      ▼
+   Local dev
+   (localhost)
+```
+
+**Workflow Steps:**
+
+```
+LOCAL DEVELOPMENT
+─────────────────
+1. Create feature branch from `develop`
+   git checkout develop && git pull
+   git checkout -b feature/my-feature
+
+2. Develop and test locally
+   npm run dev  # Runs frontend + backend
+   # Test at http://localhost:5173
+
+3. Commit and push feature branch
+   git add . && git commit -m "Add feature"
+   git push -u origin feature/my-feature
+
+STAGING (User Acceptance Testing)
+─────────────────────────────────
+4. Create PR: feature/* → develop
+   # Review code, then merge
+
+5. Auto-deploys to staging
+   # Wait ~2 min for Railway + Vercel deploy
+
+6. TEST on staging.reddstudio.ai
+   # User tests the feature
+   # Fix issues? Go back to step 2
+
+7. USER APPROVES ✓
+   # Only proceed when user confirms it works
+
+PRODUCTION RELEASE
+──────────────────
+8. Create PR: develop → main
+   # Final review
+
+9. Merge to main → Auto-deploys to production
+   # Wait ~2 min for deploy
+
+10. Verify on reddstudio.ai
+    # Confirm feature works in production
+```
+
+**Key Rule:** Never merge to `main` without user approval on staging first.
+
+### Quick Git Commands
+
+```bash
+# Start new feature
+git checkout develop && git pull
+git checkout -b feature/my-feature
+
+# Push feature for staging
+git push -u origin feature/my-feature
+# Then create PR to develop on GitHub, merge it
+# → Auto-deploys to staging.reddstudio.ai
+
+# After user approval, promote to production
+git checkout main && git pull
+git merge develop
+git push
+# → Auto-deploys to reddstudio.ai
+```
+
+### Deployment Commands
+
+**Railway CLI:**
+```bash
+# Login
+railway login
+
+# Link to project (one-time)
+railway link
+
+# Deploy manually (usually auto-deploys on git push)
+railway up -s reddstudio-backend --environment production
+
+# Check logs
+railway logs -s reddstudio-backend --environment production
+
+# Set environment variable
+railway variables set KEY=value -s reddstudio-backend --environment production
+```
+
+**Vercel CLI:**
+```bash
+# Login
+vercel login
+
+# Deploy preview (staging)
+cd frontend && vercel
+
+# Deploy production
+cd frontend && vercel --prod
+
+# Set environment variable
+vercel env add VITE_API_URL production
+```
+
+### Environment Variables by Environment
+
+**Production (Railway + Vercel):**
+```bash
+# Railway (backend)
+DATABASE_URL=postgresql://postgres.PROJECT_ID:PASSWORD@aws-1-us-east-1.pooler.supabase.com:5432/postgres
+GEMINI_API_KEY=xxx
+SUPABASE_URL=https://qkosgwvqczfjnkdmcumb.supabase.co
+SUPABASE_ANON_KEY=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx
+ALLOWED_EMAILS=robertoxma@hotmail.com  # Whitelist (empty = allow all)
+APP_ENV=production
+
+# Vercel (frontend)
+VITE_API_URL=https://reddstudio-backend-production.up.railway.app
+VITE_SUPABASE_URL=https://qkosgwvqczfjnkdmcumb.supabase.co
+VITE_SUPABASE_ANON_KEY=xxx
+```
+
+**Staging (Railway + Vercel):**
+```bash
+# Railway (backend)
+DATABASE_URL=postgresql://postgres.PROJECT_ID:PASSWORD@aws-1-us-east-1.pooler.supabase.com:5432/postgres
+GEMINI_API_KEY=xxx
+SUPABASE_URL=https://ovjexeavaaajxrmqpxle.supabase.co
+SUPABASE_ANON_KEY=xxx
+SUPABASE_SERVICE_ROLE_KEY=xxx
+ALLOWED_EMAILS=  # Empty = allow all for testing
+APP_ENV=staging
+
+# Vercel (frontend - preview environment)
+VITE_API_URL=https://reddstudio-staging-backend-staging.up.railway.app
+VITE_SUPABASE_URL=https://ovjexeavaaajxrmqpxle.supabase.co
+VITE_SUPABASE_ANON_KEY=xxx
+```
+
+### Health Check URLs
+
+```bash
+# Production
+curl https://reddstudio-backend-production.up.railway.app/health
+curl https://reddstudio-backend-production.up.railway.app/api/health  # Detailed
+
+# Staging
+curl https://reddstudio-staging-backend-staging.up.railway.app/health
+curl https://reddstudio-staging-backend-staging.up.railway.app/api/health
+```
+
+### Database Notes
+
+- **Production & Staging use PostgreSQL** via Supabase Supavisor connection pooler
+- **Local uses SQLite** for simplicity
+- SQLAlchemy handles both automatically based on `DATABASE_URL`
+- Connection pooler region must be `aws-1` (not `aws-0`) for Supabase
+
+**PostgreSQL URL format:**
+```
+postgresql://postgres.PROJECT_ID:PASSWORD@aws-1-us-east-1.pooler.supabase.com:5432/postgres
+```
+
+### Access Control (Email Whitelist)
+
+The `ALLOWED_EMAILS` environment variable restricts access:
+- **Set** (e.g., `robertoxma@hotmail.com`) → Only those emails can use the app
+- **Empty** → All authenticated users allowed
+
+Configured in `app/config.py`, enforced in `app/core/auth.py`.
+
+### DNS Configuration (Porkbun)
+
+| Type | Host | Value |
+|------|------|-------|
+| A | `@` | `76.76.21.21` (Vercel) |
+| A | `www` | `76.76.21.21` (Vercel) |
+| A | `staging` | `76.76.21.21` (Vercel) |
+
+### Troubleshooting
+
+**"Tenant or user not found" (PostgreSQL):**
+- Wrong pooler region. Change `aws-0` to `aws-1` in DATABASE_URL
+
+**"JWKS fetch failed" (Auth):**
+- Check SUPABASE_URL and SUPABASE_ANON_KEY are correct
+- Verify Supabase project is active
+
+**"Gemini API not configured" (Frontend):**
+- Vercel env vars not set. Use `vercel env add` command
+- Redeploy after adding env vars
+
+**CORS errors:**
+- Add domain to `cors_origins` in `app/config.py`
+- Redeploy backend
+
+---
 
 ## Key Files for Development
 
