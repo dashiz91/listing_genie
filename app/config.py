@@ -17,10 +17,14 @@ class Settings(BaseSettings):
     cors_origins: List[str] = [
         "http://localhost:5173",
         "http://localhost:3000",
+        # Production
         "https://reddstudio.ai",
         "https://www.reddstudio.ai",
         "https://frontend-weld-kappa-94.vercel.app",
-        "https://frontend-7sm95xxax-redds-projects-be5739a8.vercel.app",
+        # Staging
+        "https://staging.reddstudio.ai",
+        # Vercel preview deployments
+        "https://frontend-*-redds-projects-be5739a8.vercel.app",
     ]
 
     # Account lockdown - comma-separated list of allowed emails
