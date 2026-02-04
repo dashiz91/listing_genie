@@ -110,7 +110,7 @@ Return valid JSON with this structure:
         {{"image_number": 2, "image_type": "infographic_1", "headline": "Headline", "subhead": "Optional", "feature_callouts": [], "cta": null}},
         {{"image_number": 3, "image_type": "infographic_2", "headline": "Headline", "subhead": null, "feature_callouts": ["Feature 1", "Feature 2", "Feature 3"], "cta": null}},
         {{"image_number": 4, "image_type": "lifestyle", "headline": "Aspirational headline", "subhead": null, "feature_callouts": [], "cta": null}},
-        {{"image_number": 5, "image_type": "comparison", "headline": "Trust headline", "subhead": null, "feature_callouts": [], "cta": "Call to action"}}
+        {{"image_number": 5, "image_type": "comparison", "headline": "FOMO/aspiration headline that creates urgency", "subhead": null, "feature_callouts": [], "cta": "Action CTA (Amazon-compliant)"}}
       ],
       "brand_voice": "Copy tone description",
       "layout": {{
@@ -324,10 +324,12 @@ arranging, enjoying. Natural window light (~5200K). A moment they
 can imagine themselves in. Not posed. Lived.
 The viewer's unconscious thought: "I want this feeling."
 
-**IMAGE 5: PERMISSION** — "I deserve this"
-Remove the final barrier. Show value, versatility, what's included.
-Whatever transforms "I want it" into "I'm buying it."
-The viewer's unconscious thought: "I'm making a smart choice."
+**IMAGE 5: URGENCY** — "I don't want to miss this"
+Create emotional urgency. Show the transformation they're one click away from.
+What does life look like WITH this product? Make them feel the gap between
+their current life and the life they could have. Social proof that others
+are already living this upgraded reality.
+The viewer's unconscious thought: "Others have this. I need it too."
 
 ═══════════════════════════════════════════════════════════════════════════════
                               PROMPT CRAFT

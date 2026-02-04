@@ -574,108 +574,121 @@ def _build_comparison_prompt(
 ) -> str:
     primary_color, secondary_color, accent_color = _extract_colors(fw)
 
-    cta = image_copy.cta if image_copy and image_copy.cta else "Order Now"
-    headline = image_copy.headline if image_copy else "Everything You Need"
+    cta = image_copy.cta if image_copy and image_copy.cta else "Upgrade Your Life"
+    headline = image_copy.headline if image_copy else "Experience the Difference"
 
-    return f"""=== AMAZON FINAL IMAGE - COMPARISON/CLOSING IMAGE ===
+    return f"""=== AMAZON FINAL IMAGE - FOMO/CLOSING IMAGE ===
 
 PRODUCT: {session.product_title}
 
 === IMAGE PURPOSE ===
-This is Image 5 of 5 - The CLOSING IMAGE.
-Purpose: CLOSE THE SALE. This image should eliminate remaining objections
-and give the customer confidence to purchase.
-Think: The final push that converts browsers to buyers.
+This is Image 5 of 5 - The FOMO IMAGE.
+Purpose: Create EMOTIONAL URGENCY. Make them feel what they're missing.
+This isn't about logic — it's about the gap between their current life
+and the upgraded life that's one click away.
+Think: "Others are already enjoying this. Why aren't you?"
 
 === COMPOSITION OPTIONS ===
-Choose ONE of these approaches based on what would best close the sale:
+Choose ONE approach that creates the strongest FOMO for THIS product:
 
-OPTION A: MULTIPLE USE CASES
-- Show 2-4 scenarios where the product excels
-- Grid layout showing versatility
-- "Use it for X, Y, and Z" visual story
-- Demonstrates value through variety
+OPTION A: TRANSFORMATION / BEFORE-AFTER FEELING
+- Split or comparison showing the UPGRADE in life quality
+- Left: The "without" state (subtle, muted, incomplete)
+- Right: The "with" state (vibrant, complete, elevated)
+- NOT a product comparison — a LIFE comparison
+- The viewer should FEEL the gap
 
-OPTION B: PACKAGE CONTENTS / WHAT'S INCLUDED
-- Show all items that come with purchase
-- Organized flatlay or arranged display
-- Clearly shows everything customer receives
-- "You get all of this" presentation
+OPTION B: SOCIAL PROOF / "EVERYONE HAS THIS"
+- Show the product in an aspirational lifestyle context
+- Multiple instances suggesting widespread adoption
+- "Join thousands who've upgraded" visual story
+- Create the feeling of being left behind without it
+- Premium, curated, enviable presentation
 
-OPTION C: TRUST & CREDIBILITY
-- Include trust badges, certifications, awards
-- Satisfaction guarantee badges
-- Star ratings or review snippets
-- "100% Satisfaction Guaranteed" messaging
+OPTION C: THE MOMENT THEY'RE MISSING
+- Capture a specific, desirable moment the product enables
+- Golden hour lighting, perfect composition
+- The exact moment they've been dreaming about
+- Make them viscerally WANT to be in that scene
+- "This could be your life" energy
 
-OPTION D: STYLED BEAUTY SHOT
-- Premium styled product photography
-- Complementary props that elevate perception
-- Aspirational setting (marble surface, greenery, etc.)
-- Editorial magazine quality presentation
+OPTION D: CURATED LIFESTYLE FLATLAY
+- Product as centerpiece of an aspirational life
+- Surrounding items suggest taste, success, intentionality
+- "People who own this also have refined taste"
+- Premium surface (marble, wood, linen)
+- Editorial, magazine-quality presentation
 
-For this generation, create OPTION A or B (most common for Amazon).
+For this generation, create OPTION A, B, or C (strongest FOMO drivers).
 
 === VISUAL COMPOSITION ===
 
-IF MULTIPLE USE CASES (Option A):
-- 2x2 grid or triptych layout
-- Each section shows a different use case
-- Consistent styling across all sections
-- Labels for each use case (optional)
-- Product visible in each scenario
+IF TRANSFORMATION (Option A):
+- Split composition or subtle before/after
+- "Without" side: desaturated, incomplete, ordinary
+- "With" side: vibrant, complete, elevated
+- Product bridges the transformation
+- Emotional contrast is key
 
-IF PACKAGE CONTENTS (Option B):
-- Clean flatlay arrangement
-- All items organized aesthetically
-- Main product as hero, accessories around it
-- Clear labeling of each item (optional)
-- Premium presentation of what's included
+IF SOCIAL PROOF (Option B):
+- Lifestyle setting showing widespread use
+- Multiple people or contexts enjoying the product
+- Premium, aspirational environment
+- "You're missing out" energy
+- Subtle urgency without pressure
+
+IF THE MOMENT (Option C):
+- Single powerful lifestyle shot
+- Perfect lighting (golden hour, soft natural)
+- Human interaction or implied human presence
+- The exact moment they fantasize about
+- Kinfolk/Cereal magazine aesthetic
 
 === DESIGN SPECIFICATIONS ===
 COLOR PALETTE:
 - Primary: {primary_color}
 - Secondary: {secondary_color}
 - Accent: {accent_color}
-- Background: Clean, premium (subtle gradient or solid)
+- Background: Premium, aspirational (warm tones for desire)
 
 HEADLINE:
 - Text: "{headline}"
-- Position: Top or bottom of image
+- Position: Creates maximum emotional impact
 - Font: {fw.typography.headline_font}, bold
-- Color: High contrast for readability
+- Tone: Speaks to desire, not features
 
-OPTIONAL CTA:
+CTA (Amazon-Compliant):
 - Text: "{cta}"
 - Position: Bottom of image
-- Style: Button or badge format
-- Color: {accent_color} or contrasting
+- Style: Inviting, not pushy
+- NO fake urgency, NO "limited time", NO scarcity claims
 
 LAYOUT:
-- Clear visual hierarchy
-- Organized, professional grid (if applicable)
-- Product(s) prominently featured
-- Text enhances but doesn't overwhelm
+- Emotional impact over information density
+- Product is the hero of a desirable scene
+- Text enhances the feeling, doesn't explain it
+- White space creates aspiration
 
 === VISUAL ELEMENTS ===
 DO include:
-- Product shown in multiple scenarios OR complete package
-- Clear, organized layout
-- Optional headline and CTA
-- Trust elements (if applicable)
-- Premium, professional styling
+- Product in an aspirational, desirable context
+- Warm, inviting lighting
+- Human elements (hands, lifestyle, implied presence)
+- Premium styling and surfaces
+- Emotional resonance over information
 
-OPTIONAL additions:
-- Satisfaction guarantee badge
-- "What's Included" label
-- Use case labels
-- Subtle icons representing benefits
+FOMO TRIGGERS (subtle, not aggressive):
+- The life they could be living
+- The moment they're not experiencing yet
+- The upgrade others are enjoying
+- The gap between "now" and "with this product"
 
 DO NOT include:
-- Cluttered or messy layouts
-- Low-quality graphics
-- Overwhelming amount of text
-- Disconnected visual elements
+- Fake urgency ("Limited time!", "Almost gone!")
+- Misleading scarcity claims
+- Aggressive countdown timers
+- Price comparisons or discounts
+- Anything that violates Amazon ToS
 
 === BRAND ALIGNMENT ===
 Framework: {fw.framework_name}
@@ -683,36 +696,37 @@ Brand Voice: {fw.brand_voice}
 Mood: {', '.join(fw.visual_treatment.mood_keywords)}
 
 Visual Treatment:
-- Lighting: {fw.visual_treatment.lighting_style}
+- Lighting: {fw.visual_treatment.lighting_style} — warm, inviting
 - Background: {fw.visual_treatment.background_treatment}
-- Overall feel: Premium, trustworthy, compelling
+- Overall feel: Aspirational, desirable, attainable
 
-=== CLOSING PSYCHOLOGY ===
-This image should address:
-1. "Is this product versatile enough?" → Show multiple uses
-2. "What exactly do I get?" → Show package contents
-3. "Can I trust this brand?" → Include trust elements
-4. "Is this really premium?" → Styled beauty presentation
+=== FOMO PSYCHOLOGY ===
+This image should trigger:
+1. "Others are enjoying this right now" → Social proof
+2. "My life could look like this" → Aspiration gap
+3. "I don't want to miss this feeling" → Emotional urgency
+4. "This is the upgrade I've been waiting for" → Permission to desire
 
-The image should make the customer think:
-"Yes, I need this. I'm confident in this purchase."
+The viewer should think:
+"I can see myself in this picture. I WANT to be in this picture.
+Others are already there. Why am I still hesitating?"
 
 === TECHNICAL SPECIFICATIONS ===
 - 1000x1000 pixel square format
 - All text legible at 100x100px thumbnail
-- High contrast, clear visual hierarchy
-- Professional, e-commerce ready quality
+- Warm color temperature for desire
+- Professional, editorial quality
 
 === FINAL OUTPUT ===
-Generate a CLOSING/COMPARISON image that:
-- Shows multiple use cases OR package contents
-- Includes compelling headline
-- Features trust elements or premium styling
-- Maintains professional, organized layout
-- Creates confidence and urgency to purchase
+Generate a FOMO-driven closing image that:
+- Creates emotional urgency through aspiration, not pressure
+- Shows the life/moment the product enables
+- Makes the viewer FEEL what they're missing
+- Uses social proof or transformation visuals
+- Stays 100% Amazon ToS compliant (no fake urgency)
 
-This image is the FINAL impression before the customer decides to buy.
-Make it count.
+This is the image that converts "maybe later" into "add to cart."
+Make them FEEL the gap. Make them want to close it.
 """
 
 
