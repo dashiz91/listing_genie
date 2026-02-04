@@ -536,75 +536,6 @@ export const HomePage: React.FC = () => {
     }
   }, [images]);
 
-  // Handle generate all
-  const handleGenerate = useCallback(async () => {
-    if (uploads.length === 0 || !selectedFramework) return;
-
-    const primaryUpload = uploads[0];
-
-    setError(null);
-    setIsGenerating(true);
-    setGenerationStatus('processing');
-
-    try {
-      // Parse keywords
-      const keywords = formData.keywords
-        .split(',')
-        .map((k) => k.trim())
-        .filter((k) => k.length > 0)
-        .map((keyword) => ({ keyword, intents: [] }));
-
-      // Generate
-      const response = await apiClient.generateWithFramework(
-        {
-          product_title: formData.productTitle,
-          feature_1: formData.feature1 || undefined,
-          feature_2: formData.feature2 || undefined,
-          feature_3: formData.feature3 || undefined,
-          target_audience: formData.targetAudience || undefined,
-          keywords,
-          upload_path: primaryUpload.file_path,
-          additional_upload_paths: uploads.slice(1).map((u) => u.file_path),
-          brand_name: formData.brandName || undefined,
-          brand_colors: formData.brandColors,
-          logo_path: logoPath || undefined,
-          style_reference_path: (useOriginalStyleRef && originalStyleRefPath) ? originalStyleRefPath : (selectedFramework.preview_path || undefined),
-          // Track original style ref separately for project restoration
-          original_style_reference_path: originalStyleRefPath || undefined,
-          global_note: formData.globalNote || undefined,
-        },
-        selectedFramework,
-        productAnalysisRaw || undefined,
-        undefined, // singleImageType
-        undefined, // createOnly
-        formData.imageModel // imageModel
-      );
-
-      updateSessionId(response.session_id);
-      setGenerationStatus(response.status);
-      // Persist session to URL for refresh resilience
-      setSearchParams({ session: response.session_id }, { replace: true });
-
-      // Convert to SessionImage format
-      const sessionImages: SessionImage[] = response.images.map((img) => ({
-        type: img.image_type,
-        status: img.status,
-        label: getImageLabel(img.image_type),
-        url: img.storage_path,
-        error: img.error_message,
-      }));
-      setImages(sessionImages);
-
-      if (response.status === 'complete' || response.status === 'partial') {
-        setIsGenerating(false);
-      }
-    } catch (err: any) {
-      console.error('Generation failed:', err);
-      setError(extractErrorMessage(err, 'Failed to generate images. Please try again.'));
-      setIsGenerating(false);
-    }
-  }, [uploads, formData, selectedFramework, logoPath, productAnalysisRaw, useOriginalStyleRef, originalStyleRefPath, setSearchParams]);
-
   // Helper: ensure a session exists (fast — create_only, no image generation)
   // Uses a mutex (ref) to prevent duplicate session creation when multiple slots are clicked concurrently
   const ensureSession = useCallback(async (): Promise<string> => {
@@ -743,6 +674,42 @@ export const HomePage: React.FC = () => {
     },
     [uploads, selectedFramework, ensureSession, formData.imageModel]
   );
+
+  // Generate all 5 images - triggers 5 individual generations (same code path as clicking slots)
+  const handleGenerate = useCallback(async () => {
+    if (uploads.length === 0 || !selectedFramework) return;
+
+    setError(null);
+    setIsGenerating(true);
+    setGenerationStatus('processing');
+
+    // Initialize all 5 images as pending (will be set to processing by handleGenerateSingle)
+    setImages([
+      { type: 'main', status: 'pending', label: 'Main Image' },
+      { type: 'infographic_1', status: 'pending', label: 'Infographic 1' },
+      { type: 'infographic_2', status: 'pending', label: 'Infographic 2' },
+      { type: 'lifestyle', status: 'pending', label: 'Lifestyle' },
+      { type: 'comparison', status: 'pending', label: 'Comparison' },
+    ]);
+
+    // Fire all 5 generations concurrently (same as clicking all 5 slots)
+    // handleGenerateSingle will handle session creation via ensureSession (with mutex)
+    const imageTypes = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'comparison'];
+
+    // Wait for all to complete (but they run concurrently)
+    const results = await Promise.allSettled(
+      imageTypes.map((type) => handleGenerateSingle(type))
+    );
+
+    // Check if any failed
+    const anyFailed = results.some((r) => r.status === 'rejected');
+    if (anyFailed) {
+      setGenerationStatus('partial');
+    } else {
+      setGenerationStatus('complete');
+    }
+    setIsGenerating(false);
+  }, [uploads, selectedFramework, handleGenerateSingle]);
 
   // Handle retry
   const handleRetry = useCallback(async () => {
