@@ -1,17 +1,18 @@
 """
-A+ Content Module Prompt Templates - Principle-Based Creative Direction
+A+ Content Module Prompt Templates - Emotional Storytelling
 
 These templates power the Art Director visual script system for generating
-Premium A+ Content images. Uses the same vocabulary triggers and product
-protection philosophy as listing images for consistent quality.
+Premium A+ Content images. Uses the same emotional storytelling approach
+as listing images — making viewers FEEL, not just understand.
 
-Philosophy: Great A+ content feels like one seamless scroll — a visual story
-that pulls the customer deeper into the brand world with every banner.
+Philosophy: Great A+ content is a visual journey that deepens the emotional
+connection established by the listing images. Each banner pulls the customer
+deeper into desire until buying feels inevitable.
 """
 import json
 from typing import Optional
 
-from ..vocabulary import get_aplus_quality_standard
+from ..vocabulary import get_aplus_quality_standard, get_storytelling_standard, EMOTIONAL_ARC
 from ..product_protection import PRODUCT_PROTECTION_DIRECTIVE
 
 
@@ -22,12 +23,12 @@ from ..product_protection import PRODUCT_PROTECTION_DIRECTIVE
 APLUS_FULL_IMAGE_BASE = """Sotheby's catalog. Campaign imagery. Cinematic.
 
 You're creating a premium A+ Content banner for {product_title}.
-Brand "{brand_name}" needs a wide frame that stops the scroll.
+Brand "{brand_name}" needs a wide frame that makes them FEEL something.
 
-The audience — {target_audience} — should feel something instantly.
-This isn't a product photo. This is a brand moment.
+The audience — {target_audience} — should feel drawn in instantly.
+This isn't a product photo. This is a moment they want to live in.
 
-PRODUCT DNA:
+Don't show features. Show the FEELING of owning this:
 {features}
 
 CREATIVE DIRECTION ({framework_name}):
@@ -41,6 +42,12 @@ Use the product reference photos to capture the REAL product — its materials,
 proportions, colors, and character. Never invent a different product.
 Brand colors live in atmosphere — lighting, surfaces, gradients.
 Never flat graphic overlays. Never touching the product itself.
+
+CREATE FEELING, NOT INFORMATION:
+- Don't describe what the product IS
+- Show what life FEELS LIKE with it
+- Create a scene they want to step into
+- Make them imagine reaching for it
 
 FORMAT:
 Wide cinematic banner (2.4:1). Editorial, not catalog.
@@ -60,19 +67,19 @@ Both banners are one continuous canvas split in two.
 """
 
 APLUS_FULL_IMAGE_FIRST = APLUS_FULL_IMAGE_BASE + """
-OPENING MOVE:
-First thing they see in your A+ section. Design with downward momentum.
-Gradients pulling south, surfaces receding, light inviting further scroll.
-Plant visual seeds that modules below will grow.
+OPENING MOVE — AWE:
+First thing they see in your A+ section. Create immediate impact.
+The viewer should think: "Wow, this is beautiful."
+Design with downward momentum — draw them deeper into the story.
 """
 
 APLUS_FULL_IMAGE_CHAINED = APLUS_FULL_IMAGE_BASE + APLUS_CONTINUITY_ADDITION
 
 APLUS_FULL_IMAGE_LAST = APLUS_FULL_IMAGE_BASE + APLUS_CONTINUITY_ADDITION + """
-CLOSING FRAME:
-Final banner. Visual story resolves. Background settles.
-Gradients reach destination, compositions find rest.
-Customer feels: "I've seen enough. I want this."
+CLOSING FRAME — CERTAINTY:
+Final banner. The emotional journey resolves.
+Customer feels: "I've seen enough. I want this. I'm ready."
+No more questions. Just quiet confidence in their choice.
 """
 
 
@@ -127,9 +134,9 @@ def get_aplus_prompt(
 # ============================================================================
 
 VISUAL_SCRIPT_PROMPT = """You are an Art Director at a top-tier agency. Samsung, Dyson, Apple, Glossier, Aesop.
-Today: Amazon Premium A+ Content — {module_count} full-width banners (1464×600) stacking into one editorial scroll.
+Today: Amazon Premium A+ Content — {module_count} full-width banners (1464×600) stacking into one emotional journey.
 
-Sotheby's catalog quality. Campaign imagery standards.
+Campaign imagery standards. But more importantly: FEELING first.
 
 THE PRODUCT:
 - {product_title}
@@ -149,6 +156,25 @@ Study the attached product photos. Notice materials, finish, scale, color.
 Your script must reflect the REAL product, not an imagined one.
 
 ═══════════════════════════════════════════════════════════════════════════════
+                    THE EMOTIONAL JOURNEY — NOT INFORMATION
+═══════════════════════════════════════════════════════════════════════════════
+
+By the time they reach A+ Content, they've seen the listing images.
+They're already INTERESTED. Now deepen that into DESIRE.
+
+Each module should make them FEEL something:
+- Not "4,900 mAh battery" → "A full day without worrying about power"
+- Not "Premium ceramic" → "The kind of object you reach for every morning"
+- Not "Modern design" → "Understated confidence on your shelf"
+
+THE EMOTIONAL ARC FOR A+:
+- Modules 0+1 (Hero): AWE — "Wow, this is beautiful"
+- Module 2: INTRIGUE — "Tell me more about this"
+- Module 3: TRUST — "I can see the quality"
+- Module 4: BELONGING — "This fits my life"
+- Module 5: CERTAINTY — "I'm ready to buy"
+
+═══════════════════════════════════════════════════════════════════════════════
                          THE EDITORIAL DESIGN SYSTEM
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -158,14 +184,19 @@ Modules 0+1 = HERO PAIR. ONE continuous image split in half.
 Product DRAMATICALLY LARGE, filling full height of both modules combined.
 Module 0: Top portion (50-60% of product visible, cropped at bottom).
 Module 1: Reveals the rest + brand/product name as text.
-Together: "wow" moment like Samsung's Galaxy hero banners.
+Together: "wow" moment — not information, pure visual impact.
 
 Modules 2-5 = INDEPENDENT editorial compositions. Each one:
-- SHORT PUNCHY HEADLINE (2-5 words) — "Big. Bright. Smooth."
-- Supporting body copy (1-2 sentences)
-- Optional spec callouts (large numbers + units)
+- SHORT EVOCATIVE HEADLINE (2-5 words) — feeling, not feature
+- Supporting body copy that creates DESIRE, not description
+- Optional spec callouts (only if they feel impressive, not just informative)
 - Product from a DIFFERENT angle each time
 - Clean background (solid or subtle gradient — NOT busy scenes)
+
+HEADLINE EXAMPLES:
+- WRONG: "Water-Tight Interior" → RIGHT: "Every Morning, Fresh"
+- WRONG: "Premium Ceramic Material" → RIGHT: "Made to Last"
+- WRONG: "8 inches tall" → RIGHT: "A Quiet Presence"
 
 BACKGROUND RHYTHM — Alternate using ONLY framework palette colors:
 - Modules 0+1 (hero): Framework primary color
@@ -185,33 +216,46 @@ LAYOUT ALTERNATION — Ping-pong composition:
 
 PRODUCT ANGLE PROGRESSION:
 - Modules 0+1: Dramatic tilt, close-up, HUGE
-- Module 2: 3/4 angle, feature callouts
-- Module 3: Front-facing or detail close-up
-- Module 4: Multiple angles or product in context
-- Module 5: Lifestyle/ecosystem or final beauty angle
+- Module 2: 3/4 angle, inviting exploration
+- Module 3: Detail close-up, reveals craft
+- Module 4: In context, shows belonging
+- Module 5: Final beauty shot, confident
 
-MODULE ROLES (pick best for THIS audience):
-- "hero_reveal": Dramatic intro (always modules 0+1)
-- "feature_specs": Technical callouts — "What am I getting?"
-- "craftsmanship": Close-up details — "Is this well-made?"
-- "lifestyle_context": Real environment — "Will this fit my life?"
-- "versatility": Multiple uses — "Is it flexible?"
-- "comparison": Before/after — "Why not the cheaper one?"
-- "social_proof": Awards, certifications — "Do others trust this?"
-- "ecosystem": Related products — "What else should I get?"
+MODULE EMOTIONAL ROLES (pick best for THIS audience):
+- "hero_reveal": Pure visual impact — "Wow" (always modules 0+1)
+- "intrigue": Draw them deeper — "Tell me more"
+- "trust": Prove quality through craft — "This is well-made"
+- "belonging": Show their life with it — "This fits me"
+- "desire": Create longing — "I want this feeling"
+- "certainty": Remove doubt — "I'm ready to buy"
 
 ═══════════════════════════════════════════════════════════════════════════════
-                         TYPOGRAPHY IN THE IMAGE
+                         TYPOGRAPHY — WORDS THAT FEEL
 ═══════════════════════════════════════════════════════════════════════════════
 
 HERO PAIR (modules 0+1):
-- Module 0: NO text. Pure dramatic product photography.
-- Module 1: Brand name (smaller) + Product name (large, bold).
+- Module 0: NO text. Pure visual impact. Let the product speak.
+- Module 1: Brand name (smaller) + Product name (large, bold). Nothing else.
 
 FEATURE MODULES (2-5):
-- HEADLINE: 2-5 words, BOLD, large. "Big. Bright. Smooth."
-- BODY COPY: 1-2 sentences, smaller, lighter weight.
-- SPEC CALLOUTS: Large numbers + small units. "4,900 mAh"
+- HEADLINE: 2-5 words that create FEELING, not describe features
+- BODY COPY: 1-2 sentences that paint a moment, not list specs
+- SPEC CALLOUTS: Only if impressive — "4,900 mAh" with "All-day confidence"
+
+COPYWRITING RULES:
+- Headlines should feel like a whisper, not a shout
+- Body copy should create a scene, not explain a feature
+- Every word should make them want the product MORE
+
+WRONG COPY:
+- "Water-Tight Interior"
+- "Premium ceramic material ensures durability"
+- "Perfect for fresh flowers"
+
+RIGHT COPY:
+- "Every Morning, Fresh"
+- "The quiet ritual of arranging flowers in something beautiful"
+- (No feature explanation needed — the image shows it)
 
 Typography uses framework fonts. Headlines bold, body regular.
 Keep text to ONE SIDE — never scatter across image.
@@ -256,22 +300,26 @@ Your prompts MUST reference PRODUCT_PHOTO and STYLE_REFERENCE by name.
 
 Respond with ONLY valid JSON:
 {{
-  "narrative_theme": "Single sentence capturing the visual story",
+  "narrative_theme": "Single sentence capturing the EMOTIONAL journey",
   "color_flow": "How palette evolves — which module gets which color",
   "background_strategy": "Rhythm pattern",
-  "hero_pair_prompt": "COMPLETE 200-350 word prompt for tall 4:3 hero image",
+  "hero_pair_prompt": "COMPLETE 200-350 word prompt for tall 4:3 hero image — FEELING first",
   "modules": [
     {{
       "index": 0,
       "role": "hero_reveal",
+      "emotional_beat": "awe",
+      "viewer_thought": "Wow, this is beautiful",
       "headline": "NO TEXT",
       "mood": "Feeling this evokes",
-      "scene_description": "50-100 words: top half",
+      "scene_description": "50-100 words: top half — describe the FEELING, not just visuals",
       "render_text": null
     }},
     {{
       "index": 1,
       "role": "hero_reveal",
+      "emotional_beat": "awe",
+      "viewer_thought": "I want to know more",
       "headline": "Brand + Product Name",
       "mood": "Feeling",
       "scene_description": "50-100 words: bottom half",
@@ -279,36 +327,38 @@ Respond with ONLY valid JSON:
     }},
     {{
       "index": 2,
-      "role": "feature_specs | craftsmanship | etc.",
+      "role": "intrigue | trust | belonging | desire | certainty",
+      "emotional_beat": "intrigue",
+      "viewer_thought": "What the viewer unconsciously thinks",
       "mood": "...",
       "scene_description": "OPTIONAL — only for continuity",
-      "render_text": {{"headline": "2-5 words", "body_copy": "1-2 sentences", "spec_callouts": [], "text_position": "left or right"}},
-      "generation_prompt": "COMPLETE 200-350 word prompt..."
+      "render_text": {{"headline": "2-5 evocative words", "body_copy": "1-2 sentences that create a scene", "spec_callouts": [], "text_position": "left or right"}},
+      "generation_prompt": "COMPLETE 200-350 word prompt — FEELING first, then visuals..."
     }}
   ]
 }}
 
-Generate exactly {module_count} modules. Each earns its place — no filler.
+Generate exactly {module_count} modules. Each creates FEELING — no filler, no feature lists.
 """
 
 
 APLUS_MODULE_WITH_SCRIPT = """Sotheby's catalog. Campaign imagery. Cinematic.
 
 You're executing a premium A+ banner for {product_title}.
-The Art Director scripted the entire section as one continuous visual world.
-Bring THIS frame to life — faithful to the script, with craft and instinct.
+The Art Director scripted the entire section as one EMOTIONAL JOURNEY.
+Bring THIS frame to life — faithful to the feeling, with craft and instinct.
 
 PRODUCT:
 - Brand: {brand_name}
-- What matters: {features}
-- Audience: {target_audience}
+- What creates desire: {features}
+- Who dreams of this: {target_audience}
 
 VISUAL IDENTITY ({framework_name}):
 {design_philosophy}
 Anchor color: {primary_color} | Palette: {color_palette}
 Mood: {framework_mood}
 
-THE ART DIRECTOR'S VISION:
+THE ART DIRECTOR'S EMOTIONAL VISION:
 "{narrative_theme}"
 Color journey: {color_flow}
 Background world: {background_strategy}
@@ -319,8 +369,8 @@ Headline: "{module_headline}"
 Product treatment: {module_product_angle}
 Background: {module_background}
 Visual elements: {module_elements}
-Emotional beat: {module_mood}
-Story purpose: {module_content_focus}
+THE FEELING: {module_mood}
+What the viewer thinks: {module_content_focus}
 
 EDGE CONTRACTS:
 - Top edge resolves to: {top_edge}
@@ -329,8 +379,13 @@ EDGE CONTRACTS:
 POSITION: {module_position}
 {position_instruction}
 
+FEELING FIRST:
+- Don't just show the product — create a moment they want to live in
+- Every element should deepen desire, not deliver information
+- The viewer should FEEL something, not just understand something
+- Wide format (2.4:1) — cinematic, not catalog
+
 CRAFT NOTES:
-- Wide format (2.4:1) — cinematic, not square
 - Use product reference for REAL product. Honor materials and proportions.
 - Style reference = visual direction. Match mood, lighting, sophistication.
 - Brand colors in scene naturally — lighting, surfaces, atmosphere
@@ -357,11 +412,16 @@ CANVAS_INPAINTING_PROMPT = """CANVAS_TO_COMPLETE is split in two:
 YOUR TASK: Replace bottom green half with new content. ONE seamless photograph.
 Bottom half should show: {current_scene_description}
 
+EMOTIONAL CONTINUITY:
+The previous module created a feeling. Continue that feeling while deepening it.
+The viewer shouldn't notice a transition — just a continuous journey of desire.
+
 RULES:
 - Keep top half intact — do NOT change it
 - Replace ONLY the bottom green half
 - Transition must be seamless — ONE continuous image, no visible seam
 - Same lighting direction, perspective, surfaces continuing
+- Same EMOTIONAL temperature — don't jar them out of the feeling
 - Use PRODUCT_PHOTO for real product reference
 - Use STYLE_REFERENCE for visual style and mood
 """
@@ -369,6 +429,9 @@ RULES:
 
 HERO_PAIR_PROMPT = """Generate ONE single tall portrait photograph — NOT two separate panels.
 This image will later be cropped into two halves. Must look like one seamless photo top to bottom.
+
+THE GOAL: Create immediate AWE. The viewer's first thought should be "Wow."
+Not "What is this?" or "What are the features?" Just: "Wow, this is beautiful."
 
 CRITICAL: Do NOT compose as "top section" and "bottom section."
 Think: ONE tall editorial magazine photograph that happens to be cropped later.
@@ -381,6 +444,12 @@ REFERENCE IMAGES:
 ═══ ART DIRECTOR'S CREATIVE BRIEF ═══
 
 {hero_pair_brief}
+
+═══ EMOTIONAL IMPACT (NON-NEGOTIABLE) ═══
+- This is the FIRST thing they see in A+ content
+- After listing images, they're interested — now make them DESIRE
+- Pure visual impact. No information needed.
+- Create the "wow" moment that pulls them deeper into the story
 
 ═══ COMPOSITION RULES (NON-NEGOTIABLE) ═══
 - ONE continuous photograph, NOT two stacked panels
@@ -513,33 +582,37 @@ def build_aplus_module_prompt(
 
     mod = modules[module_index]
 
-    # Position instructions
+    # Position instructions with emotional context
     if module_index == 0:
         position_instruction = (
-            "Opening frame. Design with downward momentum — eye should want to scroll. "
-            "Plant visual seeds that pay off in later modules."
+            "Opening frame — AWE. Create immediate visual impact. "
+            "The viewer should think: 'Wow, this is beautiful.' "
+            "Plant the emotional seed that grows through all modules."
         )
         module_position = "FIRST (the opening)"
     elif module_index == module_count - 1:
         position_instruction = (
-            "Closing frame. Visual story resolves — gradients settle, compositions rest, "
-            "customer feels confident and ready to buy."
+            "Closing frame — CERTAINTY. The emotional journey resolves. "
+            "Customer feels confident and ready to buy. No more questions. "
+            "Just quiet certainty: 'I want this. I'm ready.'"
         )
         module_position = "LAST (the close)"
     else:
         position_instruction = (
-            "Middle frame. Seamlessly receive flow from above, pass it below. "
-            "Deepen the story — reveal something new."
+            "Middle frame. Deepen the desire they already feel. "
+            "Don't inform — intensify. Each module should make them want it MORE."
         )
         module_position = f"{module_index + 1} of {module_count} (middle)"
 
-    # Continuity instruction
+    # Continuity instruction with emotional context
     if is_chained and module_index > 0:
         continuity_instruction = (
             "CONTINUITY NON-NEGOTIABLE:\n"
             "Reference image = banner above. Look at its BOTTOM EDGE — exact colors, gradient, lighting. "
             "Your TOP EDGE starts with those same colors, then transitions into your background. "
-            "Top 20% of your image = natural extension of previous banner."
+            "Top 20% of your image = natural extension of previous banner.\n\n"
+            "EMOTIONAL CONTINUITY: The previous module created a feeling. "
+            "Continue that feeling while deepening it. Don't jar them out of the desire."
         )
     else:
         continuity_instruction = ""

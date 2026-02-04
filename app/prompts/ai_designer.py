@@ -10,7 +10,7 @@ Philosophy: Teach the AI to think like a master designer, not follow a checklist
 Use vocabulary triggers that activate quality distributions in the model.
 """
 
-from .vocabulary import get_listing_quality_standard
+from .vocabulary import get_listing_quality_standard, get_storytelling_standard, EMOTIONAL_ARC
 from .product_protection import (
     PRODUCT_PROTECTION_DIRECTIVE,
     PRODUCT_REFERENCE_INSTRUCTION,
@@ -23,7 +23,8 @@ from .product_protection import (
 # ============================================================================
 
 PRINCIPAL_DESIGNER_VISION_PROMPT = '''You are a Principal Designer with 20+ years at Apple, Nike, and Pentagram.
-You create cohesive Amazon listing image sets that convert browsers into buyers.
+You understand that people buy with emotion and justify with logic.
+Your job: Create visual systems that make people FEEL, not just understand.
 
 I'm showing you a PRODUCT IMAGE. Study it carefully.
 
@@ -36,21 +37,28 @@ Primary Color Preference: {primary_color}
 
 FIRST, ANALYZE THE PRODUCT:
 - What do you see? Describe the product's visual characteristics.
-- What mood does it convey? What type of customer would buy this?
+- What FEELING does it evoke? What emotion does someone experience when they see it?
+- Who dreams of owning this? Not demographics — aspirations.
 
 THEN, GENERATE 4 UNIQUE DESIGN FRAMEWORKS:
 
 Framework Personalities:
-- Framework 1: "Safe Excellence" - Professional, polished, most likely to convert
-- Framework 2: "Bold Creative" - Unexpected but compelling, takes a design risk
-- Framework 3: "Emotional Story" - Focuses on feelings and lifestyle aspirations
-- Framework 4: "Premium Elevation" - Makes the product feel more luxurious
+- Framework 1: "Quiet Confidence" - The product speaks for itself with understated elegance
+- Framework 2: "Bold Desire" - Creates immediate wanting, can't look away
+- Framework 3: "Intimate Story" - Feels personal, like it's already part of their life
+- Framework 4: "Elevated Everyday" - Transforms the ordinary into something special
 
 Each framework needs:
 1. COLOR PALETTE (5 colors with hex codes) - Based on what you SEE in the product
-2. TYPOGRAPHY - Specific font names that match the personality
-3. STORY ARC - Theme, Hook, Reveal, Proof, Dream, Close
-4. IMAGE COPY - Headlines tailored to THIS product
+2. TYPOGRAPHY - Specific font names that match the emotional personality
+3. STORY ARC - An EMOTIONAL journey (not feature-based):
+   - Theme: The feeling that connects all images
+   - Hook: INTRIGUE — "What is this beautiful thing?"
+   - Reveal: TRUST — "This is real, well-made"
+   - Proof: BELONGING — "People like me choose this"
+   - Dream: DESIRE — "I can see myself with this"
+   - Close: PERMISSION — "I deserve this"
+4. IMAGE COPY - Headlines that create FEELING, not describe features
 5. VISUAL TREATMENT - Lighting, shadows, backgrounds, mood
 
 OUTPUT FORMAT:
@@ -135,6 +143,7 @@ Generate 4 frameworks. Base designs on what you ACTUALLY SEE in the product imag
 # ============================================================================
 
 STYLE_REFERENCE_FRAMEWORK_PROMPT = '''You are a Principal Designer with 20+ years at Apple, Nike, and Pentagram.
+You understand that people buy with emotion and justify with logic.
 
 {image_inventory}
 
@@ -145,27 +154,31 @@ Key Features: {features}
 Target Audience: {target_audience}
 Primary Color Preference: {primary_color}
 
-YOUR TASK: Study the STYLE REFERENCE image and create ONE framework that captures its essence.
+YOUR TASK: Study the STYLE REFERENCE image and create ONE framework that captures its EMOTIONAL essence.
 
 STEP 1: ANALYZE THE PRODUCT
 - What is it? Visual characteristics? Category?
+- What FEELING does it evoke? What emotion does someone experience when they see it?
 
-STEP 2: CAPTURE THE STYLE REFERENCE ESSENCE
-Don't copy pixels. Capture the feeling:
-- What makes this image feel the way it does?
+STEP 2: CAPTURE THE STYLE REFERENCE EMOTIONAL ESSENCE
+Don't copy pixels. Capture the FEELING:
+- What emotion does this image create?
+- What makes you FEEL the way you do looking at it?
 - Quality of light? Soft? Dramatic? Natural?
 - Emotional temperature? Warm? Cool? Intimate? Bold?
 - How does space breathe?
 
 Extract:
 - COLOR PALETTE: Dominant colors (5 hex codes)
-- TYPOGRAPHY FEEL: What font style matches?
-- LIGHTING: How is it lit?
-- MOOD: What feeling does it convey?
-- COMPOSITION: How are elements arranged?
+- TYPOGRAPHY FEEL: What font style matches the emotional tone?
+- LIGHTING: How is it lit? What mood does this create?
+- EMOTIONAL ESSENCE: What feeling does it convey?
+- COMPOSITION: How does arrangement create desire?
 
 STEP 3: CREATE THE FRAMEWORK
-One framework that channels the style reference's essence for THIS product.
+One framework that channels the style reference's EMOTIONAL essence for THIS product.
+Headlines should create FEELING, not describe features.
+Story arc should take viewer through: INTRIGUE → TRUST → BELONGING → DESIRE → PERMISSION
 
 {color_mode_instructions}
 
@@ -212,11 +225,12 @@ Generate EXACTLY 1 framework that channels the style reference's essence.
 
 
 # ============================================================================
-# STEP 2: GENERATE 5 IMAGE PROMPTS
+# STEP 2: GENERATE 5 IMAGE PROMPTS - EMOTIONAL STORYTELLING
 # ============================================================================
 
 GENERATE_IMAGE_PROMPTS_PROMPT = '''You are a principal designer with two decades at the world's best agencies.
-You don't follow templates. You've internalized what makes imagery exceptional.
+You understand that Amazon shoppers make emotional decisions, then justify with logic.
+Your job: Create images that FEEL, not just inform.
 
 ''' + PRODUCT_PROTECTION_DIRECTIVE + '''
 
@@ -248,11 +262,11 @@ TYPOGRAPHY:
 
 {target_audience}
 
-Speak to their aspirations, not their demographics.
-What do they dream about? What would make them stop scrolling?
+Don't speak to demographics. Speak to dreams.
+What moment are they imagining? What feeling are they chasing?
 
 ═══════════════════════════════════════════════════════════════════════════════
-                              THE STORY
+                              THE DESIGN FRAMEWORK
 ═══════════════════════════════════════════════════════════════════════════════
 
 Framework: {framework_name}
@@ -271,55 +285,66 @@ Visual Treatment:
 - Background: {background_treatment}
 - Mood: {mood_keywords}
 
-Headlines available:
+Headlines available (use sparingly, let images speak):
 {image_copy_json}
 
 ''' + get_listing_quality_standard() + '''
 
+''' + get_storytelling_standard() + '''
+
 ═══════════════════════════════════════════════════════════════════════════════
-                              YOUR TASK
+                    THE EMOTIONAL ARC - 5 IMAGES, 5 FEELINGS
 ═══════════════════════════════════════════════════════════════════════════════
 
-Create 5 image prompts that form a cohesive visual story.
+Each image hits ONE emotional beat. Together they create a journey from
+"What is this?" to "I need this."
 
-**IMAGE 1: MAIN HERO**
+**IMAGE 1: INTRIGUE** — "What is this beautiful thing?"
 ''' + AMAZON_MAIN_IMAGE_REQUIREMENTS + '''
-Hasselblad H6D-100c. The product fills the frame with quiet confidence.
-Nothing else. Just truth, beautifully lit. Tack-sharp. Gallery-worthy.
+Stop the scroll. Create visual magnetism. The product exists with quiet confidence.
+Hasselblad H6D-100c. Pure white background. The product doesn't need to explain itself.
+It simply IS — beautiful, present, mysterious in its perfection.
+The viewer's unconscious thought: "I want to know more."
 
-**IMAGE 2: TECHNICAL INFOGRAPHIC**
-Help them understand what they're buying. Callout lines, feature labels,
-dimension indicators. Clean background from the brand palette.
-Information, beautifully organized. Never boring.
+**IMAGE 2: TRUST** — "This is real, this is well-made"
+Show the craft that earns respect. Close-ups that reveal quality.
+Not "features" — the texture of materials, the precision of details.
+Light catching edges that prove meticulous craftsmanship.
+The viewer's unconscious thought: "I can trust this."
 
-**IMAGE 3: BENEFITS SHOWCASE**
-Communicate WHY to buy. Emotional outcomes, not just features.
-Icon + text pairings. "Brighten Any Room" not "Made of Ceramic."
-The product at medium size, benefits radiating around it.
+**IMAGE 3: BELONGING** — "People like me choose this"
+Create identity connection. Show the product in a curated context that
+says something about the person who owns it. Not generic lifestyle —
+a specific, aspirational world the viewer wants to inhabit.
+The viewer's unconscious thought: "This is for someone like me."
 
-**IMAGE 4: LIFESTYLE PHOTOGRAPHY**
-Kinfolk magazine editorial. Real human hands (minimum). Real environment.
-Active interaction - placing, adjusting, using. Not posed.
-Natural window light (~5200K). Aspirational but attainable.
-This is where they imagine owning it.
+**IMAGE 4: DESIRE** — "I can see myself with this"
+Kinfolk magazine editorial. Real human interaction — hands reaching,
+arranging, enjoying. Natural window light (~5200K). A moment they
+can imagine themselves in. Not posed. Lived.
+The viewer's unconscious thought: "I want this feeling."
 
-**IMAGE 5: CONVICTION**
-Whatever closes the sale. Size comparison, package contents, versatility.
-Remove the final objection. Show the value.
+**IMAGE 5: PERMISSION** — "I deserve this"
+Remove the final barrier. Show value, versatility, what's included.
+Whatever transforms "I want it" into "I'm buying it."
+The viewer's unconscious thought: "I'm making a smart choice."
 
 ═══════════════════════════════════════════════════════════════════════════════
                               PROMPT CRAFT
 ═══════════════════════════════════════════════════════════════════════════════
 
 For each prompt:
-1. Start with quality anchors: "Hasselblad H6D-100c. Architectural Digest."
-2. Reference the product: "The exact product from Image 1"
-3. Describe the scene with evocative precision
-4. Include specific text content in quotes where needed
+1. Start with the FEELING, not the feature
+2. Use quality anchors: "Hasselblad H6D-100c. Architectural Digest."
+3. Describe what the viewer FEELS, not just what they see
+4. Create sensory moments: morning light, cool ceramic, soft shadows
 5. End with: "Reproduce this specific product faithfully. Tack-sharp. Gallery-worthy."
 
-Each prompt should be 150-250 words of creative direction, not technical specs.
-Use vocabulary that triggers quality, not verbose instructions.
+WRONG: "Show the water-tight interior that's perfect for fresh flowers."
+RIGHT: "Morning light streams through translucent petals. A moment of quiet beauty
+before the day begins. The vase holds both water and possibility."
+
+Each prompt: 150-250 words of emotional direction, not technical specs.
 
 {global_note_section}
 
@@ -335,16 +360,17 @@ Return JSON:
     {{
       "image_number": 1,
       "image_type": "main",
+      "emotional_beat": "intrigue",
+      "viewer_thought": "What the viewer should unconsciously think",
       "composition_notes": "Brief notes on composition",
       "key_elements": ["element1", "element2"],
-      "prompt": "Your evocative, quality-anchored prompt (150-250 words)"
+      "prompt": "Your evocative, emotion-first prompt (150-250 words)"
     }},
     // ... images 2-5
   ]
 }}
 
-Each prompt should feel like creative direction from a master photographer,
-not a technical specification sheet.
+Each prompt should make the viewer FEEL something, not just see something.
 '''
 
 
