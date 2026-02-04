@@ -37,10 +37,7 @@ def _get_image_url(relative_path: str) -> str:
     Uses backend_url setting if configured, otherwise returns relative path.
     """
     if settings.backend_url:
-        result = f"{settings.backend_url.rstrip('/')}{relative_path}"
-        logger.info(f"[URL DEBUG] backend_url='{settings.backend_url}' + relative='{relative_path}' => '{result}'")
-        return result
-    logger.info(f"[URL DEBUG] No backend_url, returning relative: '{relative_path}'")
+        return f"{settings.backend_url.rstrip('/')}{relative_path}"
     return relative_path
 from app.services.canvas_compositor import CanvasCompositor
 from app.models.database import (
