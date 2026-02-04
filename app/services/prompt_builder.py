@@ -50,7 +50,8 @@ def build_framework_prompt(
         ImageTypeEnum.INFOGRAPHIC_1: 2,
         ImageTypeEnum.INFOGRAPHIC_2: 3,
         ImageTypeEnum.LIFESTYLE: 4,
-        ImageTypeEnum.COMPARISON: 5,
+        ImageTypeEnum.TRANSFORMATION: 5,
+        ImageTypeEnum.COMPARISON: 6,
     }
     image_num = image_type_map.get(image_type, 1)
 
@@ -567,6 +568,191 @@ It sells the EXPERIENCE, not just the item.
 """
 
 
+def _build_transformation_prompt(
+    session: GenerationSession,
+    fw: DesignFramework,
+    image_copy=None,
+) -> str:
+    """
+    Build the TRANSFORMATION image prompt (Image 5 of 6).
+
+    Based on StoryBrand + JTBD: The customer is the HERO on a journey.
+    This image shows their transformation - the before/after of their LIFE STATE.
+    Not a product comparison, but a LIFE comparison.
+    """
+    primary_color, secondary_color, accent_color = _extract_colors(fw)
+
+    headline = image_copy.headline if image_copy else "Your Life, Upgraded"
+
+    return f"""=== AMAZON TRANSFORMATION IMAGE - THE HERO'S JOURNEY ===
+
+PRODUCT: {session.product_title}
+
+=== THE FRAMEWORK ===
+This image is built on three principles from the world's greatest business thinkers:
+
+1. JOBS TO BE DONE (Clayton Christensen):
+   The customer isn't buying a product. They're "hiring" it to do a JOB.
+   What job is {session.product_title} hired to do? Show the JOB GETTING DONE.
+
+2. STORYBRAND (Donald Miller):
+   The customer is the HERO, not your product. Your product is the GUIDE.
+   Show the hero's transformation — who they BECOME with this product.
+
+3. SYSTEM 1 THINKING (Daniel Kahneman):
+   Decisions are emotional first, rational second.
+   Trigger FEELING before thinking. Show, don't tell.
+
+=== IMAGE PURPOSE ===
+This is Image 5 of 6 - The TRANSFORMATION IMAGE.
+Purpose: Show the HERO'S JOURNEY. The customer's life BEFORE vs AFTER.
+Not a product comparison — a LIFE STATE comparison.
+
+The viewer should see themselves transforming from:
+→ Struggling/Incomplete/Frustrated (subtle, not dramatic)
+TO:
+→ Successful/Complete/Satisfied (aspirational, achievable)
+
+=== COMPOSITION OPTIONS ===
+Choose ONE approach that best shows the transformation:
+
+OPTION A: SPLIT LIFE COMPARISON
+- Left side: Life WITHOUT (muted, incomplete, subtle frustration)
+- Right side: Life WITH (vibrant, complete, satisfaction)
+- Same person/setting, different states
+- Product visible on the "after" side
+- The contrast should be FELT, not analyzed
+
+OPTION B: THE MOMENT OF TRANSFORMATION
+- Single scene showing the pivotal moment
+- The instant where the job gets DONE
+- Customer experiencing the solution
+- Before state implied, after state shown
+- Emotional peak of the journey
+
+OPTION C: THE HERO VICTORIOUS
+- Customer in their "success state"
+- Having completed the job they hired the product for
+- Confidence, satisfaction, completion visible
+- Product present but customer is the hero
+- Aspirational but attainable
+
+OPTION D: THE JOURNEY MAP
+- Visual narrative showing progression
+- Multiple moments: struggle → discovery → success
+- Product as the turning point
+- Story arc visible in composition
+- Before/during/after flow
+
+For this generation, create OPTION A or B (strongest transformation impact).
+
+=== THE JOB TO BE DONE ===
+Think: What frustrating situation made them search for this product?
+What does their life look like when that frustration is SOLVED?
+
+NOT: "This vase holds flowers"
+BUT: "Their living room finally feels put-together when guests arrive"
+
+NOT: "This pan heats evenly"
+BUT: "They're confident cooking for people they want to impress"
+
+NOT: "This organizer has 12 compartments"
+BUT: "They start each day feeling in control, not frantic"
+
+Show the JOB getting done, not the product features.
+
+=== VISUAL COMPOSITION ===
+
+IF SPLIT COMPARISON (Option A):
+- 50/50 or 60/40 split (favor the "after")
+- "Before" side: Desaturated, cooler tones, subtle tension
+- "After" side: Warm, vibrant, resolution
+- Same environment, transformed mood
+- Product bridges the gap visually
+- NO text labels like "Before/After" — let the image speak
+
+IF MOMENT OF TRANSFORMATION (Option B):
+- Single powerful scene
+- The exact moment the job gets done
+- Customer's expression shows relief/satisfaction
+- Product in use, solving the problem
+- Golden hour or warm lighting
+- Editorial magazine quality
+
+=== DESIGN SPECIFICATIONS ===
+COLOR PALETTE:
+- "Before" elements: Cooler, muted, less saturated
+- "After" elements: {primary_color}, {secondary_color} warmth
+- Accent: {accent_color} on transformation moment
+- Overall: Warm, hopeful, resolved
+
+HEADLINE (Optional):
+- Text: "{headline}"
+- Position: Supporting the transformation narrative
+- Font: {fw.typography.headline_font}, bold
+- Only include if it enhances, not explains
+
+EMOTIONAL TEMPERATURE:
+- Before: Slight tension, incompleteness (subtle, not dramatic)
+- After: Warmth, satisfaction, completion
+- Transition: Hope, possibility, relief
+
+=== THE CUSTOMER AS HERO ===
+This image answers: "Who do I BECOME when I own this?"
+
+The customer should see themselves in the "after" state and think:
+"That's who I want to be. That's the life I want."
+
+The product is Yoda, not Luke. The mentor, not the hero.
+The customer is the hero who transforms.
+
+=== VISUAL ELEMENTS ===
+DO include:
+- Real person experiencing the transformation
+- Authentic emotion (not stock photo smiles)
+- The job being DONE, not the product being used
+- Life context that grounds the transformation
+- Aspirational but achievable outcome
+
+DO NOT include:
+- Fake before/after text labels
+- Dramatic over-the-top transformation
+- Product as the hero/centerpiece
+- Feature callouts or specifications
+- Anything that feels like an ad vs a story
+
+=== BRAND ALIGNMENT ===
+Framework: {fw.framework_name}
+Brand Voice: {fw.brand_voice}
+Mood: {', '.join(fw.visual_treatment.mood_keywords)}
+
+Visual Treatment:
+- Lighting: {fw.visual_treatment.lighting_style}
+- Background: {fw.visual_treatment.background_treatment}
+- Overall feel: Transformative, hopeful, achieved
+
+=== TECHNICAL SPECIFICATIONS ===
+- 1000x1000 pixel square format
+- High emotional impact
+- Professional photography quality
+- Warm color temperature overall
+- Clear visual narrative
+
+=== FINAL OUTPUT ===
+Generate a TRANSFORMATION image that:
+- Shows the customer's life state before vs after (not product comparison)
+- Makes the customer the HERO of the story
+- Demonstrates the JOB getting done
+- Triggers emotional response (System 1) before rational thought
+- Creates desire to experience that transformation
+
+The viewer should think:
+"I want to go from THERE to HERE. This product is how I get there."
+
+This image sells the TRANSFORMATION, not the transaction.
+"""
+
+
 def _build_comparison_prompt(
     session: GenerationSession,
     fw: DesignFramework,
@@ -582,7 +768,7 @@ def _build_comparison_prompt(
 PRODUCT: {session.product_title}
 
 === IMAGE PURPOSE ===
-This is Image 5 of 5 - The FOMO IMAGE.
+This is Image 6 of 6 - The FOMO CLOSING IMAGE.
 Purpose: Create EMOTIONAL URGENCY. Make them feel what they're missing.
 This isn't about logic — it's about the gap between their current life
 and the upgraded life that's one click away.
@@ -739,6 +925,7 @@ _TEMPLATE_BUILDERS = {
     ImageTypeEnum.INFOGRAPHIC_1: _build_infographic_1_prompt,
     ImageTypeEnum.INFOGRAPHIC_2: _build_infographic_2_prompt,
     ImageTypeEnum.LIFESTYLE: _build_lifestyle_prompt,
+    ImageTypeEnum.TRANSFORMATION: _build_transformation_prompt,
     ImageTypeEnum.COMPARISON: _build_comparison_prompt,
 }
 

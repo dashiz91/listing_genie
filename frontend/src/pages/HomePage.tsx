@@ -556,7 +556,7 @@ export const HomePage: React.FC = () => {
     // A preview session only has style_preview image records, not main/infographic/etc.
     // We detect this by checking if images state has listing image types
     const hasListingImages = images.some((img) =>
-      ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'comparison'].includes(img.type)
+      ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'].includes(img.type)
     );
     if (sessionIdRef.current && hasListingImages) return sessionIdRef.current;
 
@@ -696,18 +696,19 @@ export const HomePage: React.FC = () => {
     setIsGenerating(true);
     setGenerationStatus('processing');
 
-    // Initialize all 5 images as pending (will be set to processing by handleGenerateSingle)
+    // Initialize all 6 images as pending (will be set to processing by handleGenerateSingle)
     setImages([
       { type: 'main', status: 'pending', label: 'Main Image' },
       { type: 'infographic_1', status: 'pending', label: 'Infographic 1' },
       { type: 'infographic_2', status: 'pending', label: 'Infographic 2' },
       { type: 'lifestyle', status: 'pending', label: 'Lifestyle' },
+      { type: 'transformation', status: 'pending', label: 'Transformation' },
       { type: 'comparison', status: 'pending', label: 'Comparison' },
     ]);
 
-    // Fire all 5 generations concurrently (same as clicking all 5 slots)
+    // Fire all 6 generations concurrently (same as clicking all 6 slots)
     // handleGenerateSingle will handle session creation via ensureSession (with mutex)
-    const imageTypes = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'comparison'];
+    const imageTypes = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
 
     // Wait for all to complete (but they run concurrently)
     const results = await Promise.allSettled(

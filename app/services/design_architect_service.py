@@ -58,8 +58,8 @@ class TypographySpec:
 @dataclass
 class ImageCopy:
     """Copy for a single image"""
-    image_number: int           # 1-5
-    image_type: str             # main, infographic_1, etc.
+    image_number: int           # 1-6
+    image_type: str             # main, infographic_1, infographic_2, lifestyle, transformation, comparison
     headline: str               # Main headline (can be empty for main image)
     subhead: Optional[str]      # Optional subheadline
     feature_callouts: List[str] # Feature bullet points (for infographics)
@@ -68,13 +68,14 @@ class ImageCopy:
 
 @dataclass
 class StoryArc:
-    """The narrative arc across all 5 images"""
+    """The narrative arc across all 6 images (Hero's Journey)"""
     theme: str                  # Overall story theme
-    hook: str                   # Image 1 - What grabs attention
-    reveal: str                 # Image 2 - What we're revealing
-    proof: str                  # Image 3 - How we prove it
-    dream: str                  # Image 4 - The aspiration
-    close: str                  # Image 5 - The final persuasion
+    hook: str                   # Image 1 - INTRIGUE: What grabs attention
+    reveal: str                 # Image 2 - TRUST: What we're revealing
+    proof: str                  # Image 3 - BELONGING: How we prove it
+    dream: str                  # Image 4 - DESIRE: The aspiration
+    transform: str = ""         # Image 5 - TRANSFORMATION: The hero's journey (optional for backward compat)
+    close: str = ""             # Image 6 - URGENCY: The final FOMO push
 
 
 @dataclass

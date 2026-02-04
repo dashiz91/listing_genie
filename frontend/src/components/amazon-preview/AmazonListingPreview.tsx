@@ -58,7 +58,7 @@ interface AmazonListingPreviewProps {
 }
 
 // Default image type order
-const DEFAULT_IMAGE_ORDER = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'comparison'];
+const DEFAULT_IMAGE_ORDER = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
 
 // Image labels
 const IMAGE_LABELS: Record<string, string> = {
@@ -66,6 +66,7 @@ const IMAGE_LABELS: Record<string, string> = {
   infographic_1: 'Infographic 1',
   infographic_2: 'Infographic 2',
   lifestyle: 'Lifestyle',
+  transformation: 'Transformation',
   comparison: 'Comparison',
 };
 

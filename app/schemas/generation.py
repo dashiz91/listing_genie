@@ -83,13 +83,14 @@ class TypographySpec(BaseModel):
 
 
 class StoryArc(BaseModel):
-    """Story arc across 5 images"""
+    """Story arc across 6 images (Hero's Journey)"""
     theme: str
-    hook: str
-    reveal: str
-    proof: str
-    dream: str
-    close: str
+    hook: str       # Image 1: INTRIGUE
+    reveal: str     # Image 2: TRUST
+    proof: str      # Image 3: BELONGING
+    dream: str      # Image 4: DESIRE
+    transform: Optional[str] = None  # Image 5: TRANSFORMATION (optional for backward compat)
+    close: str      # Image 6: URGENCY
 
 
 class ImageCopy(BaseModel):
@@ -113,8 +114,8 @@ class ImageGenerationPrompt(BaseModel):
     - The specific image type (main, infographic, lifestyle, etc.)
     - The design framework style
     """
-    image_number: int  # 1-5
-    image_type: str    # main, infographic_1, infographic_2, lifestyle, comparison
+    image_number: int  # 1-6
+    image_type: str    # main, infographic_1, infographic_2, lifestyle, transformation, comparison
     prompt: str        # The full, detailed generation prompt (can be 500+ words)
     composition_notes: str  # Brief notes on what this image should show
     key_elements: List[str] = Field(default_factory=list)  # Must-have elements in the image

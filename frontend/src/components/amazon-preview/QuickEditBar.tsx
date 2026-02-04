@@ -12,7 +12,7 @@ interface QuickEditBarProps {
 }
 
 // Image type order for display
-const IMAGE_ORDER = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'comparison'];
+const IMAGE_ORDER = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
 
 // Short labels for the edit bar
 const SHORT_LABELS: Record<string, string> = {
@@ -20,6 +20,7 @@ const SHORT_LABELS: Record<string, string> = {
   infographic_1: 'Info 1',
   infographic_2: 'Info 2',
   lifestyle: 'Lifestyle',
+  transformation: 'Transform',
   comparison: 'Compare',
 };
 

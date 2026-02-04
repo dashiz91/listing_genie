@@ -494,6 +494,7 @@ Make each framework's palette distinct but appropriate for the product.
             story_reveal=story.get('reveal', ''),
             story_proof=story.get('proof', ''),
             story_dream=story.get('dream', ''),
+            story_transform=story.get('transform', ''),
             story_close=story.get('close', ''),
             image_copy_json=image_copy_json,
             global_note_section="",  # Appended separately below

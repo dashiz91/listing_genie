@@ -22,6 +22,7 @@ class ImageTypeEnum(enum.Enum):
     INFOGRAPHIC_1 = "infographic_1"
     INFOGRAPHIC_2 = "infographic_2"
     LIFESTYLE = "lifestyle"
+    TRANSFORMATION = "transformation"  # New: Before/After life state (StoryBrand hero journey)
     COMPARISON = "comparison"
     # Style previews
     STYLE_PREVIEW = "style_preview"

@@ -99,18 +99,20 @@ Return valid JSON with this structure:
       }},
       "story_arc": {{
         "theme": "Narrative thread",
-        "hook": "Image 1 strategy",
-        "reveal": "Image 2 story",
-        "proof": "Image 3 demonstration",
-        "dream": "Image 4 aspiration",
-        "close": "Image 5 conviction"
+        "hook": "Image 1 strategy (INTRIGUE - stop the scroll)",
+        "reveal": "Image 2 story (TRUST - this is real)",
+        "proof": "Image 3 demonstration (BELONGING - people like me)",
+        "dream": "Image 4 aspiration (DESIRE - I can see myself)",
+        "transform": "Image 5 journey (TRANSFORMATION - who I become)",
+        "close": "Image 6 conviction (URGENCY - don't miss this)"
       }},
       "image_copy": [
         {{"image_number": 1, "image_type": "main", "headline": "", "subhead": null, "feature_callouts": [], "cta": null}},
         {{"image_number": 2, "image_type": "infographic_1", "headline": "Headline", "subhead": "Optional", "feature_callouts": [], "cta": null}},
         {{"image_number": 3, "image_type": "infographic_2", "headline": "Headline", "subhead": null, "feature_callouts": ["Feature 1", "Feature 2", "Feature 3"], "cta": null}},
         {{"image_number": 4, "image_type": "lifestyle", "headline": "Aspirational headline", "subhead": null, "feature_callouts": [], "cta": null}},
-        {{"image_number": 5, "image_type": "comparison", "headline": "FOMO/aspiration headline that creates urgency", "subhead": null, "feature_callouts": [], "cta": "Action CTA (Amazon-compliant)"}}
+        {{"image_number": 5, "image_type": "transformation", "headline": "Transformation headline (before/after life state)", "subhead": null, "feature_callouts": [], "cta": null}},
+        {{"image_number": 6, "image_type": "comparison", "headline": "FOMO/urgency headline", "subhead": null, "feature_callouts": [], "cta": "Action CTA (Amazon-compliant)"}}
       ],
       "brand_voice": "Copy tone description",
       "layout": {{
@@ -225,12 +227,37 @@ Generate EXACTLY 1 framework that channels the style reference's essence.
 
 
 # ============================================================================
-# STEP 2: GENERATE 5 IMAGE PROMPTS - EMOTIONAL STORYTELLING
+# STEP 2: GENERATE 6 IMAGE PROMPTS - EMOTIONAL STORYTELLING
 # ============================================================================
 
 GENERATE_IMAGE_PROMPTS_PROMPT = '''You are a principal designer with two decades at the world's best agencies.
-You understand that Amazon shoppers make emotional decisions, then justify with logic.
-Your job: Create images that FEEL, not just inform.
+You've studied the greatest business minds and understand three fundamental truths:
+
+═══════════════════════════════════════════════════════════════════════════════
+                     THE THREE FRAMEWORKS THAT DRIVE SALES
+═══════════════════════════════════════════════════════════════════════════════
+
+1. JOBS TO BE DONE (Clayton Christensen - Harvard Business School)
+   Customers don't buy products. They "hire" them to do a job.
+   A milkshake isn't competing with other milkshakes — it's competing with
+   bagels, bananas, and boredom on a long commute.
+   ASK: What job is this product HIRED to do? Show the job getting DONE.
+
+2. SYSTEM 1 THINKING (Daniel Kahneman - Nobel Prize Economics)
+   Humans have two systems: Fast (emotional) and Slow (rational).
+   Amazon shoppers are in System 1 mode — scrolling, feeling, not analyzing.
+   Trigger FEELING before thinking. Images must hit emotion FIRST.
+   Loss aversion: People feel losses 2x more than gains. Show what they MISS.
+
+3. STORYBRAND (Donald Miller)
+   The customer is the HERO, not your product. Your product is the GUIDE.
+   Every story: Hero has Problem → Meets Guide → Gets Plan → Takes Action →
+   Avoids Failure → Achieves Success.
+   The product is Yoda, not Luke. Show the customer's transformation.
+
+Your job: Create images that leverage all three frameworks.
+Make shoppers FEEL, not just see. Show the JOB getting done.
+Position the customer as the hero who transforms.
 
 ''' + PRODUCT_PROTECTION_DIRECTIVE + '''
 
@@ -272,13 +299,14 @@ What moment are they imagining? What feeling are they chasing?
 Framework: {framework_name}
 Philosophy: {design_philosophy}
 
-Story Arc:
+Story Arc (The Hero's Journey):
 - Theme: {story_theme}
-- Hook: {story_hook}
-- Reveal: {story_reveal}
-- Proof: {story_proof}
-- Dream: {story_dream}
-- Close: {story_close}
+- Hook: {story_hook} (Image 1: INTRIGUE)
+- Reveal: {story_reveal} (Image 2: TRUST)
+- Proof: {story_proof} (Image 3: BELONGING)
+- Dream: {story_dream} (Image 4: DESIRE)
+- Transform: {story_transform} (Image 5: TRANSFORMATION)
+- Close: {story_close} (Image 6: URGENCY)
 
 Visual Treatment:
 - Lighting: {lighting_style}
@@ -293,11 +321,13 @@ Headlines available (use sparingly, let images speak):
 ''' + get_storytelling_standard() + '''
 
 ═══════════════════════════════════════════════════════════════════════════════
-                    THE EMOTIONAL ARC - 5 IMAGES, 5 FEELINGS
+                    THE EMOTIONAL ARC - 6 IMAGES, 6 FEELINGS
 ═══════════════════════════════════════════════════════════════════════════════
 
-Each image hits ONE emotional beat. Together they create a journey from
-"What is this?" to "I need this."
+Each image hits ONE emotional beat. Together they create the HERO'S JOURNEY
+from "What is this?" to "I need this NOW."
+
+The customer is the HERO. The product is the GUIDE that enables transformation.
 
 **IMAGE 1: INTRIGUE** — "What is this beautiful thing?"
 ''' + AMAZON_MAIN_IMAGE_REQUIREMENTS + '''
@@ -324,12 +354,18 @@ arranging, enjoying. Natural window light (~5200K). A moment they
 can imagine themselves in. Not posed. Lived.
 The viewer's unconscious thought: "I want this feeling."
 
-**IMAGE 5: URGENCY** — "I don't want to miss this"
-Create emotional urgency. Show the transformation they're one click away from.
-What does life look like WITH this product? Make them feel the gap between
-their current life and the life they could have. Social proof that others
-are already living this upgraded reality.
-The viewer's unconscious thought: "Others have this. I need it too."
+**IMAGE 5: TRANSFORMATION** — "This is who I become"
+The hero's journey climax. Show the customer's life state BEFORE vs AFTER.
+Not a product comparison — a LIFE comparison. The job getting DONE.
+Clayton Christensen's insight: They're not buying a product, they're hiring
+a solution to a problem. Show the problem SOLVED.
+The viewer's unconscious thought: "I want to go from there to here."
+
+**IMAGE 6: URGENCY** — "I don't want to miss this"
+The final FOMO push. Create emotional urgency through aspiration, not pressure.
+Social proof that others are already living this upgraded reality.
+The gap between their current life and the life that's one click away.
+The viewer's unconscious thought: "Others have this. Why don't I?"
 
 ═══════════════════════════════════════════════════════════════════════════════
                               PROMPT CRAFT
@@ -368,7 +404,7 @@ Return JSON:
       "key_elements": ["element1", "element2"],
       "prompt": "Your evocative, emotion-first prompt (150-250 words)"
     }},
-    // ... images 2-5
+    // ... images 2-6
   ]
 }}
 

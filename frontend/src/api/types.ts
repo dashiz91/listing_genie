@@ -23,7 +23,7 @@ export interface ProductInfo {
   targetAudience: string;
 }
 
-export type ImageType = 'main' | 'infographic_1' | 'infographic_2' | 'lifestyle' | 'comparison';
+export type ImageType = 'main' | 'infographic_1' | 'infographic_2' | 'lifestyle' | 'transformation' | 'comparison';
 export type GenerationStatus = 'pending' | 'processing' | 'complete' | 'partial' | 'failed';
 
 export interface KeywordInput {
@@ -61,6 +61,7 @@ export interface StoryArc {
   reveal: string;
   proof: string;
   dream: string;
+  transform?: string;  // Image 5: TRANSFORMATION - the hero's journey
   close: string;
 }
 

@@ -29,8 +29,8 @@ interface ThumbnailGalleryProps {
   className?: string;
 }
 
-// Image type order for Amazon listing (1-5)
-const IMAGE_ORDER = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'comparison'];
+// Image type order for Amazon listing (1-6)
+const IMAGE_ORDER = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
 
 // Sortable Thumbnail Item
 interface SortableThumbnailProps {

@@ -98,7 +98,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
 
   // Sorted images
   const sortedImages = useMemo(() => {
-    const order = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'comparison'];
+    const order = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
     return [...images].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
   }, [images]);
 

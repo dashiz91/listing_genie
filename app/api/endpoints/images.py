@@ -246,6 +246,7 @@ def _get_image_label(image_type: str) -> str:
         "infographic_1": "Infographic 1",
         "infographic_2": "Infographic 2",
         "lifestyle": "Lifestyle",
+        "transformation": "Transformation",
         "comparison": "Comparison",
     }
     return labels.get(image_type, image_type.title())

@@ -59,7 +59,8 @@ class GenerationService:
         ImageTypeEnum.INFOGRAPHIC_1,
         ImageTypeEnum.INFOGRAPHIC_2,
         ImageTypeEnum.LIFESTYLE,
-        ImageTypeEnum.COMPARISON,
+        ImageTypeEnum.TRANSFORMATION,  # New: Before/After life state (image 5)
+        ImageTypeEnum.COMPARISON,      # FOMO closing image (now image 6)
     ]
 
     def __init__(
