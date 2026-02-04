@@ -187,8 +187,8 @@ export const HomePage: React.FC = () => {
           logoFile: null,
           logoPreview: project.logo_path ? apiClient.getFileUrl(project.logo_path) : null,
           styleReferenceFile: null,
-          // Show the original user style reference (not framework preview)
-          styleReferencePreview: styleRefPath ? apiClient.getFileUrl(styleRefPath) : null,
+          // Use versioned style reference URL if available, otherwise fallback to path
+          styleReferencePreview: project.style_reference_url || (styleRefPath ? apiClient.getFileUrl(styleRefPath) : null),
         }));
 
         // 1b. Restore original style reference path for generation calls
@@ -197,6 +197,12 @@ export const HomePage: React.FC = () => {
         } else if (project.style_reference_path && !project.style_reference_path.includes('framework_preview')) {
           // Fallback: if no original_style_reference_path but style_reference_path is not a framework preview
           setOriginalStyleRefPath(project.style_reference_path);
+        }
+
+        // 1c. Restore style reference versions (if any)
+        if (project.style_reference_versions && project.style_reference_versions.length > 0) {
+          // For now just log - version navigation UI would be added here
+          console.log('[STYLE REF] Versions available:', project.style_reference_versions);
         }
 
         // 2. Restore upload previews from paths

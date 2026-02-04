@@ -373,6 +373,8 @@ export interface ProjectDetailResponse {
   color_count?: number;
   logo_path?: string;
   style_reference_path?: string;
+  style_reference_url?: string;  // Signed URL for current style reference
+  style_reference_versions?: Array<{ version: number; image_url: string; image_path: string }>;
   original_style_reference_path?: string;  // User's original upload (if different from framework preview)
   // Design framework (full JSON)
   design_framework?: DesignFramework;

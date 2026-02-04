@@ -174,6 +174,47 @@ class SupabaseStorageService:
         latest_path = self.save_generated_image(session_id, image_type, image)
         return latest_path
 
+    def copy_upload_to_generated_versioned(
+        self,
+        upload_path: str,
+        session_id: str,
+        image_type: str,
+        version: int,
+    ) -> str:
+        """
+        Copy an uploaded file to the generated bucket with versioning.
+        Used for style references that need to be versioned like generated images.
+
+        Args:
+            upload_path: Source path (supabase://uploads/xxx.png)
+            session_id: Target session ID
+            image_type: Target image type (e.g., 'style_reference')
+            version: Version number
+
+        Returns:
+            Storage path for the latest copy (supabase://generated/session/type.png)
+        """
+        # Extract filename from upload path
+        if upload_path.startswith("supabase://"):
+            parts = upload_path.replace("supabase://", "").split("/", 1)
+            if len(parts) == 2:
+                source_bucket, source_filename = parts
+            else:
+                raise ValueError(f"Invalid upload path: {upload_path}")
+        else:
+            raise ValueError(f"Invalid upload path format: {upload_path}")
+
+        # Download from uploads bucket
+        try:
+            response = self.client.storage.from_(source_bucket).download(source_filename)
+            image = Image.open(BytesIO(response))
+        except Exception as e:
+            logger.error(f"Failed to download source image: {e}")
+            raise
+
+        # Save versioned copy to generated bucket
+        return self.save_generated_image_versioned(session_id, image_type, image, version)
+
     def get_upload_url(self, upload_id: str, expires_in: int = 3600) -> str:
         """
         Get a signed URL for an uploaded file.

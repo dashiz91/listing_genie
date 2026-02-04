@@ -108,6 +108,8 @@ class ProjectDetailResponse(BaseModel):
     color_count: Optional[int] = None
     logo_path: Optional[str] = None
     style_reference_path: Optional[str] = None
+    style_reference_url: Optional[str] = None  # Signed URL for current style reference
+    style_reference_versions: Optional[List[ImageVersionDetail]] = None  # Version history
     original_style_reference_path: Optional[str] = None  # User's original upload (if different from framework preview)
     # Design framework (full JSON)
     design_framework: Optional[dict] = None
@@ -384,6 +386,26 @@ async def get_project_detail(
     if not any(m.image_url for m in aplus_modules_list):
         aplus_modules_list = None
 
+    # Build style reference URL and versions
+    style_reference_url = None
+    style_reference_versions = None
+
+    # First check for versioned style references in generated bucket
+    style_ref_versions_list = _build_versions("style_reference")
+    if style_ref_versions_list:
+        style_reference_versions = style_ref_versions_list
+        # Get the latest version URL
+        try:
+            style_reference_url = storage.get_generated_url(session.id, "style_reference", expires_in=3600)
+        except Exception:
+            pass
+    elif original_style_reference_path:
+        # Fallback: use original style reference from uploads bucket
+        try:
+            style_reference_url = f"/api/images/file?path={original_style_reference_path}"
+        except Exception:
+            pass
+
     return ProjectDetailResponse(
         session_id=session.id,
         product_title=session.product_title,
@@ -407,6 +429,8 @@ async def get_project_detail(
         color_count=session.color_count,
         logo_path=session.logo_path,
         style_reference_path=session.style_reference_path,
+        style_reference_url=style_reference_url,
+        style_reference_versions=style_reference_versions,
         original_style_reference_path=original_style_reference_path,
         # Design framework
         design_framework=session.design_framework_json,

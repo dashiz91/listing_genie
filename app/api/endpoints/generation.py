@@ -861,7 +861,7 @@ async def analyze_and_generate_frameworks(
             session.style_reference_path = request.style_reference_path
             service.db.commit()
 
-        # Store original style reference in DesignContext (so it persists even when session.style_reference_path changes)
+        # Store original style reference in DesignContext AND copy to generated bucket with versioning
         if request.style_reference_path:
             logger.info(f"Creating DesignContext with original_style_reference_path: {request.style_reference_path}")
             service.create_design_context(
@@ -869,6 +869,20 @@ async def analyze_and_generate_frameworks(
                 product_analysis=analysis_result,
                 original_style_reference_path=request.style_reference_path,
             )
+
+            # Copy style reference to generated bucket with version 1
+            try:
+                storage = get_storage_service()
+                versioned_path = storage.copy_upload_to_generated_versioned(
+                    upload_path=request.style_reference_path,
+                    session_id=session.id,
+                    image_type="style_reference",
+                    version=1,
+                )
+                logger.info(f"Saved versioned style reference: {versioned_path}")
+            except Exception as e:
+                logger.warning(f"Failed to save versioned style reference: {e}")
+                # Non-fatal - continue with original path
 
         # Step 3: Generate preview images (or skip if using original style ref)
         logger.info(f"skip_preview_generation={request.skip_preview_generation}, style_reference_path={request.style_reference_path}")
