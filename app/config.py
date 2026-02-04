@@ -12,6 +12,9 @@ class Settings(BaseSettings):
 
     # API
     api_prefix: str = "/api"
+    # Backend URL for generating absolute image URLs (set in production/staging)
+    # If empty, relative URLs are used (works for same-origin setups)
+    backend_url: str = ""  # e.g., "https://reddstudio-staging-backend-staging.up.railway.app"
 
     # CORS
     cors_origins: List[str] = [

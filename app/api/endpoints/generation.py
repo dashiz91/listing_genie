@@ -28,6 +28,17 @@ from app.services.generation_utils import (
 from app.services.prompt_builder import get_structural_context
 from app.services.openai_vision_service import get_openai_vision_service
 from app.services.image_utils import resize_for_aplus_module, APLUS_DIMENSIONS
+from app.config import settings
+
+
+def _get_image_url(relative_path: str) -> str:
+    """
+    Convert a relative API path to an absolute URL.
+    Uses backend_url setting if configured, otherwise returns relative path.
+    """
+    if settings.backend_url:
+        return f"{settings.backend_url.rstrip('/')}{relative_path}"
+    return relative_path
 from app.services.canvas_compositor import CanvasCompositor
 from app.models.database import (
     GenerationSession, DesignContext,
@@ -891,7 +902,7 @@ async def analyze_and_generate_frameworks(
             logger.info("Skipping preview generation — using original style reference image")
             storage = get_storage_service()
             # Build a preview URL from the style reference path
-            style_ref_url = f"/api/images/file?path={request.style_reference_path}"
+            style_ref_url = _get_image_url(f"/api/images/file?path={request.style_reference_path}")
             for fw in frameworks:
                 fw['preview_url'] = style_ref_url
                 fw['preview_path'] = request.style_reference_path
@@ -918,7 +929,7 @@ async def analyze_and_generate_frameworks(
                             image_type=f"framework_preview_{i+1}",
                             image=preview_image,
                         )
-                        framework['preview_url'] = f"/api/images/{session.id}/framework_preview_{i+1}"
+                        framework['preview_url'] = _get_image_url(f"/api/images/{session.id}/framework_preview_{i+1}")
                         framework['preview_path'] = storage_path
                         logger.info(f"Preview {i+1} generated successfully")
                     else:

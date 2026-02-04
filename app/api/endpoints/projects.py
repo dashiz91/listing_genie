@@ -16,8 +16,19 @@ from app.dependencies import get_db, get_storage_service
 from app.core.auth import User, get_current_user
 from app.models.database import GenerationSession, ImageRecord, GenerationStatusEnum, DesignContext
 from app.services.supabase_storage_service import SupabaseStorageService
+from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _get_image_url(relative_path: str) -> str:
+    """
+    Convert a relative API path to an absolute URL.
+    Uses backend_url setting if configured, otherwise returns relative path.
+    """
+    if settings.backend_url:
+        return f"{settings.backend_url.rstrip('/')}{relative_path}"
+    return relative_path
 
 router = APIRouter()
 
@@ -187,8 +198,8 @@ async def list_projects(
             None
         )
         if main_image and main_image.storage_path:
-            # Use proxy URL instead of direct Supabase URL
-            thumbnail_url = f"/api/images/{session.id}/main"
+            # Use absolute proxy URL to ensure it goes to backend, not frontend
+            thumbnail_url = _get_image_url(f"/api/images/{session.id}/main")
 
         projects.append(ProjectListItem(
             session_id=session.id,
@@ -254,24 +265,24 @@ async def get_project_detail(
         logger.warning(f"Failed to list session files for version discovery: {e}")
 
     # Helper to build version details for a given storage key
-    # Returns proxy URLs (/api/images/...) that bypass CORS issues
+    # Returns absolute proxy URLs that go to backend (bypass CORS issues)
     def _build_versions(base_key: str) -> List[ImageVersionDetail]:
         versions = []
         for v in version_map.get(base_key, []):
             versioned_key = f"{base_key}_v{v}"
-            # Use proxy URL instead of direct Supabase URL to avoid CORS
-            v_url = f"/api/images/{session.id}/{versioned_key}"
+            # Use absolute proxy URL to ensure it goes to backend, not frontend
+            v_url = _get_image_url(f"/api/images/{session.id}/{versioned_key}")
             v_path = f"supabase://generated/{session.id}/{versioned_key}.png"
             versions.append(ImageVersionDetail(version=v, image_url=v_url, image_path=v_path))
         return versions
 
-    # Build image details with proxy URLs (avoid CORS issues)
+    # Build image details with absolute proxy URLs (avoid CORS issues)
     images = []
     for img in session.images:
         image_url = None
         if img.storage_path and img.status == GenerationStatusEnum.COMPLETE:
-            # Use proxy URL instead of direct Supabase URL
-            image_url = f"/api/images/{session.id}/{img.image_type.value}"
+            # Use absolute proxy URL to ensure it goes to backend, not frontend
+            image_url = _get_image_url(f"/api/images/{session.id}/{img.image_type.value}")
 
         img_versions = _build_versions(img.image_type.value) if img.status == GenerationStatusEnum.COMPLETE else []
 
@@ -317,18 +328,18 @@ async def get_project_detail(
         storage_key = f"aplus_full_image_{i}"
         versions = _build_versions(storage_key)
 
-        # Get latest (unversioned) URL - use proxy to avoid CORS
+        # Get latest (unversioned) URL - use absolute proxy to avoid CORS
         latest_url = None
         latest_path = None
         # Check if file exists by looking at version_map or probing
         if storage_key in version_map or versions:
-            latest_url = f"/api/images/{session.id}/{storage_key}"
+            latest_url = _get_image_url(f"/api/images/{session.id}/{storage_key}")
             latest_path = f"supabase://generated/{session.id}/{storage_key}.png"
         else:
             # Probe if unversioned file exists
             try:
                 storage.client.storage.from_(storage.generated_bucket).download(f"{session.id}/{storage_key}.png")
-                latest_url = f"/api/images/{session.id}/{storage_key}"
+                latest_url = _get_image_url(f"/api/images/{session.id}/{storage_key}")
                 latest_path = f"supabase://generated/{session.id}/{storage_key}.png"
             except Exception:
                 pass
@@ -344,12 +355,12 @@ async def get_project_detail(
             mobile_versions = _build_versions(mobile_key)
             # Check if mobile file exists
             if mobile_key in version_map or mobile_versions:
-                mobile_url = f"/api/images/{session.id}/{mobile_key}"
+                mobile_url = _get_image_url(f"/api/images/{session.id}/{mobile_key}")
                 mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
             else:
                 try:
                     storage.client.storage.from_(storage.generated_bucket).download(f"{session.id}/{mobile_key}.png")
-                    mobile_url = f"/api/images/{session.id}/{mobile_key}"
+                    mobile_url = _get_image_url(f"/api/images/{session.id}/{mobile_key}")
                     mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
                 except Exception:
                     pass
@@ -361,12 +372,12 @@ async def get_project_detail(
             mobile_key = f"aplus_full_image_{i}_mobile"
             mobile_versions = _build_versions(mobile_key)
             if mobile_key in version_map or mobile_versions:
-                mobile_url = f"/api/images/{session.id}/{mobile_key}"
+                mobile_url = _get_image_url(f"/api/images/{session.id}/{mobile_key}")
                 mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
             else:
                 try:
                     storage.client.storage.from_(storage.generated_bucket).download(f"{session.id}/{mobile_key}.png")
-                    mobile_url = f"/api/images/{session.id}/{mobile_key}"
+                    mobile_url = _get_image_url(f"/api/images/{session.id}/{mobile_key}")
                     mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
                 except Exception:
                     pass
@@ -403,19 +414,19 @@ async def get_project_detail(
     style_ref_versions_list = _build_versions("style_reference")
     if style_ref_versions_list:
         style_reference_versions = style_ref_versions_list
-        # Use proxy URL to avoid CORS issues
-        style_reference_url = f"/api/images/{session.id}/style_reference"
-        logger.info(f"[STYLE REF] Found versioned style ref, using proxy URL")
+        # Use absolute proxy URL to ensure it goes to backend
+        style_reference_url = _get_image_url(f"/api/images/{session.id}/style_reference")
+        logger.info(f"[STYLE REF] Found versioned style ref, using absolute proxy URL")
 
     # Fallback chain if no versioned style reference found
     if not style_reference_url:
         # Try original_style_reference_path from DesignContext
         if original_style_reference_path:
-            style_reference_url = f"/api/images/file?path={original_style_reference_path}"
+            style_reference_url = _get_image_url(f"/api/images/file?path={original_style_reference_path}")
             logger.info(f"[STYLE REF] Using original_style_reference_path: {original_style_reference_path}")
         # Try session.style_reference_path if not a framework preview
         elif session.style_reference_path and 'framework_preview' not in session.style_reference_path:
-            style_reference_url = f"/api/images/file?path={session.style_reference_path}"
+            style_reference_url = _get_image_url(f"/api/images/file?path={session.style_reference_path}")
             logger.info(f"[STYLE REF] Using session.style_reference_path: {session.style_reference_path}")
         else:
             logger.info(f"[STYLE REF] No style reference found for session {session.id}")
