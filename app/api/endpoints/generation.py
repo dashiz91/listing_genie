@@ -1059,6 +1059,7 @@ async def generate_with_framework(
             service.create_design_context(
                 session=session,
                 product_analysis=request.product_analysis,
+                original_style_reference_path=request.original_style_reference_path,
             )
 
         # Check if we should create only, generate one, or generate all

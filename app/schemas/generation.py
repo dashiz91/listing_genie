@@ -443,6 +443,7 @@ class GenerateWithFrameworkRequest(BaseModel):
     target_audience: Optional[str] = Field(None, max_length=200)
     logo_path: Optional[str] = Field(None, description="Path to logo image")
     style_reference_path: Optional[str] = Field(None, description="Path to style reference (preview image)")
+    original_style_reference_path: Optional[str] = Field(None, description="Path to user's original style reference upload (if different from preview)")
     global_note: Optional[str] = Field(None, max_length=2000, description="Global instructions for all images")
     product_analysis: Optional[dict] = Field(None, description="AI's product analysis from framework generation")
     single_image_type: Optional[str] = Field(None, description="If provided, only generate this image type (main, infographic_1, etc.)")

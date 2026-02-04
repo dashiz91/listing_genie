@@ -168,6 +168,8 @@ export interface GenerationRequest {
   primary_color?: string;
   // Style reference image - AI matches this visual style
   style_reference_path?: string;
+  // User's original style reference upload (if different from framework preview)
+  original_style_reference_path?: string;
   // Color palette options
   color_count?: number;
   color_palette?: string[];
@@ -371,6 +373,7 @@ export interface ProjectDetailResponse {
   color_count?: number;
   logo_path?: string;
   style_reference_path?: string;
+  original_style_reference_path?: string;  // User's original upload (if different from framework preview)
   // Design framework (full JSON)
   design_framework?: DesignFramework;
   // Product analysis

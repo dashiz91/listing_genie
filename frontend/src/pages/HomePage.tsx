@@ -163,6 +163,14 @@ export const HomePage: React.FC = () => {
         const project = await apiClient.getProjectDetail(sessionParam);
 
         // 1. Restore form data
+        // Determine the best style reference preview to show:
+        // - original_style_reference_path (user's uploaded style reference)
+        // - or style_reference_path if it's not a framework preview
+        const styleRefPath = project.original_style_reference_path ||
+          (project.style_reference_path && !project.style_reference_path.includes('framework_preview')
+            ? project.style_reference_path
+            : null);
+
         setFormData((prev) => ({
           ...prev,
           productTitle: project.product_title,
@@ -179,13 +187,17 @@ export const HomePage: React.FC = () => {
           logoFile: null,
           logoPreview: project.logo_path ? apiClient.getFileUrl(project.logo_path) : null,
           styleReferenceFile: null,
-          // Don't show framework previews as user style references
-          styleReferencePreview:
-            project.style_reference_path &&
-            !project.style_reference_path.includes('framework_preview')
-              ? apiClient.getFileUrl(project.style_reference_path)
-              : null,
+          // Show the original user style reference (not framework preview)
+          styleReferencePreview: styleRefPath ? apiClient.getFileUrl(styleRefPath) : null,
         }));
+
+        // 1b. Restore original style reference path for generation calls
+        if (project.original_style_reference_path) {
+          setOriginalStyleRefPath(project.original_style_reference_path);
+        } else if (project.style_reference_path && !project.style_reference_path.includes('framework_preview')) {
+          // Fallback: if no original_style_reference_path but style_reference_path is not a framework preview
+          setOriginalStyleRefPath(project.style_reference_path);
+        }
 
         // 2. Restore upload previews from paths
         if (project.upload_path) {
@@ -557,6 +569,8 @@ export const HomePage: React.FC = () => {
           brand_colors: formData.brandColors,
           logo_path: logoPath || undefined,
           style_reference_path: (useOriginalStyleRef && originalStyleRefPath) ? originalStyleRefPath : (selectedFramework.preview_path || undefined),
+          // Track original style ref separately for project restoration
+          original_style_reference_path: originalStyleRefPath || undefined,
           global_note: formData.globalNote || undefined,
         },
         selectedFramework,
@@ -630,6 +644,8 @@ export const HomePage: React.FC = () => {
           brand_colors: formData.brandColors,
           logo_path: logoPath || undefined,
           style_reference_path: (useOriginalStyleRef && originalStyleRefPath) ? originalStyleRefPath : (selectedFramework!.preview_path || undefined),
+          // Track original style ref separately for project restoration
+          original_style_reference_path: originalStyleRefPath || undefined,
           global_note: formData.globalNote || undefined,
         },
         selectedFramework!,

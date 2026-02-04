@@ -151,6 +151,7 @@ class GenerationService:
         color_mode: ColorModeEnum = ColorModeEnum.AI_DECIDES,
         locked_colors: Optional[List[str]] = None,
         product_analysis: Optional[Dict] = None,
+        original_style_reference_path: Optional[str] = None,
     ) -> DesignContext:
         """
         Create a DesignContext for AI Designer memory.
@@ -166,6 +167,7 @@ class GenerationService:
             color_mode: How colors should be determined
             locked_colors: Specific hex colors if mode is LOCKED_PALETTE
             product_analysis: AI's analysis of the product from framework generation
+            original_style_reference_path: User's original style reference upload (if different from framework preview)
 
         Returns:
             Created DesignContext
@@ -196,11 +198,19 @@ class GenerationService:
                     "description": f"Additional product photo {i+1}"
                 })
 
+        # Track both the original user upload AND the framework preview used for generation
+        if original_style_reference_path:
+            image_inventory.append({
+                "type": "original_style_reference",
+                "path": original_style_reference_path,
+                "description": "User's original style reference image"
+            })
+
         if session.style_reference_path:
             image_inventory.append({
                 "type": "style_reference",
                 "path": session.style_reference_path,
-                "description": "Style reference image"
+                "description": "Style reference image used for generation"
             })
 
         if session.logo_path:

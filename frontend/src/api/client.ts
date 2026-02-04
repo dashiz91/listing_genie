@@ -295,6 +295,8 @@ class ApiClient {
       target_audience: request.target_audience || null,
       logo_path: request.logo_path || null,
       style_reference_path: request.style_reference_path || null,
+      // Track original style ref separately so it can be restored on project load
+      original_style_reference_path: request.original_style_reference_path || null,
       global_note: request.global_note || null,
       // Include product_analysis for regeneration context
       product_analysis: productAnalysis || null,

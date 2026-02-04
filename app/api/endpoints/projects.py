@@ -108,6 +108,7 @@ class ProjectDetailResponse(BaseModel):
     color_count: Optional[int] = None
     logo_path: Optional[str] = None
     style_reference_path: Optional[str] = None
+    original_style_reference_path: Optional[str] = None  # User's original upload (if different from framework preview)
     # Design framework (full JSON)
     design_framework: Optional[dict] = None
     # Product analysis from DesignContext
@@ -302,6 +303,14 @@ async def get_project_detail(
         if isinstance(pa, dict):
             product_analysis_summary = pa.get("summary") or pa.get("product_category", "")
 
+    # Extract original style reference path from DesignContext image_inventory
+    original_style_reference_path = None
+    if design_context and design_context.image_inventory:
+        for item in design_context.image_inventory:
+            if item.get("type") == "original_style_reference":
+                original_style_reference_path = item.get("path")
+                break
+
     # Load A+ modules — use version_map + storage probing
     aplus_modules_list = None
     aplus_slot_count = 0
@@ -398,6 +407,7 @@ async def get_project_detail(
         color_count=session.color_count,
         logo_path=session.logo_path,
         style_reference_path=session.style_reference_path,
+        original_style_reference_path=original_style_reference_path,
         # Design framework
         design_framework=session.design_framework_json,
         # Product analysis
