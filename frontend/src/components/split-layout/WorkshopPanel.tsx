@@ -1162,7 +1162,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
           {frameworks.length === 0
             ? 'Upload photos and add a title to continue'
             : selectedFramework
-            ? 'Click to generate all 5 Amazon listing images'
+            ? 'Click to generate all 6 Amazon listing images'
             : 'Select a design framework above'}
         </p>
       </div>
