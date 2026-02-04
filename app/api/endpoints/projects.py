@@ -397,14 +397,22 @@ async def get_project_detail(
         # Get the latest version URL
         try:
             style_reference_url = storage.get_generated_url(session.id, "style_reference", expires_in=3600)
-        except Exception:
-            pass
-    elif original_style_reference_path:
-        # Fallback: use original style reference from uploads bucket
-        try:
+            logger.info(f"[STYLE REF] Found versioned style ref, URL: {style_reference_url[:50]}...")
+        except Exception as e:
+            logger.warning(f"[STYLE REF] Failed to get versioned URL: {e}")
+
+    # Fallback chain if no versioned style reference found
+    if not style_reference_url:
+        # Try original_style_reference_path from DesignContext
+        if original_style_reference_path:
             style_reference_url = f"/api/images/file?path={original_style_reference_path}"
-        except Exception:
-            pass
+            logger.info(f"[STYLE REF] Using original_style_reference_path: {original_style_reference_path}")
+        # Try session.style_reference_path if not a framework preview
+        elif session.style_reference_path and 'framework_preview' not in session.style_reference_path:
+            style_reference_url = f"/api/images/file?path={session.style_reference_path}"
+            logger.info(f"[STYLE REF] Using session.style_reference_path: {session.style_reference_path}")
+        else:
+            logger.info(f"[STYLE REF] No style reference found for session {session.id}")
 
     return ProjectDetailResponse(
         session_id=session.id,

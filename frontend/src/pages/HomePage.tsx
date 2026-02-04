@@ -191,6 +191,13 @@ export const HomePage: React.FC = () => {
           styleReferencePreview: project.style_reference_url || (styleRefPath ? apiClient.getFileUrl(styleRefPath) : null),
         }));
 
+        // Debug: log what style reference URL is being used
+        console.log('[STYLE REF DEBUG] project.style_reference_url:', project.style_reference_url);
+        console.log('[STYLE REF DEBUG] project.original_style_reference_path:', project.original_style_reference_path);
+        console.log('[STYLE REF DEBUG] project.style_reference_path:', project.style_reference_path);
+        console.log('[STYLE REF DEBUG] styleRefPath computed:', styleRefPath);
+        console.log('[STYLE REF DEBUG] Final preview URL:', project.style_reference_url || (styleRefPath ? apiClient.getFileUrl(styleRefPath) : null));
+
         // 1b. Restore original style reference path for generation calls
         if (project.original_style_reference_path) {
           setOriginalStyleRefPath(project.original_style_reference_path);
