@@ -120,7 +120,7 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
               <div className="aspect-square bg-slate-700 relative">
                 {framework.preview_url ? (
                   <img
-                    src={`http://localhost:8000${framework.preview_url}`}
+                    src={framework.preview_url.startsWith('http') ? framework.preview_url : `${import.meta.env.VITE_API_URL || ''}${framework.preview_url}`}
                     alt={framework.framework_name}
                     className="w-full h-full object-cover"
                   />
