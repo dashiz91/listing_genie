@@ -84,6 +84,8 @@ export const HomePage: React.FC = () => {
   // URL params for project loading
   const [searchParams, setSearchParams] = useSearchParams();
   const projectParam = searchParams.get('project');
+  const sessionParam = searchParams.get('session');
+  const hasProjectToLoad = !!(projectParam || sessionParam);
 
   // Health check state
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -120,7 +122,7 @@ export const HomePage: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<string[]>(['photos', 'product']);
-  const [_isLoadingProject, setIsLoadingProject] = useState(false);
+  const [isLoadingProject, setIsLoadingProject] = useState(hasProjectToLoad);
 
   // Uploaded paths (for API calls)
   const [logoPath, setLogoPath] = useState<string | null>(null);
@@ -1589,6 +1591,18 @@ export const HomePage: React.FC = () => {
     }
     return refs;
   }, [uploads, originalStyleRefPath, formData.styleReferencePreview, logoPath]);
+
+  // Loading skeleton for session/project loading
+  if (isLoadingProject) {
+    return (
+      <div className="h-[calc(100vh-80px)] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-slate-600 border-t-redd-500 rounded-full animate-spin" />
+          <p className="text-slate-400">Loading project...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[calc(100vh-80px)]">
