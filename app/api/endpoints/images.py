@@ -1,9 +1,15 @@
 """
 Image Serving Endpoints
+
+Supports two modes:
+1. Redirect mode (default): Returns 302 redirect to Supabase signed URL
+2. Proxy mode (?proxy=true): Fetches image server-side and serves directly
+   - Bypasses CORS issues when frontend domain not in Supabase CORS config
+   - Slightly higher latency but works from any domain
 """
 import logging
 import re
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 
 logger = logging.getLogger(__name__)
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -15,6 +21,20 @@ from app.db.session import get_db
 from sqlalchemy.orm import Session
 
 router = APIRouter()
+
+
+def _get_content_type(path: str) -> str:
+    """Determine content type from file extension"""
+    path_lower = path.lower()
+    if path_lower.endswith('.png'):
+        return 'image/png'
+    elif path_lower.endswith('.jpg') or path_lower.endswith('.jpeg'):
+        return 'image/jpeg'
+    elif path_lower.endswith('.webp'):
+        return 'image/webp'
+    elif path_lower.endswith('.gif'):
+        return 'image/gif'
+    return 'image/png'  # Default to PNG
 
 
 def get_generation_service(
@@ -31,11 +51,17 @@ def get_generation_service(
 @router.get("/file")
 async def get_file_by_path(
     path: str,
+    proxy: bool = Query(default=True, description="Proxy image through backend (bypasses CORS)"),
     storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Serve a file by its storage path (for reference image previews).
     Handles Supabase paths (supabase://bucket/path format) and legacy local paths.
+
+    Args:
+        path: Storage path (supabase://bucket/file or legacy storage/bucket/file)
+        proxy: If True (default), fetches image server-side and serves directly.
+               If False, redirects to Supabase signed URL (may hit CORS issues).
     """
     try:
         # Normalise legacy local paths (storage\uploads\UUID.png or storage/uploads/UUID.png)
@@ -48,21 +74,39 @@ async def get_file_by_path(
             else:
                 raise HTTPException(status_code=400, detail="Unrecognised storage path format.")
 
-        # Parse supabase:// URL and create signed URL
+        # Parse supabase:// URL
         parts = normalised[len("supabase://"):].split("/", 1)
         bucket = parts[0]
         file_path = parts[1] if len(parts) > 1 else ""
 
-        response = storage.client.storage.from_(bucket).create_signed_url(
-            path=file_path,
-            expires_in=3600
-        )
-        signed_url = response.get('signedURL') or response.get('signedUrl') or ''
-        if signed_url:
-            return RedirectResponse(url=signed_url, status_code=302)
+        if proxy:
+            # Proxy mode: fetch image server-side and serve directly (bypasses CORS)
+            try:
+                image_data = storage.client.storage.from_(bucket).download(file_path)
+                content_type = _get_content_type(file_path)
+                return Response(
+                    content=image_data,
+                    media_type=content_type,
+                    headers={
+                        "Cache-Control": "public, max-age=3600",
+                        "Content-Disposition": f"inline; filename={file_path.split('/')[-1]}",
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Failed to proxy image from {bucket}/{file_path}: {e}")
+                raise HTTPException(status_code=404, detail="File not found")
         else:
-            logger.warning(f"No signed URL in response keys: {list(response.keys())}")
-            raise HTTPException(status_code=404, detail="File not found")
+            # Redirect mode: return signed URL (may hit CORS on some domains)
+            response = storage.client.storage.from_(bucket).create_signed_url(
+                path=file_path,
+                expires_in=3600
+            )
+            signed_url = response.get('signedURL') or response.get('signedUrl') or ''
+            if signed_url:
+                return RedirectResponse(url=signed_url, status_code=302)
+            else:
+                logger.warning(f"No signed URL in response keys: {list(response.keys())}")
+                raise HTTPException(status_code=404, detail="File not found")
     except HTTPException:
         raise
     except Exception as e:
@@ -72,15 +116,41 @@ async def get_file_by_path(
 @router.get("/upload/{upload_id}")
 async def get_upload_file(
     upload_id: str,
+    proxy: bool = Query(default=True, description="Proxy image through backend (bypasses CORS)"),
     storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Serve an uploaded image file.
-    Redirects to a signed Supabase URL.
+
+    Args:
+        upload_id: The upload ID (filename without extension)
+        proxy: If True (default), fetches image server-side and serves directly.
+               If False, redirects to Supabase signed URL (may hit CORS issues).
     """
     try:
-        signed_url = storage.get_upload_url(upload_id, expires_in=3600)
-        return RedirectResponse(url=signed_url, status_code=302)
+        if proxy:
+            # Proxy mode: fetch image server-side and serve directly
+            # Try common extensions
+            for ext in ['.png', '.jpg', '.jpeg', '.webp']:
+                file_path = f"{upload_id}{ext}"
+                try:
+                    image_data = storage.client.storage.from_('uploads').download(file_path)
+                    content_type = _get_content_type(file_path)
+                    return Response(
+                        content=image_data,
+                        media_type=content_type,
+                        headers={
+                            "Cache-Control": "public, max-age=3600",
+                            "Content-Disposition": f"inline; filename={file_path}",
+                        }
+                    )
+                except Exception:
+                    continue
+            raise HTTPException(status_code=404, detail="Upload not found")
+        else:
+            # Redirect mode
+            signed_url = storage.get_upload_url(upload_id, expires_in=3600)
+            return RedirectResponse(url=signed_url, status_code=302)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Upload not found")
     except ValueError as e:
@@ -132,15 +202,39 @@ async def get_session_images(
 async def get_image_file(
     session_id: str,
     image_type: str,
+    proxy: bool = Query(default=True, description="Proxy image through backend (bypasses CORS)"),
     storage: SupabaseStorageService = Depends(get_storage_service),
 ):
     """
     Serve a generated image file.
-    Redirects to a signed Supabase URL.
+
+    Args:
+        session_id: The generation session ID
+        image_type: Type of image (main, infographic_1, etc.)
+        proxy: If True (default), fetches image server-side and serves directly.
+               If False, redirects to Supabase signed URL (may hit CORS issues).
     """
     try:
-        signed_url = storage.get_generated_url(session_id, image_type, expires_in=3600)
-        return RedirectResponse(url=signed_url, status_code=302)
+        if proxy:
+            # Proxy mode: fetch image server-side and serve directly
+            file_path = f"{session_id}/{image_type}.png"
+            try:
+                image_data = storage.client.storage.from_('generated').download(file_path)
+                return Response(
+                    content=image_data,
+                    media_type='image/png',
+                    headers={
+                        "Cache-Control": "public, max-age=3600",
+                        "Content-Disposition": f"inline; filename={image_type}.png",
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Failed to proxy generated image {file_path}: {e}")
+                raise HTTPException(status_code=404, detail="Image not found")
+        else:
+            # Redirect mode
+            signed_url = storage.get_generated_url(session_id, image_type, expires_in=3600)
+            return RedirectResponse(url=signed_url, status_code=302)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Image not found")
 
