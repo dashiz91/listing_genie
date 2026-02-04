@@ -449,8 +449,13 @@ Make each framework's palette distinct but appropriate for the product.
                 colors = fw.get('colors', [])
                 logger.info(f"[GEMINI COLOR MODE DEBUG] Framework {i+1} ({fw_name}):")
                 for j, color in enumerate(colors):
-                    color_hex = color.get('hex', 'N/A')
-                    color_role = color.get('role', 'N/A')
+                    # Handle both dict format and string format for colors
+                    if isinstance(color, dict):
+                        color_hex = color.get('hex', 'N/A')
+                        color_role = color.get('role', 'N/A')
+                    else:
+                        color_hex = str(color) if color else 'N/A'
+                        color_role = 'unknown'
                     logger.info(f"[GEMINI COLOR MODE DEBUG]   Color {j+1}: {color_hex} ({color_role})")
             logger.info("=" * 60)
 
@@ -525,6 +530,8 @@ Make each framework's palette distinct but appropriate for the product.
 
         # Build color palette string and extract specific hex values
         colors = framework.get('colors', [])
+        if not isinstance(colors, list):
+            colors = []
         color_palette = ""
         primary_hex = "#000000"
         accent_hex = "#000000"
@@ -532,9 +539,19 @@ Make each framework's palette distinct but appropriate for the product.
         text_light_hex = "#FFFFFF"
 
         for color in colors:
-            role = color.get('role', 'color').lower()
-            hex_val = color.get('hex', '#000000')
-            color_palette += f"- {role.upper()}: {hex_val} ({color.get('name', 'Color')}) - {color.get('usage', '')}\n"
+            # Handle both dict format and string format for colors
+            if isinstance(color, dict):
+                role = color.get('role', 'color').lower()
+                hex_val = color.get('hex', '#000000')
+                color_name = color.get('name', 'Color')
+                color_usage = color.get('usage', '')
+            else:
+                # Color is a string (just hex value)
+                role = 'color'
+                hex_val = str(color) if color else '#000000'
+                color_name = 'Color'
+                color_usage = ''
+            color_palette += f"- {role.upper()}: {hex_val} ({color_name}) - {color_usage}\n"
 
             # Extract specific colors by role
             if role == 'primary':
@@ -552,14 +569,20 @@ Make each framework's palette distinct but appropriate for the product.
         image_copy = framework.get('image_copy', [])
         image_copy_json = json.dumps(image_copy, indent=2) if image_copy else "[]"
 
-        # Get typography
+        # Get typography (handle string case)
         typo = framework.get('typography', {})
+        if not isinstance(typo, dict):
+            typo = {}
 
-        # Get visual treatment
+        # Get visual treatment (handle string case)
         visual = framework.get('visual_treatment', {})
+        if not isinstance(visual, dict):
+            visual = {}
 
-        # Get story arc
+        # Get story arc (handle string case)
         story = framework.get('story_arc', {})
+        if not isinstance(story, dict):
+            story = {}
 
         # Build the prompt
         prompt = GENERATE_IMAGE_PROMPTS_PROMPT.format(
@@ -623,7 +646,10 @@ Make each framework's palette distinct but appropriate for the product.
         logger.info("-" * 40)
         logger.info("[GEMINI VISION PROMPTS] FRAMEWORK COLORS:")
         for color in colors:
-            logger.info(f"[GEMINI VISION PROMPTS]   {color.get('role', '?')}: {color.get('hex', '?')} ({color.get('name', '?')})")
+            if isinstance(color, dict):
+                logger.info(f"[GEMINI VISION PROMPTS]   {color.get('role', '?')}: {color.get('hex', '?')} ({color.get('name', '?')})")
+            else:
+                logger.info(f"[GEMINI VISION PROMPTS]   color: {color}")
         logger.info("-" * 40)
         logger.info("[GEMINI VISION PROMPTS] FULL PROMPT:")
         logger.info("-" * 40)
