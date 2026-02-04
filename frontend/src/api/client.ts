@@ -499,6 +499,33 @@ class ApiClient {
       module_index: moduleIndex,
     };
   }
+
+  // ============================================================================
+  // Assets - User's uploaded and generated assets
+  // ============================================================================
+
+  /**
+   * List user's assets by category (logos, style-refs, products, generated, or all)
+   */
+  async listAssets(
+    assetType: 'logos' | 'style-refs' | 'products' | 'generated' | 'all' = 'all'
+  ): Promise<{ assets: AssetItem[]; total: number }> {
+    const response = await this.client.get<{ assets: AssetItem[]; total: number }>(
+      `/assets/?asset_type=${assetType}`
+    );
+    return response.data;
+  }
+}
+
+// Asset item type
+export interface AssetItem {
+  id: string;
+  name: string;
+  url: string;
+  type: 'logos' | 'style-refs' | 'products' | 'generated';
+  created_at: string;
+  session_id?: string;
+  image_type?: string;
 }
 
 export const apiClient = new ApiClient();

@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import health, generation, upload, images, projects
+from app.api.endpoints import health, generation, upload, images, projects, assets
 
 api_router = APIRouter(prefix="/api")
 
@@ -32,4 +32,11 @@ api_router.include_router(
     projects.router,
     prefix="/projects",
     tags=["projects"]
+)
+
+# Assets endpoints
+api_router.include_router(
+    assets.router,
+    prefix="/assets",
+    tags=["assets"]
 )
