@@ -985,6 +985,7 @@ async def generate_with_framework(
             target_audience=request.target_audience,
             global_note=request.global_note,  # AI Designer interprets for each image
             has_style_reference=bool(request.style_reference_path),  # Tell AI Designer about style ref
+            brand_name=request.brand_name,
         )
 
         logger.info(f"Generated {len(generation_prompts)} prompts")

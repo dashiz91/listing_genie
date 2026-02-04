@@ -405,6 +405,7 @@ Make each framework's palette distinct but appropriate for the product.
         target_audience: Optional[str] = None,
         global_note: Optional[str] = None,
         has_style_reference: bool = False,
+        brand_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         STEP 2: Generate 5 detailed image prompts for the SELECTED framework.
@@ -420,6 +421,7 @@ Make each framework's palette distinct but appropriate for the product.
             target_audience: Target audience description
             global_note: User's global instructions - interpreted differently per image
             has_style_reference: Whether user provided a style reference image
+            brand_name: The brand name for the product
 
         Returns:
             List of 5 ImageGenerationPrompt dicts
@@ -472,6 +474,7 @@ Make each framework's palette distinct but appropriate for the product.
             product_description=product_description or product_name,
             features=", ".join(features) if features else "Not specified",
             target_audience=target_audience or "General consumers",
+            brand_name=brand_name or "Not specified",
             framework_name=framework.get('framework_name', 'Design Framework'),
             design_philosophy=framework.get('design_philosophy', ''),
             brand_voice=framework.get('brand_voice', 'Professional'),
@@ -493,6 +496,8 @@ Make each framework's palette distinct but appropriate for the product.
             story_dream=story.get('dream', ''),
             story_close=story.get('close', ''),
             image_copy_json=image_copy_json,
+            global_note_section="",  # Appended separately below
+            style_reference_section="",  # Appended separately below
         )
 
         # Add global note instructions if provided - AI Designer interprets for each image

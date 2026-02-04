@@ -110,6 +110,7 @@ class VisionService:
         target_audience: Optional[str] = None,
         global_note: Optional[str] = None,
         has_style_reference: bool = False,
+        brand_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         STEP 2: Generate 5 detailed image prompts for the SELECTED framework.
@@ -120,6 +121,7 @@ class VisionService:
             global_note: User's global instructions - AI Designer interprets
                          these differently for each of the 5 image types.
             has_style_reference: Whether user provided a style reference image.
+            brand_name: The brand name for the product.
         """
         logger.info(f"[{self.provider.upper()}] Generating image prompts for: {framework.get('framework_name')}")
         if global_note:
@@ -135,6 +137,7 @@ class VisionService:
             target_audience=target_audience,
             global_note=global_note,
             has_style_reference=has_style_reference,
+            brand_name=brand_name,
         )
 
     def framework_to_prompt(self, framework: Dict[str, Any], image_type: str) -> str:
