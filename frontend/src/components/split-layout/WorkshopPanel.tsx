@@ -1132,7 +1132,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                   Generating Images...
                 </span>
               ) : selectedFramework ? (
-                `Generate All 5 Images`
+                `Generate All 6 Images`
               ) : (
                 'Select a Framework'
               )}

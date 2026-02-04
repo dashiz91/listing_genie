@@ -122,7 +122,7 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
 
   // Calculate generation progress
   const completeCount = images.filter((img) => img.status === 'complete').length;
-  const totalImages = images.length || 5;
+  const totalImages = images.length || 6;
   const generationProgress = totalImages > 0 ? (completeCount / totalImages) * 100 : 0;
 
   // Get accent color from framework

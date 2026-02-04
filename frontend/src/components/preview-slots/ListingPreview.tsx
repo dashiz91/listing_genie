@@ -12,7 +12,8 @@ const LISTING_SLOTS: { id: ImageType; label: string; description: string }[] = [
   { id: 'infographic_1', label: 'Infographic 1', description: 'Features callout' },
   { id: 'infographic_2', label: 'Infographic 2', description: 'Benefits grid' },
   { id: 'lifestyle', label: 'Lifestyle', description: 'Product in use' },
-  { id: 'comparison', label: 'Comparison', description: 'Uses or contents' },
+  { id: 'transformation', label: 'Transformation', description: 'Before/After life' },
+  { id: 'comparison', label: 'Comparison', description: 'FOMO closing' },
 ];
 
 interface ListingPreviewProps {
@@ -148,13 +149,13 @@ export const ListingPreview: React.FC<ListingPreviewProps> = ({
               }}
             >
               <span>✨</span>
-              <span>Generate All 5</span>
+              <span>Generate All 6</span>
             </button>
           )}
         </div>
 
         {/* Slots Grid */}
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-6 gap-3">
           {LISTING_SLOTS.map((slot, idx) => {
             const slotState = slotStatuses[slot.id];
             return (

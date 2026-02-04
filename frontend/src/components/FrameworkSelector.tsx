@@ -270,13 +270,13 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
         {isLoading ? (
           <span className="flex items-center justify-center space-x-2">
             <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-            <span>Generating All 5 Images...</span>
+            <span>Generating All 6 Images...</span>
           </span>
         ) : !selectedFramework ? (
           'Select a Design Framework'
         ) : (
           <span className="flex items-center justify-center gap-2">
-            <span>Generate All 5 Images with "{selectedFramework.framework_name}"</span>
+            <span>Generate All 6 Images with "{selectedFramework.framework_name}"</span>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
