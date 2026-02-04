@@ -6,6 +6,7 @@ import { HomePage } from './pages/HomePage';
 import { LandingPage } from './pages/LandingPage';
 import { AuthPage } from './pages/AuthPage';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { AssetsPage } from './pages/AssetsPage';
 
 function App() {
   return (
@@ -37,6 +38,18 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <ProjectsPage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Assets - protected, requires authentication */}
+          <Route
+            path="/app/assets"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <AssetsPage />
                 </Layout>
               </ProtectedRoute>
             }
