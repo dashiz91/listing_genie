@@ -861,6 +861,15 @@ async def analyze_and_generate_frameworks(
             session.style_reference_path = request.style_reference_path
             service.db.commit()
 
+        # Store original style reference in DesignContext (so it persists even when session.style_reference_path changes)
+        if request.style_reference_path:
+            logger.info(f"Creating DesignContext with original_style_reference_path: {request.style_reference_path}")
+            service.create_design_context(
+                session=session,
+                product_analysis=analysis_result,
+                original_style_reference_path=request.style_reference_path,
+            )
+
         # Step 3: Generate preview images (or skip if using original style ref)
         logger.info(f"skip_preview_generation={request.skip_preview_generation}, style_reference_path={request.style_reference_path}")
         if request.skip_preview_generation and request.style_reference_path:
@@ -1053,9 +1062,9 @@ async def generate_with_framework(
         user_id = user.id if user else None
         session = service.create_session(gen_request, user_id=user_id)
 
-        # Create DesignContext with product_analysis for regeneration support
-        if request.product_analysis:
-            logger.info("Creating DesignContext with product_analysis for regeneration support")
+        # Create DesignContext with product_analysis and/or original_style_reference for restoration support
+        if request.product_analysis or request.original_style_reference_path:
+            logger.info("Creating DesignContext for regeneration/restoration support")
             service.create_design_context(
                 session=session,
                 product_analysis=request.product_analysis,
