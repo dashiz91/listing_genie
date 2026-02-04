@@ -544,6 +544,7 @@ export const HomePage: React.FC = () => {
         { type: 'infographic_1', status: 'pending', label: 'Infographic 1' },
         { type: 'infographic_2', status: 'pending', label: 'Infographic 2' },
         { type: 'lifestyle', status: 'pending', label: 'Lifestyle' },
+        { type: 'transformation', status: 'pending', label: 'Transformation' },
         { type: 'comparison', status: 'pending', label: 'Comparison' },
       ]);
     }
