@@ -180,17 +180,15 @@ async def list_projects(
             if img.status == GenerationStatusEnum.COMPLETE
         ) if session.images else 0
 
-        # Get thumbnail URL (main image)
+        # Get thumbnail URL (main image) - use proxy URL to avoid CORS
         thumbnail_url = None
         main_image = next(
             (img for img in session.images if img.image_type.value == "main" and img.status == GenerationStatusEnum.COMPLETE),
             None
         )
         if main_image and main_image.storage_path:
-            try:
-                thumbnail_url = storage.get_generated_url(session.id, "main", expires_in=3600)
-            except Exception as e:
-                logger.warning(f"Failed to get thumbnail URL for session {session.id}: {e}")
+            # Use proxy URL instead of direct Supabase URL
+            thumbnail_url = f"/api/images/{session.id}/main"
 
         projects.append(ProjectListItem(
             session_id=session.id,
@@ -256,31 +254,24 @@ async def get_project_detail(
         logger.warning(f"Failed to list session files for version discovery: {e}")
 
     # Helper to build version details for a given storage key
+    # Returns proxy URLs (/api/images/...) that bypass CORS issues
     def _build_versions(base_key: str) -> List[ImageVersionDetail]:
         versions = []
         for v in version_map.get(base_key, []):
             versioned_key = f"{base_key}_v{v}"
-            try:
-                v_url = storage.get_generated_url(session.id, versioned_key, expires_in=3600)
-                v_path = f"supabase://generated/{session.id}/{versioned_key}.png"
-                versions.append(ImageVersionDetail(version=v, image_url=v_url, image_path=v_path))
-            except Exception:
-                pass
+            # Use proxy URL instead of direct Supabase URL to avoid CORS
+            v_url = f"/api/images/{session.id}/{versioned_key}"
+            v_path = f"supabase://generated/{session.id}/{versioned_key}.png"
+            versions.append(ImageVersionDetail(version=v, image_url=v_url, image_path=v_path))
         return versions
 
-    # Build image details with signed URLs and versions
+    # Build image details with proxy URLs (avoid CORS issues)
     images = []
     for img in session.images:
         image_url = None
         if img.storage_path and img.status == GenerationStatusEnum.COMPLETE:
-            try:
-                image_url = storage.get_generated_url(
-                    session.id,
-                    img.image_type.value,
-                    expires_in=3600
-                )
-            except Exception as e:
-                logger.warning(f"Failed to get URL for {img.image_type}: {e}")
+            # Use proxy URL instead of direct Supabase URL
+            image_url = f"/api/images/{session.id}/{img.image_type.value}"
 
         img_versions = _build_versions(img.image_type.value) if img.status == GenerationStatusEnum.COMPLETE else []
 
@@ -326,14 +317,21 @@ async def get_project_detail(
         storage_key = f"aplus_full_image_{i}"
         versions = _build_versions(storage_key)
 
-        # Get latest (unversioned) URL for backward compat
+        # Get latest (unversioned) URL - use proxy to avoid CORS
         latest_url = None
         latest_path = None
-        try:
-            latest_url = storage.get_generated_url(session.id, storage_key, expires_in=3600)
+        # Check if file exists by looking at version_map or probing
+        if storage_key in version_map or versions:
+            latest_url = f"/api/images/{session.id}/{storage_key}"
             latest_path = f"supabase://generated/{session.id}/{storage_key}.png"
-        except Exception:
-            pass
+        else:
+            # Probe if unversioned file exists
+            try:
+                storage.client.storage.from_(storage.generated_bucket).download(f"{session.id}/{storage_key}.png")
+                latest_url = f"/api/images/{session.id}/{storage_key}"
+                latest_path = f"supabase://generated/{session.id}/{storage_key}.png"
+            except Exception:
+                pass
 
         # Probe mobile versions - special handling for hero modules
         mobile_url = None
@@ -344,11 +342,17 @@ async def get_project_detail(
             # Module 0: use hero mobile image
             mobile_key = "aplus_full_image_hero_mobile"
             mobile_versions = _build_versions(mobile_key)
-            try:
-                mobile_url = storage.get_generated_url(session.id, mobile_key, expires_in=3600)
+            # Check if mobile file exists
+            if mobile_key in version_map or mobile_versions:
+                mobile_url = f"/api/images/{session.id}/{mobile_key}"
                 mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
-            except Exception:
-                pass
+            else:
+                try:
+                    storage.client.storage.from_(storage.generated_bucket).download(f"{session.id}/{mobile_key}.png")
+                    mobile_url = f"/api/images/{session.id}/{mobile_key}"
+                    mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
+                except Exception:
+                    pass
         elif i == 1:
             # Module 1: skip mobile probing (shares hero mobile with module 0)
             pass
@@ -356,11 +360,16 @@ async def get_project_detail(
             # Modules 2+: standard individual mobile images
             mobile_key = f"aplus_full_image_{i}_mobile"
             mobile_versions = _build_versions(mobile_key)
-            try:
-                mobile_url = storage.get_generated_url(session.id, mobile_key, expires_in=3600)
+            if mobile_key in version_map or mobile_versions:
+                mobile_url = f"/api/images/{session.id}/{mobile_key}"
                 mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
-            except Exception:
-                pass
+            else:
+                try:
+                    storage.client.storage.from_(storage.generated_bucket).download(f"{session.id}/{mobile_key}.png")
+                    mobile_url = f"/api/images/{session.id}/{mobile_key}"
+                    mobile_path = f"supabase://generated/{session.id}/{mobile_key}.png"
+                except Exception:
+                    pass
 
         if latest_url:
             aplus_modules_list.append(AplusModuleDetail(
@@ -394,12 +403,9 @@ async def get_project_detail(
     style_ref_versions_list = _build_versions("style_reference")
     if style_ref_versions_list:
         style_reference_versions = style_ref_versions_list
-        # Get the latest version URL
-        try:
-            style_reference_url = storage.get_generated_url(session.id, "style_reference", expires_in=3600)
-            logger.info(f"[STYLE REF] Found versioned style ref, URL: {style_reference_url[:50]}...")
-        except Exception as e:
-            logger.warning(f"[STYLE REF] Failed to get versioned URL: {e}")
+        # Use proxy URL to avoid CORS issues
+        style_reference_url = f"/api/images/{session.id}/style_reference"
+        logger.info(f"[STYLE REF] Found versioned style ref, using proxy URL")
 
     # Fallback chain if no versioned style reference found
     if not style_reference_url:
