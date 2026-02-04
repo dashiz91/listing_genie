@@ -1,10 +1,9 @@
 """
-A+ Content Module Prompt Templates
+A+ Content Module Prompt Templates - Principle-Based Creative Direction
 
 These templates power the Art Director visual script system for generating
-Premium A+ Content images. The Art Director plans the entire A+ section as
-one continuous visual narrative, then guides each module's generation with
-rich creative direction.
+Premium A+ Content images. Uses the same vocabulary triggers and product
+protection philosophy as listing images for consistent quality.
 
 Philosophy: Great A+ content feels like one seamless scroll — a visual story
 that pulls the customer deeper into the brand world with every banner.
@@ -12,74 +11,68 @@ that pulls the customer deeper into the brand world with every banner.
 import json
 from typing import Optional
 
+from ..vocabulary import get_aplus_quality_standard
+from ..product_protection import PRODUCT_PROTECTION_DIRECTIVE
+
 
 # ============================================================================
 # LEGACY PROMPTS (fallback when no visual script exists)
 # ============================================================================
 
-APLUS_FULL_IMAGE_BASE = """You are an award-winning commercial photographer and art director shooting a premium
-Amazon A+ Content banner for {product_title}.
+APLUS_FULL_IMAGE_BASE = """Sotheby's catalog. Campaign imagery. Cinematic.
 
-THE BRIEF:
-Brand "{brand_name}" needs a wide cinematic banner that stops the scroll. The audience —
-{target_audience} — should feel something the instant they see it. This isn't a product photo.
-This is a brand moment.
+You're creating a premium A+ Content banner for {product_title}.
+Brand "{brand_name}" needs a wide frame that stops the scroll.
+
+The audience — {target_audience} — should feel something instantly.
+This isn't a product photo. This is a brand moment.
 
 PRODUCT DNA:
-The product's standout qualities: {features}
+{features}
 
 CREATIVE DIRECTION ({framework_name}):
-Visual identity: {framework_style}
-Hero color: {primary_color} — use this to anchor the composition, not flood it.
-Supporting palette: {color_palette}
-Emotional register: {framework_mood}
+{framework_style}
+Hero color: {primary_color} — anchor the composition, don't flood it.
+Palette: {color_palette}
+Mood: {framework_mood}
 
-WHAT TO CREATE:
-A wide-format banner (roughly 2.4:1) that feels like a frame from a luxury brand film.
-The product must be the undeniable star, but the environment around it should whisper
-the brand story. Think editorial, not catalog.
+THE PRODUCT IS SACRED:
+Use the product reference photos to capture the REAL product — its materials,
+proportions, colors, and character. Never invent a different product.
+Brand colors live in atmosphere — lighting, surfaces, gradients.
+Never flat graphic overlays. Never touching the product itself.
 
-Use the product reference photos to capture the REAL product — its materials, proportions,
-colors, and character. Don't invent a different product.
-
-Let the brand colors live in the background, lighting, and atmosphere — not as flat graphic
-blocks. The palette should feel like it belongs to the scene, not painted on top.
-
-Leave breathing room at the top and bottom edges. The design should feel like it extends
-beyond the frame — as if this banner is a window into a larger world.
+FORMAT:
+Wide cinematic banner (2.4:1). Editorial, not catalog.
+Breathing room at edges — the design extends beyond the frame.
 
 ABSOLUTE RULES:
-- NEVER include any website UI, Amazon navigation, search bars, browser chrome, or page elements. This is a standalone product image.
-- Do NOT render any text, headlines, logos, or typography in the image. Produce a purely photographic/visual composition.
+- NEVER include website UI, Amazon navigation, browser chrome
+- Do NOT render text, headlines, logos in the image
+- Pure photographic/visual composition only
 """
 
 APLUS_CONTINUITY_ADDITION = """
-CONTINUITY DIRECTIVE:
-This banner sits DIRECTLY below another banner. The reference image is what appears above you.
-
-Your job: make the seam disappear. The viewer should never notice where one banner ends
-and the next begins. Match the background's gradient direction, color temperature, lighting
-angle, shadow behavior, and any decorative rhythms. If there's a surface, continue it.
-If there's a gradient, extend it. If there's a pattern, let it flow.
-
-Both banners are one continuous canvas that happened to be split in two.
+CONTINUITY:
+This banner sits directly below another. Make the seam disappear.
+Match gradient direction, color temperature, lighting angle, shadow behavior.
+Both banners are one continuous canvas split in two.
 """
 
 APLUS_FULL_IMAGE_FIRST = APLUS_FULL_IMAGE_BASE + """
 OPENING MOVE:
-This is the first thing they see when they scroll to your A+ section.
-Design the background with downward momentum — gradients that pull the eye south,
-surfaces that recede toward the bottom edge, light that invites further scrolling.
-Plant visual seeds that the modules below will grow.
+First thing they see in your A+ section. Design with downward momentum.
+Gradients pulling south, surfaces receding, light inviting further scroll.
+Plant visual seeds that modules below will grow.
 """
 
 APLUS_FULL_IMAGE_CHAINED = APLUS_FULL_IMAGE_BASE + APLUS_CONTINUITY_ADDITION
 
 APLUS_FULL_IMAGE_LAST = APLUS_FULL_IMAGE_BASE + APLUS_CONTINUITY_ADDITION + """
 CLOSING FRAME:
-This is the final banner. The visual story resolves here. The background should settle —
-gradients reaching their destination, surfaces finding rest, the composition achieving
-a sense of quiet confidence. The customer should feel: "I've seen enough. I want this."
+Final banner. Visual story resolves. Background settles.
+Gradients reach destination, compositions find rest.
+Customer feels: "I've seen enough. I want this."
 """
 
 
@@ -133,12 +126,10 @@ def get_aplus_prompt(
 # ART DIRECTOR VISUAL SCRIPT SYSTEM
 # ============================================================================
 
-VISUAL_SCRIPT_PROMPT = """You are an Art Director at a top-tier e-commerce creative agency. You've directed
-campaigns for Samsung, Dyson, Apple, Glossier, and Aesop. Today you're planning an Amazon Premium A+ Content
-section — {module_count} full-width banners (1464×600 each) that stack vertically into one editorial scroll.
+VISUAL_SCRIPT_PROMPT = """You are an Art Director at a top-tier agency. Samsung, Dyson, Apple, Glossier, Aesop.
+Today: Amazon Premium A+ Content — {module_count} full-width banners (1464×600) stacking into one editorial scroll.
 
-You design like Samsung's Galaxy A+ pages: each module is a carefully composed editorial frame with bold
-typography, clean backgrounds, and product photography that tells a story through RHYTHM and CONTRAST.
+Sotheby's catalog quality. Campaign imagery standards.
 
 THE PRODUCT:
 - {product_title}
@@ -146,7 +137,7 @@ THE PRODUCT:
 - What makes it special: {features}
 - Who it's for: {target_audience}
 
-THE DESIGN LANGUAGE (selected framework):
+THE DESIGN LANGUAGE:
 - Identity: {framework_name}
 - Philosophy: {design_philosophy}
 - Palette: {color_palette}
@@ -154,220 +145,158 @@ THE DESIGN LANGUAGE (selected framework):
 - Story arc: {story_arc}
 - Visual treatment: {visual_treatment}
 
-I've attached the actual product photos. STUDY THEM. Notice the materials, the finish, the scale,
-the color. Your script must reflect the REAL product, not an imagined one.
+Study the attached product photos. Notice materials, finish, scale, color.
+Your script must reflect the REAL product, not an imagined one.
 
-═══════════════════════════════════════════════════════════════════════
-THE EDITORIAL DESIGN SYSTEM
-═══════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════════════
+                         THE EDITORIAL DESIGN SYSTEM
+═══════════════════════════════════════════════════════════════════════════════
 
 STRUCTURE — THE {module_count}-MODULE ARC:
 
-Modules 0+1 are the HERO PAIR. They form ONE continuous image that gets split in half.
-The product should be DRAMATICALLY LARGE, filling the full height of both modules combined,
-shot at a dynamic angle. Module 0 shows the top portion (intentionally cropped at the bottom —
-we only see 50-60% of the product). Module 1 reveals the rest of the product plus the brand/product
-name as text. Together they create a "wow" moment like Samsung's Galaxy hero banners.
+Modules 0+1 = HERO PAIR. ONE continuous image split in half.
+Product DRAMATICALLY LARGE, filling full height of both modules combined.
+Module 0: Top portion (50-60% of product visible, cropped at bottom).
+Module 1: Reveals the rest + brand/product name as text.
+Together: "wow" moment like Samsung's Galaxy hero banners.
 
-Modules 2-5 are INDEPENDENT editorial compositions. Each one is its own frame with:
-- A SHORT PUNCHY HEADLINE (2-5 words, bold, large) — e.g. "Big. Bright. Smooth." or "Built to Last."
-- Supporting body copy (1-2 sentences explaining the feature)
-- Optional spec callouts (large numbers + units, e.g. "4,900 mAh" or "6.7 inches")
-- The product shown from a DIFFERENT angle each time
-- Clean background (solid color or subtle gradient — NOT busy scenes)
+Modules 2-5 = INDEPENDENT editorial compositions. Each one:
+- SHORT PUNCHY HEADLINE (2-5 words) — "Big. Bright. Smooth."
+- Supporting body copy (1-2 sentences)
+- Optional spec callouts (large numbers + units)
+- Product from a DIFFERENT angle each time
+- Clean background (solid or subtle gradient — NOT busy scenes)
 
-BACKGROUND RHYTHM — You MUST alternate backgrounds using ONLY colors from the framework palette above.
-NEVER default to generic white or generic black — always pick a specific hex from the palette.
-- Modules 0+1 (hero): Framework primary color as background (e.g. {color_palette} — pick the primary)
-- Module 2: The lightest color from the palette (or the text_light color). If the palette has no
-  near-white, use a very light tint of the primary color.
-- Module 3: The darkest color from the palette (text_dark, or the deepest secondary/accent).
-  This is the "drama beat" — use a DARK shade from the palette, NOT generic black.
-- Module 4: Light palette color again (same as module 2, or another light palette entry)
-- Module 5: Return to framework primary/secondary color — bookend the section
+BACKGROUND RHYTHM — Alternate using ONLY framework palette colors:
+- Modules 0+1 (hero): Framework primary color
+- Module 2: Lightest palette color
+- Module 3: Darkest palette color (drama beat)
+- Module 4: Light again
+- Module 5: Return to primary/secondary (bookend)
 
-⚠️ EVERY background MUST be a color from the framework palette or a tint/shade of one.
-The palette IS the brand identity. Using generic white (#FFFFFF) is ONLY acceptable if #FFFFFF
-is explicitly in the palette. Same for black.
+Every background MUST be from the framework palette or a tint/shade of one.
+The palette IS the brand identity.
 
-This palette-driven rhythm creates visual chapters while maintaining brand consistency.
+LAYOUT ALTERNATION — Ping-pong composition:
+- Module 2: Product LEFT, text RIGHT
+- Module 3: Text LEFT, product RIGHT
+- Module 4: Product LEFT, text RIGHT
+- Module 5: Text LEFT, product RIGHT
 
-LAYOUT ALTERNATION — Ping-pong the composition:
-- Module 2: Product on LEFT, text on RIGHT
-- Module 3: Text on LEFT, product on RIGHT
-- Module 4: Product on LEFT, text on RIGHT
-- Module 5: Text on LEFT, product on RIGHT
-(Or vice versa — just alternate consistently.)
+PRODUCT ANGLE PROGRESSION:
+- Modules 0+1: Dramatic tilt, close-up, HUGE
+- Module 2: 3/4 angle, feature callouts
+- Module 3: Front-facing or detail close-up
+- Module 4: Multiple angles or product in context
+- Module 5: Lifestyle/ecosystem or final beauty angle
 
-PRODUCT ANGLE PROGRESSION — Show the product differently every time:
-- Module 0+1 hero: Dramatic tilt, close-up, product HUGE
-- Module 2: 3/4 angle, feature callout lines pointing to details
-- Module 3: Front-facing or detail close-up, moody lighting
-- Module 4: Multiple angles or sizes side-by-side, or product in context
-- Module 5: Lifestyle/ecosystem shot, or final beauty angle
+MODULE ROLES (pick best for THIS audience):
+- "hero_reveal": Dramatic intro (always modules 0+1)
+- "feature_specs": Technical callouts — "What am I getting?"
+- "craftsmanship": Close-up details — "Is this well-made?"
+- "lifestyle_context": Real environment — "Will this fit my life?"
+- "versatility": Multiple uses — "Is it flexible?"
+- "comparison": Before/after — "Why not the cheaper one?"
+- "social_proof": Awards, certifications — "Do others trust this?"
+- "ecosystem": Related products — "What else should I get?"
 
-MODULE ROLE MENU — Pick the best role for each module based on what would persuade THIS audience:
-- "hero_reveal": Dramatic product intro (always modules 0+1)
-- "feature_specs": Technical callout lines, dimensions, materials — "What am I getting?"
-- "craftsmanship": Close-up details, materials, texture — "Is this well-made?"
-- "lifestyle_context": Product in a real environment — "Will this fit my life/space?"
-- "versatility": Multiple uses, sizes, configurations — "Is it flexible enough?"
-- "comparison": Before/after or vs. alternatives — "Why not the cheaper one?"
-- "social_proof": Ratings, awards, certifications — "Do others trust this?"
-- "ecosystem": Related products, bundles, accessories — "What else should I get?"
-
-Choose roles for modules 2-5 that would most effectively persuade {target_audience} to buy {product_title}.
-Don't repeat roles. Each module must earn its place.
-
-═══════════════════════════════════════════════════════════════════════
-TYPOGRAPHY IN THE IMAGE
-═══════════════════════════════════════════════════════════════════════
-
-Text IS rendered in the image. This is a key part of the design. For each module:
+═══════════════════════════════════════════════════════════════════════════════
+                         TYPOGRAPHY IN THE IMAGE
+═══════════════════════════════════════════════════════════════════════════════
 
 HERO PAIR (modules 0+1):
 - Module 0: NO text. Pure dramatic product photography.
-- Module 1: Brand name (smaller, above) + Product name (large, bold). Placed in the open space
-  beside or below the revealed product. Clean and confident.
+- Module 1: Brand name (smaller) + Product name (large, bold).
 
 FEATURE MODULES (2-5):
-- HEADLINE: 2-5 words, BOLD, large. Punchy and benefit-driven. Think Samsung style:
-  "Big. Bright. Smooth." / "More power. Less plugging in." / "Built to outlast."
-- BODY COPY: 1-2 sentences, smaller, lighter weight. Explains the headline. Conversational tone.
-- SPEC CALLOUTS (optional): Large numbers + small units. e.g. "4,900 mAh" or "12 MP"
-  with a small label underneath like "Battery capacity" or "Wide-angle Camera"
+- HEADLINE: 2-5 words, BOLD, large. "Big. Bright. Smooth."
+- BODY COPY: 1-2 sentences, smaller, lighter weight.
+- SPEC CALLOUTS: Large numbers + small units. "4,900 mAh"
 
-Typography should use the framework's font choices. Headlines in headline font (bold),
-body in body font (regular weight). Keep text to ONE SIDE of the composition — never scatter
-text across the image. Leave breathing room around text blocks.
+Typography uses framework fonts. Headlines bold, body regular.
+Keep text to ONE SIDE — never scatter across image.
 
-⚠️ CRITICAL: When writing prompts, describe fonts and colors SEPARATELY from the text strings.
-The image model renders everything near a quoted string as visible text. NEVER write font names
-or hex codes adjacent to the text content.
-  BAD:  «"BRAND NAME" in Quicksand Bold #544381»  (model renders "Quicksand Bold #544381" as text)
-  GOOD: «The text "BRAND NAME" appears large and bold in a rounded sans-serif font, colored #544381.»
+CRITICAL: Describe fonts and colors SEPARATELY from text strings.
+  BAD:  "BRAND NAME" in Quicksand Bold #544381
+  GOOD: The text "BRAND NAME" appears large and bold, colored #544381.
 
-═══════════════════════════════════════════════════════════════════════
-CONTINUITY SYSTEM
-═══════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════════════
+                         CONTINUITY SYSTEM
+═══════════════════════════════════════════════════════════════════════════════
 
-Modules 0+1 use our HERO PAIR technique: We generate ONE tall 4:3 image covering both modules,
-then split it at the exact horizontal midpoint. Both halves come from the same pixel output —
-guaranteed perfect alignment, zero seam.
+Modules 0+1 = HERO PAIR technique: ONE tall 4:3 image split at midpoint.
+Both halves from same pixel output — guaranteed perfect alignment.
 
-You must write a single `hero_pair_prompt` (300-500 words) at the top level of your JSON output.
-This is the COMPLETE prompt sent directly to the image generation model for generating the tall image.
-Do NOT write `generation_prompt` for modules 0 or 1 — they share the hero_pair_prompt.
-
-The `hero_pair_prompt` must include:
-1. Format: "Single tall 4:3 image (~1464×1098). Split at horizontal midpoint into two 1464×600 banners."
-2. Product placement: THE SAME SINGLE PRODUCT must cross the midline — dramatically large, dynamic
-   angle, spanning from top half into bottom half as one continuous object. Do NOT introduce packaging,
-   boxes, or a second/smaller copy of the product. The bottom half reveals the REST of the same product.
-3. Background: exact hex from palette, continuous top to bottom
-4. Typography: bottom half only — specify the EXACT TEXT STRINGS to render (brand name and product name).
-   Describe the font style in natural language (e.g. "clean sans-serif, bold, large") and the text color
-   as a hex code. ⚠️ NEVER put font names, font weights, or hex codes next to the text strings in a way
-   that could be read as part of the visible text. BAD: «"BRAND NAME" in Quicksand Bold #544381»
-   GOOD: «The text "BRAND NAME" appears in a bold rounded sans-serif font, colored #544381.»
-5. Top half: NO text, pure product photography
-6. Reference images: "Use PRODUCT_PHOTO for exact product. Match STYLE_REFERENCE mood/style."
-7. Lighting setup description
-8. Rules: no website UI, no Amazon navigation, no product packaging/boxes unless the product IS packaging
-
-For modules 2-5: scene_description is OPTIONAL. Only include it if you want canvas continuity
-between consecutive modules (e.g. modules 2→3 sharing a background). For contrast breaks
-(like white→dark), do NOT provide scene_description — let each module generate independently.
-
-═══════════════════════════════════════════════════════════════════════
-REFERENCE IMAGES
-═══════════════════════════════════════════════════════════════════════
-
-When generating each banner, the model receives these named reference images:
-- `PRODUCT_PHOTO` — the actual product (always present)
-- `STYLE_REFERENCE` — the visual style direction (if available)
-- `PREVIOUS_MODULE` — the banner directly above this one (modules 1+ only)
-
-Your prompts MUST reference PRODUCT_PHOTO and STYLE_REFERENCE by name.
-For the hero pair (modules 0+1), the PREVIOUS_MODULE reference is handled automatically by the
-canvas continuity system — you do NOT need to reference it in module 1's prompt.
-
-═══════════════════════════════════════════════════════════════════════
-YOUR OUTPUT
-═══════════════════════════════════════════════════════════════════════
-
-Write a `hero_pair_prompt` at the TOP LEVEL of your JSON — this is the single prompt for the
-tall 4:3 hero image (modules 0+1). See CONTINUITY SYSTEM above for what it must contain.
+Write a single `hero_pair_prompt` (200-350 words) at top level of JSON.
 Do NOT write `generation_prompt` for modules 0 or 1.
 
-For modules 2-5, write a `generation_prompt` — the COMPLETE, ready-to-use prompt (300-500 words)
-that will be sent directly to the image generation model.
+hero_pair_prompt must include:
+1. Format: "Single tall 4:3 image (~1464×1098). Split at midpoint."
+2. Product: ONE product crossing midline — large, dynamic angle
+3. Background: exact hex from palette, continuous top to bottom
+4. Typography: bottom half only — brand name + product name
+5. Top half: NO text, pure product photography
+6. Reference images: "Use PRODUCT_PHOTO. Match STYLE_REFERENCE mood."
+7. Rules: no website UI, no Amazon navigation, no product packaging
 
-Each module 2-5 prompt must include:
-1. Role statement ("You are a commercial photographer and typographer...")
-2. Format ("wide 2.4:1 banner, 1464×600")
-3. Reference images ("Use PRODUCT_PHOTO as reference for the real product. Match the visual style of STYLE_REFERENCE.")
-4. Background — MUST specify the EXACT hex color from the framework palette. e.g. "The background is solid #E6DFF7 (Soft Lilac)." NEVER say "pure white" or "black" unless that exact hex is in the palette.
-5. Product placement (position, angle, scale, what part is visible)
-6. Typography — use the framework's font names. e.g. "Headlines in Quicksand Bold, body in Montserrat Regular." Use text colors from the palette.
-7. Layout (which side has product, which side has text)
-8. Rules: NEVER include website UI, Amazon navigation, or browser chrome.
-9. Style continuity: "Match the color palette, mood, and visual language of STYLE_REFERENCE throughout."
+═══════════════════════════════════════════════════════════════════════════════
+                         REFERENCE IMAGES
+═══════════════════════════════════════════════════════════════════════════════
 
-Respond with ONLY valid JSON (no markdown, no code fences):
+Each banner receives:
+- `PRODUCT_PHOTO` — the actual product (always)
+- `STYLE_REFERENCE` — visual style direction (if available)
+- `PREVIOUS_MODULE` — banner above (modules 1+ only)
+
+Your prompts MUST reference PRODUCT_PHOTO and STYLE_REFERENCE by name.
+
+═══════════════════════════════════════════════════════════════════════════════
+                         OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════════════════════
+
+Respond with ONLY valid JSON:
 {{
-  "narrative_theme": "The single sentence that captures the whole visual story",
-  "color_flow": "How the palette evolves — which module gets which background color",
-  "background_strategy": "The rhythm pattern: [color] → [color] → white → dark → white → [color]",
-  "hero_pair_prompt": "The COMPLETE 300-500 word prompt for ONE tall 4:3 image that will be split into modules 0+1. Must include format spec, product crossing midline, background hex, typography in bottom half only, reference image names, lighting, and rules.",
+  "narrative_theme": "Single sentence capturing the visual story",
+  "color_flow": "How palette evolves — which module gets which color",
+  "background_strategy": "Rhythm pattern",
+  "hero_pair_prompt": "COMPLETE 200-350 word prompt for tall 4:3 hero image",
   "modules": [
     {{
       "index": 0,
       "role": "hero_reveal",
-      "headline": "NO TEXT — pure product drama",
-      "mood": "The feeling this banner evokes",
-      "scene_description": "50-100 words describing the top half of the hero pair — product angle, background, lighting.",
+      "headline": "NO TEXT",
+      "mood": "Feeling this evokes",
+      "scene_description": "50-100 words: top half",
       "render_text": null
     }},
     {{
       "index": 1,
       "role": "hero_reveal",
       "headline": "Brand + Product Name",
-      "mood": "The feeling this banner evokes",
-      "scene_description": "50-100 words describing the bottom half — revealed product, text placement, same background.",
-      "render_text": {{
-        "headline": null,
-        "body_copy": null,
-        "spec_callouts": null,
-        "text_position": "left or right"
-      }}
+      "mood": "Feeling",
+      "scene_description": "50-100 words: bottom half",
+      "render_text": {{"headline": null, "body_copy": null, "spec_callouts": null, "text_position": "left or right"}}
     }},
     {{
       "index": 2,
-      "role": "feature_specs | craftsmanship | lifestyle_context | etc.",
+      "role": "feature_specs | craftsmanship | etc.",
       "mood": "...",
-      "scene_description": "OPTIONAL — only if you want continuity with the previous module.",
-      "render_text": {{
-        "headline": "The exact headline text to render (2-5 words)",
-        "body_copy": "The exact body copy (1-2 sentences)",
-        "spec_callouts": ["Optional array of spec strings like '4,900 mAh' or '12 MP'"],
-        "text_position": "left or right — which side of the banner the text block goes on"
-      }},
-      "generation_prompt": "The COMPLETE 300-500 word prompt..."
+      "scene_description": "OPTIONAL — only for continuity",
+      "render_text": {{"headline": "2-5 words", "body_copy": "1-2 sentences", "spec_callouts": [], "text_position": "left or right"}},
+      "generation_prompt": "COMPLETE 200-350 word prompt..."
     }}
   ]
 }}
 
-Generate exactly {module_count} modules. Make each one earn its place — no filler, no repetition.
-The customer already saw the listing photos. This A+ section must close the deal.
+Generate exactly {module_count} modules. Each earns its place — no filler.
 """
 
 
-APLUS_MODULE_WITH_SCRIPT = """You are a commercial photographer executing a premium Amazon A+ banner for {product_title}.
+APLUS_MODULE_WITH_SCRIPT = """Sotheby's catalog. Campaign imagery. Cinematic.
 
-The Art Director has scripted the entire A+ section as one continuous visual world. Your job is to bring
-THIS specific frame to life — faithful to the script, but with the craft and instinct of someone who
-understands light, composition, and what makes people stop scrolling.
+You're executing a premium A+ banner for {product_title}.
+The Art Director scripted the entire section as one continuous visual world.
+Bring THIS frame to life — faithful to the script, with craft and instinct.
 
 PRODUCT:
 - Brand: {brand_name}
@@ -376,10 +305,10 @@ PRODUCT:
 
 VISUAL IDENTITY ({framework_name}):
 {design_philosophy}
-Anchor color: {primary_color} | Full palette: {color_palette}
-Emotional tone: {framework_mood}
+Anchor color: {primary_color} | Palette: {color_palette}
+Mood: {framework_mood}
 
-THE ART DIRECTOR'S VISION FOR THE FULL SECTION:
+THE ART DIRECTOR'S VISION:
 "{narrative_theme}"
 Color journey: {color_flow}
 Background world: {background_strategy}
@@ -401,19 +330,19 @@ POSITION: {module_position}
 {position_instruction}
 
 CRAFT NOTES:
-- Wide format, roughly 2.4:1 — think cinematic, not square.
-- Use the product reference photos for the REAL product. Honor its actual materials and proportions.
-- The style reference image shows the visual direction — match its mood, lighting quality, and sophistication level.
-- Let brand colors live in the scene naturally — through lighting, surfaces, and atmosphere, not flat graphic overlays.
-- This should feel like a frame from a premium brand film, not a design template.
-- NEVER include any website UI, Amazon navigation, search bars, browser chrome, or page elements. This is a standalone product image.
-- Do NOT render any text, headlines, logos, or typography in the image. Produce a purely photographic/visual composition.
+- Wide format (2.4:1) — cinematic, not square
+- Use product reference for REAL product. Honor materials and proportions.
+- Style reference = visual direction. Match mood, lighting, sophistication.
+- Brand colors in scene naturally — lighting, surfaces, atmosphere
+- Frame from a premium brand film, not a template
+- NEVER include website UI, Amazon navigation, browser chrome
+- Do NOT render text, headlines, logos in the image
 
 {continuity_instruction}"""
 
 
 # ============================================================================
-# IMAGE LABEL CONSTANTS (used in both prompt template and backend generation)
+# IMAGE LABEL CONSTANTS
 # ============================================================================
 
 IMAGE_LABEL_PRODUCT = "PRODUCT_PHOTO"
@@ -421,43 +350,45 @@ IMAGE_LABEL_STYLE = "STYLE_REFERENCE"
 IMAGE_LABEL_PREVIOUS = "PREVIOUS_MODULE"
 
 
-CANVAS_INPAINTING_PROMPT = """CANVAS_TO_COMPLETE is split into two halves:
-- TOP HALF: A finished photograph showing {previous_scene_description}
-- BOTTOM HALF: Solid bright green (#00FF00) — this is a placeholder that must be replaced.
+CANVAS_INPAINTING_PROMPT = """CANVAS_TO_COMPLETE is split in two:
+- TOP HALF: Finished photograph showing {previous_scene_description}
+- BOTTOM HALF: Solid bright green (#00FF00) — placeholder to replace
 
-YOUR TASK: Replace the bottom green half with new content to create ONE seamless continuous photograph.
-The bottom half should show: {current_scene_description}
+YOUR TASK: Replace bottom green half with new content. ONE seamless photograph.
+Bottom half should show: {current_scene_description}
 
-CRITICAL RULES:
-- Keep the top half photograph intact — do NOT change it.
-- Replace ONLY the bottom green half with the new scene content.
-- The transition between the existing top photograph and the new bottom must be seamless — ONE continuous image, no visible seam, edge, or line.
-- Same lighting direction, same perspective, same surfaces continuing from top into bottom.
-- Use PRODUCT_PHOTO as reference for what the real product looks like.
-- Use STYLE_REFERENCE to match the visual style and mood.
+RULES:
+- Keep top half intact — do NOT change it
+- Replace ONLY the bottom green half
+- Transition must be seamless — ONE continuous image, no visible seam
+- Same lighting direction, perspective, surfaces continuing
+- Use PRODUCT_PHOTO for real product reference
+- Use STYLE_REFERENCE for visual style and mood
 """
 
 
-HERO_PAIR_PROMPT = """Generate ONE single tall portrait photograph — NOT two separate panels or compositions.
-This image will later be cropped into two halves, so it MUST look like one seamless photo from top to bottom.
+HERO_PAIR_PROMPT = """Generate ONE single tall portrait photograph — NOT two separate panels.
+This image will later be cropped into two halves. Must look like one seamless photo top to bottom.
 
-CRITICAL: Do NOT compose this as "top section" and "bottom section". Think of it as ONE tall editorial magazine photograph that happens to be cropped later. The viewer should NOT be able to tell where the crop line is.
+CRITICAL: Do NOT compose as "top section" and "bottom section."
+Think: ONE tall editorial magazine photograph that happens to be cropped later.
+The viewer should NOT be able to tell where the crop line is.
 
 REFERENCE IMAGES:
-- PRODUCT_PHOTO: The actual product — honor its materials, proportions, and character.
-- STYLE_REFERENCE: Match this visual style, mood, and color treatment throughout.
+- PRODUCT_PHOTO: The actual product — honor materials, proportions, character
+- STYLE_REFERENCE: Match this visual style, mood, and color treatment
 
 ═══ ART DIRECTOR'S CREATIVE BRIEF ═══
 
 {hero_pair_brief}
 
 ═══ COMPOSITION RULES (NON-NEGOTIABLE) ═══
-- This is ONE continuous photograph, NOT two stacked panels
-- The product should be positioned so it naturally spans the vertical center of the image
-- Background must be one continuous color, gradient, or environment from top edge to bottom edge — no dividing lines, no color shifts at the midpoint
-- Place any brand name or product title text in the lower third only, integrated naturally into the scene
-- NEVER include website UI, Amazon navigation, search bars, or browser chrome
-- Do NOT duplicate the product — show it ONCE, large, crossing through the center of the frame
+- ONE continuous photograph, NOT two stacked panels
+- Product naturally spans vertical center of image
+- Background: one continuous color/gradient top to bottom — no dividing lines
+- Text in lower third only, integrated naturally
+- NEVER include website UI, Amazon navigation, browser chrome
+- Do NOT duplicate the product — show it ONCE, large, crossing center
 
 {custom_instructions_block}"""
 
@@ -468,16 +399,10 @@ def build_hero_pair_prompt(
     brand_name: str,
     custom_instructions: str = "",
 ) -> str:
-    """
-    Build a unified prompt for the hero pair (modules 0+1).
-
-    New path: use hero_pair_prompt from visual script (single unified brief).
-    Fallback: merge per-module generation_prompts from old visual scripts.
-    """
-    # New path: use hero_pair_prompt from visual script
+    """Build unified prompt for hero pair (modules 0+1)."""
     hero_brief = visual_script.get("hero_pair_prompt")
 
-    # Fallback for old visual scripts that have per-module generation_prompts
+    # Fallback for old visual scripts
     if not hero_brief:
         modules = visual_script.get("modules", [])
         parts = []
@@ -487,7 +412,7 @@ def build_hero_pair_prompt(
             parts.append(f"BOTTOM HALF:\n{modules[1]['generation_prompt']}")
         hero_brief = "\n\n".join(parts) if parts else (
             f"Dramatic product hero for {product_title} by {brand_name}. "
-            f"Single tall 4:3 image (~1464×1098). Product crosses the midline, dramatically large. "
+            f"Single tall 4:3 image (~1464×1098). Product crosses midline, dramatically large. "
             f"Typography in bottom half only — brand name smaller, product name large and bold. "
             f"Top half is pure product photography, no text."
         )
@@ -513,10 +438,8 @@ def build_canvas_inpainting_prompt(
 
 def get_aplus_module_prompt(visual_script: dict, module_index: int, custom_instructions: str = "") -> Optional[str]:
     """
-    Look up the pre-written generation prompt for a module from the visual script.
-
-    Returns the full prompt string if the visual script contains a `generation_prompt`
-    for this module index. Returns None if not found (caller should fall back to legacy).
+    Look up pre-written generation prompt for a module from visual script.
+    Returns None if not found (caller should fall back to legacy).
     """
     modules = visual_script.get("modules", [])
     if module_index >= len(modules):
@@ -568,12 +491,9 @@ def build_aplus_module_prompt(
     custom_instructions: str = "",
     is_chained: bool = False,
 ) -> str:
-    """
-    Build a rich per-module prompt using the Art Director's visual script.
-    """
+    """Build rich per-module prompt using Art Director's visual script."""
     modules = visual_script.get("modules", [])
     if module_index >= len(modules):
-        # Fallback if script doesn't cover this module
         position = "first" if module_index == 0 else "middle"
         colors = framework.get("colors", [])
         return get_aplus_prompt(
@@ -596,32 +516,30 @@ def build_aplus_module_prompt(
     # Position instructions
     if module_index == 0:
         position_instruction = (
-            "This is the opening frame. Design with downward momentum — the eye should want to keep scrolling. "
+            "Opening frame. Design with downward momentum — eye should want to scroll. "
             "Plant visual seeds that pay off in later modules."
         )
         module_position = "FIRST (the opening)"
     elif module_index == module_count - 1:
         position_instruction = (
-            "This is the closing frame. The visual story resolves here — gradients settle, compositions find rest, "
-            "the customer feels confident and ready to buy."
+            "Closing frame. Visual story resolves — gradients settle, compositions rest, "
+            "customer feels confident and ready to buy."
         )
         module_position = "LAST (the close)"
     else:
         position_instruction = (
-            "This is a middle frame. It must seamlessly receive the flow from above and pass it below. "
-            "Deepen the story — reveal something new about the product."
+            "Middle frame. Seamlessly receive flow from above, pass it below. "
+            "Deepen the story — reveal something new."
         )
         module_position = f"{module_index + 1} of {module_count} (middle)"
 
     # Continuity instruction
     if is_chained and module_index > 0:
         continuity_instruction = (
-            "CONTINUITY IS NON-NEGOTIABLE:\n"
-            "The reference image shows the banner directly above yours. Look at the BOTTOM EDGE of that reference — "
-            "its exact colors, gradient direction, lighting, and surface. Your image's TOP EDGE must start with those "
-            "same colors and tones, then gradually transition into your module's own background. The top 20% of your "
-            "image should feel like a natural extension of the previous banner. Do NOT start with a completely different "
-            "color or scene — ease into yours."
+            "CONTINUITY NON-NEGOTIABLE:\n"
+            "Reference image = banner above. Look at its BOTTOM EDGE — exact colors, gradient, lighting. "
+            "Your TOP EDGE starts with those same colors, then transitions into your background. "
+            "Top 20% of your image = natural extension of previous banner."
         )
     else:
         continuity_instruction = ""
