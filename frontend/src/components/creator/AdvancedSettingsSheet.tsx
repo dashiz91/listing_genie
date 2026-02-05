@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Sheet,
@@ -33,6 +33,10 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
   // Color input state
   const [brandColorInput, setBrandColorInput] = useState('#4CAF50');
   const [paletteColorInput, setPaletteColorInput] = useState('#2196F3');
+
+  // File input refs (explicit click needed inside Radix Sheet portal)
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const styleInputRef = useRef<HTMLInputElement>(null);
 
   // Style Library
   const [isStyleLibraryOpen, setIsStyleLibraryOpen] = useState(false);
@@ -249,15 +253,19 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
                       </button>
                     </div>
                   ) : (
-                    <label className="flex items-center justify-center p-4 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-slate-500 transition-colors">
+                    <div
+                      onClick={() => logoInputRef.current?.click()}
+                      className="flex items-center justify-center p-4 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-slate-500 transition-colors"
+                    >
                       <input
+                        ref={logoInputRef}
                         type="file"
                         accept="image/*"
                         onChange={handleLogoChange}
                         className="hidden"
                       />
                       <span className="text-sm text-slate-400">Click to upload logo</span>
-                    </label>
+                    </div>
                   )}
                 </div>
 
@@ -382,8 +390,12 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
                         <div className="flex-grow border-t border-slate-700"></div>
                       </div>
 
-                      <label className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-slate-500 transition-colors bg-slate-800/30">
+                      <div
+                        onClick={() => styleInputRef.current?.click()}
+                        className="flex flex-col items-center justify-center p-3 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-slate-500 transition-colors bg-slate-800/30"
+                      >
                         <input
+                          ref={styleInputRef}
                           type="file"
                           accept="image/*"
                           onChange={handleStyleRefChange}
@@ -393,7 +405,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                         </svg>
                         <span className="text-xs text-slate-400">Upload custom style image</span>
-                      </label>
+                      </div>
                     </div>
                   )}
                 </div>
