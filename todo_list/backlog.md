@@ -49,7 +49,6 @@ The reference should inform visual quality, not become visible copy. Keep actual
 
 ## Completed (reference)
 
-- Style reference toggle default ON + no credits when skipping preview
 - Profile Dropdown (001) - profile icon with menu, credit usage display
 - Out of Credits Modal (002) - modal popup when insufficient credits, upgrade path
 - A+ Preview Integration (003) - unified Desktop/Mobile toggle, module labels on hover, unified panel styling
