@@ -10,6 +10,7 @@ import logging
 import time
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from typing import List, Optional
 from PIL import Image
 
@@ -1824,9 +1825,15 @@ async def replan_all_prompts(
         logger.info(f"Generated {len(listing_prompts)} listing prompts")
 
         # Update framework with new prompts
-        framework['generation_prompts'] = listing_prompts
-        session.design_framework_json = framework
+        # IMPORTANT: Create a new dict to ensure SQLAlchemy detects the change
+        updated_framework = dict(framework)
+        updated_framework['generation_prompts'] = listing_prompts
+        session.design_framework_json = updated_framework
+        flag_modified(session, 'design_framework_json')
         db.commit()
+
+        # Use updated framework for the rest of this request
+        framework = updated_framework
 
         # === STEP 2: Regenerate A+ visual script ===
         logger.info(f"Re-planning A+ visual script for session {request.session_id}")
@@ -1857,8 +1864,9 @@ async def replan_all_prompts(
 
         visual_script = json_module.loads(strip_json_fences(raw_text))
 
-        # Store on session
+        # Store on session (flag_modified ensures SQLAlchemy detects JSON change)
         session.aplus_visual_script = visual_script
+        flag_modified(session, 'aplus_visual_script')
         db.commit()
 
         logger.info(f"Visual script regenerated with {len(visual_script.get('modules', []))} modules")
