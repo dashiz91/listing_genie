@@ -31,21 +31,22 @@ def init_db():
     table_names = inspector.get_table_names()
 
     # Add TRANSFORMATION to imagetypeenum (PostgreSQL only)
+    # Note: SQLAlchemy stores enum NAMES (uppercase) not VALUES (lowercase) in PostgreSQL
     if "postgresql" in SQLALCHEMY_DATABASE_URL:
         try:
             with engine.connect() as conn:
-                # Check if transformation already exists in the enum
+                # Check if TRANSFORMATION already exists in the enum (uppercase, matching enum name)
                 result = conn.execute(text(
-                    "SELECT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'transformation' "
+                    "SELECT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'TRANSFORMATION' "
                     "AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'imagetypeenum'))"
                 ))
                 exists = result.scalar()
                 if not exists:
-                    conn.execute(text("ALTER TYPE imagetypeenum ADD VALUE IF NOT EXISTS 'transformation'"))
+                    conn.execute(text("ALTER TYPE imagetypeenum ADD VALUE IF NOT EXISTS 'TRANSFORMATION'"))
                     conn.commit()
-                    logger.info("Added 'transformation' to imagetypeenum")
+                    logger.info("Added 'TRANSFORMATION' to imagetypeenum")
         except Exception as e:
-            logger.warning(f"Could not add transformation to imagetypeenum: {e}")
+            logger.warning(f"Could not add TRANSFORMATION to imagetypeenum: {e}")
 
     # Only run migrations if tables exist
     if "generation_sessions" in table_names:
