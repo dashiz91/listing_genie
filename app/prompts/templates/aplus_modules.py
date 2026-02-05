@@ -169,15 +169,18 @@ THE PRODUCT:
 Framework: {framework_name}
 Philosophy: {design_philosophy}
 
-**COLOR PALETTE** (Use ONLY these colors — same as listing images):
+**COLOR PALETTE** (3 COLORS MAX — same as listing images):
 {color_palette}
+⚠️  STRICT 3-COLOR RULE: Use ONLY these 3 hex colors + black/white for text contrast.
+NO additional colors, NO invented hues, NO rainbow compositions.
+Premium brands use FEWER colors, not more. Think Apple (white + silver + black).
 
 **TYPOGRAPHY** (Use ONLY these fonts — same as listing images):
 {typography}
 
 ⚠️  CRITICAL RULES:
 1. Every text element uses the framework fonts — NO OTHER FONTS
-2. Every background/accent color comes from the palette — NO INVENTED COLORS
+2. Every background/accent color comes from the 3-color palette — NO INVENTED COLORS
 3. When writing prompts, specify EXACT font names and hex codes
 4. This consistency is what makes 6 listings + 6 A+ modules feel like ONE brand
 
@@ -549,7 +552,7 @@ APLUS_MODULE_WITH_SCRIPT = """Ultra-premium Amazon A+ Content banner. Wide cinem
 
 PRODUCT: {product_title}
 BRAND: {brand_name}
-PALETTE: {primary_color} | {color_palette}
+PALETTE (3 colors ONLY): {primary_color} | {color_palette} — NO other colors. Premium = restrained.
 
 ═══ ART DIRECTOR'S CREATIVE BRIEF — MODULE {module_index} OF {module_count} ═══
 ARCHETYPE: {module_archetype} | ROLE: {module_role}
@@ -576,7 +579,7 @@ CRAFT NON-NEGOTIABLES:
 - Use PRODUCT_PHOTO for the REAL product. Honor its materials, proportions, character.
 - Use STYLE_REFERENCE for visual mood and lighting direction.
 - If BRAND_LOGO is provided, reproduce it faithfully where the archetype calls for it.
-- Brand colors live in the SCENE — lighting, surfaces, atmosphere. Never flat overlays.
+- ONLY 3 brand colors in the SCENE — lighting, surfaces, atmosphere. Never flat overlays. NO extra colors.
 - Wide format (2.4:1) — cinematic, not catalog. Breathing room at edges.
 - This must look like a frame from a luxury brand commercial, NOT a product photo.
 - NEVER include website UI, Amazon navigation, browser chrome.
@@ -750,7 +753,7 @@ The listing images already showed:
         framework_name=framework.get("framework_name", "Professional"),
         design_philosophy=framework.get("design_philosophy", "Clean and modern"),
         color_palette=", ".join(
-            c.get("hex", "") for c in framework.get("colors", [])
+            c.get("hex", "") for c in framework.get("colors", [])[:3]
         ) or "#C85A35",
         typography=json.dumps(framework.get("typography", {})),
         story_arc=json.dumps(framework.get("story_arc", {})),
@@ -903,11 +906,15 @@ def build_aplus_module_prompt(
         colors[0].get("hex", "#C85A35") if colors else "#C85A35",
     )
 
+    # Limit palette to 3 colors max (primary + secondary + accent) — too many colors
+    # overwhelm Gemini and produce rainbow chaos instead of cohesive brand imagery
+    palette_colors = [c.get("hex", "") for c in colors[:3]] if colors else [primary_color]
+
     prompt = APLUS_MODULE_WITH_SCRIPT.format(
         product_title=product_title,
         brand_name=brand_name or "Premium Brand",
         primary_color=primary_color,
-        color_palette=", ".join(c.get("hex", "") for c in colors) or primary_color,
+        color_palette=", ".join(palette_colors),
         module_index=module_index,
         module_count=module_count,
         module_role=mod.get("role", f"Module {module_index + 1}"),

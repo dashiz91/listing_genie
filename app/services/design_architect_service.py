@@ -150,13 +150,13 @@ Think like you're presenting 4 options to a Fortune 500 client.
 
 CRITICAL REQUIREMENTS FOR EACH FRAMEWORK:
 
-1. COLOR PALETTE (5 colors with EXACT hex codes):
+1. COLOR PALETTE (3 colors ONLY with EXACT hex codes):
    - Primary (60%): The dominant color
    - Secondary (30%): Supporting color
    - Accent (10%): Pop of contrast
-   - Text Dark: For dark text
-   - Text Light: For light text on dark backgrounds
+   Premium brands use FEWER colors, not more. Think Apple (white + silver + black).
    Include the color NAME (e.g., "Soft Lilac") and SPECIFIC usage instructions.
+   Text colors derive from the palette — dark text uses Primary darkened, light text uses Secondary lightened.
 
 2. TYPOGRAPHY (SPECIFIC font names that work well):
    Choose from real, commonly available fonts:

@@ -161,7 +161,7 @@ def resize_for_aplus_module(
         raise ValueError(f"Unknown A+ module type: {module_type}")
 
     width, height = APLUS_DIMENSIONS[key]
-    return resize_to_dimensions(image, width, height, method="contain_edge")
+    return resize_to_dimensions(image, width, height, method="cover")
 
 
 def get_aspect_ratio_for_module(module_type: str) -> str:
