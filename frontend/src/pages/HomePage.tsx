@@ -98,7 +98,7 @@ const initialFormData: WorkshopFormData = {
   colorPalette: [],
   globalNote: '',
   styleCount: 4, // Default to 4 style options
-  imageModel: 'gemini-3-pro-image-preview', // Default to Pro model
+  imageModel: 'gemini-2.5-flash-image', // Default to Flash model (cheapest)
 };
 
 export const HomePage: React.FC = () => {
