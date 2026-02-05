@@ -641,6 +641,7 @@ export interface CreditsInfo {
   plan_name: string;
   credits_per_period: number;
   period: string;
+  is_admin: boolean;  // Admin users have unlimited credits
 }
 
 export interface PlanInfo {

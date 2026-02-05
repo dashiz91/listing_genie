@@ -18,6 +18,7 @@ from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.credits_service import (
     CreditsService, PLANS, MODEL_COSTS, estimate_generation_cost
 )
+from app.config import settings as app_config
 from app.config import settings as app_settings
 
 logger = logging.getLogger(__name__)
@@ -276,6 +277,7 @@ class CreditsResponse(BaseModel):
     plan_name: str
     credits_per_period: int
     period: str  # "day" or "month"
+    is_admin: bool = False  # Admin users have unlimited credits
 
 
 class PlanInfo(BaseModel):
@@ -318,15 +320,17 @@ async def get_credits(
     Get current credits balance and plan info.
     """
     credits_service = CreditsService(db)
-    settings = credits_service.get_user_settings(user.id)
-    plan_info = credits_service.get_plan_info(settings.plan_tier)
+    user_settings = credits_service.get_user_settings(user.id)
+    plan_info = credits_service.get_plan_info(user_settings.plan_tier)
+    is_admin = credits_service.is_admin(user.id, user.email)
 
     return CreditsResponse(
-        balance=settings.credits_balance,
-        plan_tier=settings.plan_tier,
+        balance=user_settings.credits_balance,
+        plan_tier=user_settings.plan_tier,
         plan_name=plan_info["name"],
         credits_per_period=plan_info["credits_per_period"],
         period=plan_info["period"],
+        is_admin=is_admin,
     )
 
 
@@ -371,11 +375,12 @@ async def estimate_cost(
     settings = credits_service.get_user_settings(user.id)
 
     if request.operation == "full_listing":
-        # Full listing = framework + 6 listing images + 5 A+ desktop + 5 A+ mobile
+        # Full listing = framework analysis + 4 previews + 6 listing + 6 A+ desktop + 6 A+ mobile
         estimate = estimate_generation_cost(
             num_listing_images=6,
-            num_aplus_modules=5,
+            num_aplus_modules=6,
             include_mobile=True,
+            num_previews=4,
             model=request.model,
         )
         total = estimate["total"]
@@ -386,19 +391,19 @@ async def estimate_cost(
         total = cost
         breakdown = {"listing_images": cost}
     elif request.operation == "aplus":
-        # A+ section (5 desktop + 5 mobile)
+        # A+ section (6 desktop + 6 mobile)
         model_cost = MODEL_COSTS.get(request.model, 2)
-        desktop = 5 * model_cost
-        mobile = 5 * 1  # Mobile transforms are cheap
+        desktop = 6 * model_cost
+        mobile = 6 * 1  # Mobile transforms are always 1 credit
         total = desktop + mobile
         breakdown = {"aplus_desktop": desktop, "aplus_mobile": mobile}
     elif request.operation == "single_image":
         total = credits_service.get_credit_cost("listing_image", request.model, request.count)
         breakdown = {"images": total}
     elif request.operation == "framework":
-        # Framework analysis + 4 previews
-        total = 2 + 4  # Analysis + 4 preview images
-        breakdown = {"analysis": 2, "previews": 4}
+        # Framework analysis (1) + 4 previews (4)
+        total = 1 + 4
+        breakdown = {"analysis": 1, "previews": 4}
     else:
         total = credits_service.get_credit_cost(request.operation, request.model, request.count)
         breakdown = {request.operation: total}
@@ -416,25 +421,47 @@ async def get_model_costs(
     user: User = Depends(get_current_user),
 ):
     """
-    Get credit costs for each model.
+    Get credit costs for each model and operation.
+
+    Models:
+    - Flash (~$0.039/image): 1 credit
+    - Pro (~$0.134/image): 3 credits
+
+    Full listing costs:
+    - With Pro: ~47 credits
+    - With Flash: ~23 credits
     """
     return {
         "models": {
-            "gemini-2.0-flash": {
+            "gemini-2.5-flash": {
                 "name": "Flash (Fast)",
                 "cost": 1,
-                "description": "Fast generation, good for drafts",
+                "description": "Fast generation, great quality (~4¢/image)",
             },
             "gemini-3-pro-image-preview": {
-                "name": "Pro (Quality)",
+                "name": "Pro (Best)",
                 "cost": 3,
-                "description": "High quality, best for final images",
+                "description": "Highest quality, best for final images (~13¢/image)",
             },
         },
         "operations": {
-            "framework_analysis": {"cost": 2, "description": "AI product analysis"},
+            "framework_analysis": {"cost": 1, "description": "AI product analysis"},
             "framework_preview": {"cost": 1, "description": "Style preview image"},
-            "edit_image": {"cost": 1, "description": "Edit existing image"},
+            "listing_image_flash": {"cost": 1, "description": "Listing image (Flash)"},
+            "listing_image_pro": {"cost": 3, "description": "Listing image (Pro)"},
+            "aplus_module_flash": {"cost": 1, "description": "A+ module (Flash)"},
+            "aplus_module_pro": {"cost": 3, "description": "A+ module (Pro)"},
             "aplus_mobile": {"cost": 1, "description": "Mobile transform"},
+            "edit_image": {"cost": 1, "description": "Edit existing image"},
+        },
+        "full_listing": {
+            "with_pro": {
+                "total": 47,
+                "breakdown": "1 analysis + 4 previews + 18 listing (6×3) + 18 A+ desktop (6×3) + 6 mobile",
+            },
+            "with_flash": {
+                "total": 23,
+                "breakdown": "1 analysis + 4 previews + 6 listing + 6 A+ desktop + 6 mobile",
+            },
         },
     }

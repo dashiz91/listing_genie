@@ -8,18 +8,19 @@ import io
 import json as json_module
 import logging
 import time
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from PIL import Image
 
-from app.core.auth import User, get_optional_user
+from app.core.auth import User, get_optional_user, get_current_user
 from app.db.session import get_db
 from app.services.gemini_service import GeminiService, get_gemini_service, _load_image_from_path
 from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.generation_service import GenerationService
 from app.services.vision_service import VisionService, get_vision_service as get_unified_vision_service
-from app.dependencies import get_storage_service
+from app.services.credits_service import CreditsService, MODEL_COSTS
+from app.dependencies import get_storage_service, get_credits_service
 from app.services.generation_utils import (
     GenerationContext, ReferenceImageSet, assemble_reference_images,
     get_next_version, ensure_design_context, strip_json_fences,
@@ -220,6 +221,8 @@ async def get_session_status(
 async def generate_single_image(
     request: SingleImageRequest,
     service: GenerationService = Depends(get_generation_service),
+    user: Optional[User] = Depends(get_optional_user),
+    credits: CreditsService = Depends(get_credits_service),
 ):
     """
     Generate or regenerate a single image type for an existing session.
@@ -231,6 +234,17 @@ async def generate_single_image(
 
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # === CREDIT CHECK ===
+    if user:
+        model = request.image_model or "gemini-3-pro-image-preview"
+        cost = credits.get_credit_cost("listing_image", model, 1)
+        has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+        if not has_credits:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+            )
 
     try:
         # Convert schema enum to DB enum
@@ -247,6 +261,12 @@ async def generate_single_image(
         # Update session status based on image statuses
         service._update_session_status(session)
 
+        # === DEDUCT CREDITS ===
+        if user and result.status == "complete":
+            model = request.image_model or "gemini-3-pro-image-preview"
+            cost = credits.get_credit_cost("listing_image", model, 1)
+            credits.deduct_credits(user.id, cost, "listing_image", email=user.email)
+
         return SingleImageResponse(
             session_id=session.id,
             image_type=request.image_type,
@@ -255,6 +275,8 @@ async def generate_single_image(
             error_message=result.error_message,
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -266,6 +288,8 @@ async def edit_single_image(
     request: EditImageRequest,
     service: GenerationService = Depends(get_generation_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
+    user: Optional[User] = Depends(get_optional_user),
+    credits: CreditsService = Depends(get_credits_service),
 ):
     """
     Edit an existing generated image with specific instructions.
@@ -293,6 +317,16 @@ async def edit_single_image(
 
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # === CREDIT CHECK ===
+    if user:
+        cost = credits.get_credit_cost("edit_image", count=1)
+        has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+        if not has_credits:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+            )
 
     try:
         # Handle mobile A+ edit separately
@@ -335,6 +369,11 @@ async def edit_single_image(
 
             logger.info(f"Mobile A+ module {module_index} edited and saved: {result.primary_path}")
 
+            # === DEDUCT CREDITS ===
+            if user:
+                cost = credits.get_credit_cost("edit_image", count=1)
+                credits.deduct_credits(user.id, cost, "edit_image", email=user.email)
+
             return SingleImageResponse(
                 session_id=request.session_id,
                 image_type=request.image_type,
@@ -356,6 +395,11 @@ async def edit_single_image(
             model_override=request.image_model,
         )
 
+        # === DEDUCT CREDITS ===
+        if user and result.status == "complete":
+            cost = credits.get_credit_cost("edit_image", count=1)
+            credits.deduct_credits(user.id, cost, "edit_image", email=user.email)
+
         return SingleImageResponse(
             session_id=session.id,
             image_type=request.image_type,
@@ -364,10 +408,10 @@ async def edit_single_image(
             error_message=result.error_message,
         )
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Edit failed: {e}")
         raise HTTPException(status_code=500, detail=f"Edit failed: {str(e)}")
@@ -785,6 +829,7 @@ async def analyze_and_generate_frameworks(
     vision: VisionService = Depends(get_vision_service),
     service: GenerationService = Depends(get_generation_service),
     user: User = Depends(get_optional_user),
+    credits: CreditsService = Depends(get_credits_service),
 ):
     """
     MASTER LEVEL: Analyze product image, generate design frameworks, and create preview images.
@@ -826,6 +871,21 @@ async def analyze_and_generate_frameworks(
         logger.info(f"[API ENDPOINT] Request locked_colors: {request.locked_colors}")
         logger.info(f"[API ENDPOINT] Request style_reference_path: {request.style_reference_path}")
         logger.info("=" * 60)
+
+        # === CREDIT CHECK ===
+        # Framework analysis: 2 credits (analysis) + 1 credit per preview
+        if user:
+            num_previews = 0 if request.skip_preview_generation else request.framework_count
+            analysis_cost = credits.get_credit_cost("framework_analysis", count=1)
+            preview_cost = credits.get_credit_cost("framework_preview", count=num_previews)
+            total_cost = analysis_cost + preview_cost
+
+            has_credits, balance, msg = credits.check_credits(user.id, total_cost, user.email)
+            if not has_credits:
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail=f"Insufficient credits. Need {total_cost}, have {balance}. Please upgrade your plan."
+                )
 
         # Step 1: AI Vision analyzes product and generates framework(s)
         # - Without style reference: 4 different framework options
@@ -958,6 +1018,14 @@ async def analyze_and_generate_frameworks(
             analysis_text = str(product_analysis)
             product_analysis_raw = None
 
+        # === DEDUCT CREDITS ===
+        if user:
+            num_previews = len(frameworks_with_previews)
+            analysis_cost = credits.get_credit_cost("framework_analysis", count=1)
+            preview_cost = credits.get_credit_cost("framework_preview", count=num_previews)
+            total_cost = analysis_cost + preview_cost
+            credits.deduct_credits(user.id, total_cost, "framework_analysis", email=user.email)
+
         return FrameworkGenerationResponse(
             session_id=session.id,
             product_analysis=analysis_text,
@@ -983,6 +1051,7 @@ async def generate_with_framework(
     vision: VisionService = Depends(get_vision_service),
     service: GenerationService = Depends(get_generation_service),
     user: Optional[User] = Depends(get_optional_user),
+    credits: CreditsService = Depends(get_credits_service),
 ):
     """
     MASTER LEVEL - STEP 2: Generate all 5 listing images with the selected framework.
@@ -1007,6 +1076,26 @@ async def generate_with_framework(
     """
     try:
         framework = request.framework
+
+        # === CREDIT CHECK ===
+        if user:
+            # Determine how many images will be generated
+            model = request.image_model or "gemini-3-pro-image-preview"
+            if request.create_only:
+                num_images = 0
+            elif request.single_image_type:
+                num_images = 1
+            else:
+                num_images = 6  # 6 listing images (main + 5 variants)
+
+            if num_images > 0:
+                cost = credits.get_credit_cost("listing_image", model, num_images)
+                has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+                if not has_credits:
+                    raise HTTPException(
+                        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                        detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+                    )
 
         # STEP 1: Generate 5 detailed image prompts for this framework
         logger.info(f"Generating 5 image prompts for framework: {framework.get('framework_name')}")
@@ -1118,12 +1207,23 @@ async def generate_with_framework(
             logger.info("Starting generation of all 5 images...")
             results = await service.generate_all_images(session, model_override=request.image_model)
 
+        # === DEDUCT CREDITS ===
+        if user and not request.create_only:
+            model = request.image_model or "gemini-3-pro-image-preview"
+            # Count how many images were actually generated (complete status)
+            completed_count = sum(1 for r in results if r.status == "complete")
+            if completed_count > 0:
+                cost = credits.get_credit_cost("listing_image", model, completed_count)
+                credits.deduct_credits(user.id, cost, "listing_image", email=user.email)
+
         return GenerationResponse(
             session_id=session.id,
             status=GenerationStatusEnum(session.status.value),
             images=results,
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -1139,6 +1239,7 @@ async def generate_aplus_hero_pair(
     gemini: GeminiService = Depends(get_gemini_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
     db: Session = Depends(get_db),
+    credits: CreditsService = Depends(get_credits_service),
 ):
     """
     Generate the A+ hero pair (modules 0+1) as a single tall image, then split it in half.
@@ -1147,6 +1248,18 @@ async def generate_aplus_hero_pair(
     """
     start_time = time.time()
     logger.info(f"Hero pair request: session={request.session_id}, custom_instructions={request.custom_instructions!r}, ref_images={request.reference_image_paths}")
+
+    # === CREDIT CHECK ===
+    # Hero pair = 1 image generation (results in 2 modules)
+    if user:
+        model = request.image_model or "gemini-3-pro-image-preview"
+        cost = credits.get_credit_cost("aplus_module", model, 1)
+        has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+        if not has_credits:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+            )
 
     try:
         # Get session
@@ -1250,6 +1363,12 @@ async def generate_aplus_hero_pair(
         top_path, top_url, _ = result.saved.get("aplus_full_image_0", ("", "", 1))
         bottom_path, bottom_url, _ = result.saved.get("aplus_full_image_1", ("", "", 1))
 
+        # === DEDUCT CREDITS ===
+        if user and top_path and bottom_path:
+            model = request.image_model or "gemini-3-pro-image-preview"
+            cost = credits.get_credit_cost("aplus_module", model, 1)
+            credits.deduct_credits(user.id, cost, "aplus_hero", email=user.email)
+
         return HeroPairResponse(
             session_id=request.session_id,
             module_0=HeroPairModuleResult(
@@ -1280,6 +1399,7 @@ async def generate_aplus_module(
     gemini: GeminiService = Depends(get_gemini_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
     db: Session = Depends(get_db),
+    credits: CreditsService = Depends(get_credits_service),
 ):
     """
     Generate a single A+ Content module image.
@@ -1288,6 +1408,17 @@ async def generate_aplus_module(
     as previous_module_path. The AI will continue the visual design flow.
     """
     start_time = time.time()
+
+    # === CREDIT CHECK ===
+    if user:
+        model = request.image_model or "gemini-3-pro-image-preview"
+        cost = credits.get_credit_cost("aplus_module", model, 1)
+        has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+        if not has_credits:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+            )
 
     try:
         session = db.query(GenerationSession).filter(
@@ -1510,6 +1641,12 @@ async def generate_aplus_module(
 
         logger.info(f"A+ module generated in {generation_time_ms}ms: {result.primary_path}")
 
+        # === DEDUCT CREDITS ===
+        if user and result.primary_path:
+            model = request.image_model or "gemini-3-pro-image-preview"
+            cost = credits.get_credit_cost("aplus_module", model, 1)
+            credits.deduct_credits(user.id, cost, "aplus_module", email=user.email)
+
         return AplusModuleResponse(
             session_id=request.session_id,
             module_type=request.module_type.value,
@@ -1644,6 +1781,7 @@ async def generate_aplus_mobile(
     gemini: GeminiService = Depends(get_gemini_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
     db: Session = Depends(get_db),
+    credits: CreditsService = Depends(get_credits_service),
 ):
     """
     Generate a mobile-optimized version (600x450, 4:3) of an A+ module
@@ -1654,6 +1792,17 @@ async def generate_aplus_mobile(
     - module_index 1: Returns existing hero mobile image from module 0
     - module_index 2+: Standard individual mobile generation
     """
+
+    # === CREDIT CHECK ===
+    # Mobile transforms cost 1 credit each (skip for module 1 which just returns existing)
+    if user and request.module_index != 1:
+        cost = credits.get_credit_cost("aplus_mobile", count=1)
+        has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+        if not has_credits:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+            )
 
     try:
         session = db.query(GenerationSession).filter(
@@ -1789,6 +1938,11 @@ async def generate_aplus_mobile(
 
             logger.info(f"Hero mobile image generated: {image_path}")
 
+            # === DEDUCT CREDITS ===
+            if user:
+                cost = credits.get_credit_cost("aplus_mobile", count=1)
+                credits.deduct_credits(user.id, cost, "aplus_mobile", email=user.email)
+
             return AplusMobileResponse(
                 session_id=request.session_id,
                 module_index=request.module_index,
@@ -1837,6 +1991,11 @@ async def generate_aplus_mobile(
 
         logger.info(f"Mobile A+ module {request.module_index} generated: {result.primary_path}")
 
+        # === DEDUCT CREDITS ===
+        if user and result.primary_path:
+            cost = credits.get_credit_cost("aplus_mobile", count=1)
+            credits.deduct_credits(user.id, cost, "aplus_mobile", email=user.email)
+
         return AplusMobileResponse(
             session_id=request.session_id,
             module_index=request.module_index,
@@ -1858,6 +2017,8 @@ async def generate_all_aplus_mobile(
     gemini: GeminiService = Depends(get_gemini_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
     db: Session = Depends(get_db),
+    service: GenerationService = Depends(get_generation_service),
+    credits: CreditsService = Depends(get_credits_service),
 ):
     """
     Generate mobile versions for all A+ modules that have desktop images.
@@ -1869,6 +2030,28 @@ async def generate_all_aplus_mobile(
     ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Count how many modules need mobile transforms (excluding module 1)
+    modules_to_generate = []
+    for i in range(7):
+        if i == 1:  # Skip module 1 (uses hero mobile)
+            continue
+        desktop_key = f"aplus_full_image_{i}"
+        try:
+            storage.get_generated_url(request.session_id, desktop_key, expires_in=60)
+            modules_to_generate.append(i)
+        except Exception:
+            continue
+
+    # === CREDIT CHECK ===
+    if user and modules_to_generate:
+        cost = credits.get_credit_cost("aplus_mobile", count=len(modules_to_generate))
+        has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+        if not has_credits:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Insufficient credits. Need {cost} for {len(modules_to_generate)} mobile transforms, have {balance}. Please upgrade your plan."
+            )
 
     # Find all modules with desktop images
     results = []
@@ -1887,10 +2070,12 @@ async def generate_all_aplus_mobile(
             )
             result = await generate_aplus_mobile(
                 request=mobile_req,
+                service=service,
                 user=user,
                 gemini=gemini,
                 storage=storage,
                 db=db,
+                credits=credits,
             )
             results.append({
                 "module_index": i,

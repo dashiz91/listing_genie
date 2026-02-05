@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Empty = allow all (for when credits system is ready)
     allowed_emails: str = ""  # e.g., "robertoxma@hotmail.com,another@email.com"
 
+    # Admin emails - comma-separated list of emails with unlimited credits
+    # These users bypass all credit checks
+    admin_emails: str = "robertoxma@hotmail.com"
+
     # Gemini (Story 2.1)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-pro-image-preview"  # For image GENERATION

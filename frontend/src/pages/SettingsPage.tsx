@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { apiClient, UserSettings, AssetItem, PlanInfo } from '../api/client';
+import { apiClient, UserSettings, AssetItem, PlanInfo, CreditsInfo } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
 export const SettingsPage: React.FC = () => {
@@ -28,6 +28,9 @@ export const SettingsPage: React.FC = () => {
   // Plans state
   const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [currentPlan, setCurrentPlan] = useState<string>('free');
+
+  // Credits state
+  const [creditsInfo, setCreditsInfo] = useState<CreditsInfo | null>(null);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -67,11 +70,21 @@ export const SettingsPage: React.FC = () => {
     }
   }, []);
 
+  const fetchCredits = useCallback(async () => {
+    try {
+      const data = await apiClient.getCredits();
+      setCreditsInfo(data);
+    } catch (err) {
+      console.error('Failed to fetch credits:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSettings();
     fetchAssets();
     fetchPlans();
-  }, [fetchSettings, fetchAssets, fetchPlans]);
+    fetchCredits();
+  }, [fetchSettings, fetchAssets, fetchPlans, fetchCredits]);
 
   const handleSaveBrandPresets = async () => {
     setIsSaving(true);
@@ -319,46 +332,80 @@ export const SettingsPage: React.FC = () => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           Credits
+          {creditsInfo?.is_admin && (
+            <span className="ml-2 px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full">
+              ADMIN
+            </span>
+          )}
         </h2>
 
         <div className="flex items-center gap-6 mb-6">
           <div className="flex-1 bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-            <div className="flex items-baseline gap-2">
-              <span className="text-4xl font-bold text-redd-400">{settings?.usage.credits_balance || 0}</span>
-              <span className="text-slate-400">credits remaining</span>
-            </div>
-            <p className="text-sm text-slate-500 mt-1">
-              {settings?.usage.plan_tier === 'free'
-                ? 'Resets daily at midnight UTC'
-                : 'Resets monthly on billing date'
-              }
-            </p>
+            {creditsInfo?.is_admin ? (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">∞</span>
+                  <span className="text-slate-400">unlimited credits</span>
+                </div>
+                <p className="text-sm text-amber-400/80 mt-1">
+                  Admin account - no credit limits apply
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl font-bold text-redd-400">{settings?.usage.credits_balance || 0}</span>
+                  <span className="text-slate-400">credits remaining</span>
+                </div>
+                <p className="text-sm text-slate-500 mt-1">
+                  {settings?.usage.plan_tier === 'free'
+                    ? 'Resets daily at midnight UTC'
+                    : 'Resets monthly on billing date'
+                  }
+                </p>
+              </>
+            )}
           </div>
           <div className="text-right">
             <p className="text-sm text-slate-400">Current Plan</p>
-            <p className="text-xl font-semibold text-white capitalize">{settings?.usage.plan_tier || 'Free'}</p>
+            <p className="text-xl font-semibold text-white capitalize">
+              {creditsInfo?.is_admin ? 'Admin' : (settings?.usage.plan_tier || 'Free')}
+            </p>
           </div>
         </div>
 
         {/* Credit costs info */}
         <div className="bg-slate-900/30 rounded-lg p-4 border border-slate-700/30 mb-4">
           <h3 className="text-sm font-medium text-white mb-3">Credit Costs</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
             <div className="flex justify-between">
               <span className="text-slate-400">Flash model (fast)</span>
               <span className="text-white font-mono">1 credit/image</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Pro model (quality)</span>
+              <span className="text-slate-400">Pro model (best)</span>
               <span className="text-white font-mono">3 credits/image</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Framework analysis</span>
-              <span className="text-white font-mono">2 credits</span>
+              <span className="text-white font-mono">1 credit</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Edit/Mobile transform</span>
               <span className="text-white font-mono">1 credit</span>
+            </div>
+          </div>
+          <div className="border-t border-slate-700/50 pt-3">
+            <h4 className="text-xs font-medium text-slate-400 mb-2">Full Listing Cost</h4>
+            <div className="flex gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">With Pro:</span>
+                <span className="text-redd-400 font-bold">~47 credits</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400">With Flash:</span>
+                <span className="text-green-400 font-bold">~23 credits</span>
+              </div>
             </div>
           </div>
         </div>
