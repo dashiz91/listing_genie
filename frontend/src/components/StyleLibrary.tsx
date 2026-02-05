@@ -38,9 +38,11 @@ const FALLBACK_CATEGORIES: Category[] = [
   { id: 'luxury', name: 'Luxury', description: 'Premium, high-end aesthetics' },
   { id: 'vibrant', name: 'Vibrant', description: 'Bold, colorful, energetic styles' },
   { id: 'natural', name: 'Natural', description: 'Organic, earthy, eco-friendly looks' },
+  { id: 'iconic', name: 'Iconic', description: 'Inspired by world-famous brand aesthetics' },
 ];
 
 const FALLBACK_STYLES: StylePreset[] = [
+  // Seasonal
   {
     id: 'christmas',
     name: 'Holiday Magic',
@@ -50,6 +52,7 @@ const FALLBACK_STYLES: StylePreset[] = [
     preview_image: '/styles/christmas.png',
     tags: ['christmas', 'holiday', 'winter'],
   },
+  // Minimalist
   {
     id: 'clean-white',
     name: 'Pure & Simple',
@@ -59,6 +62,7 @@ const FALLBACK_STYLES: StylePreset[] = [
     preview_image: '/styles/clean-white.png',
     tags: ['minimal', 'clean', 'white'],
   },
+  // Luxury
   {
     id: 'gold-luxe',
     name: 'Golden Hour',
@@ -68,6 +72,7 @@ const FALLBACK_STYLES: StylePreset[] = [
     preview_image: '/styles/gold-luxe.png',
     tags: ['gold', 'luxury', 'premium'],
   },
+  // Vibrant
   {
     id: 'neon-pop',
     name: 'Neon Pop',
@@ -77,6 +82,7 @@ const FALLBACK_STYLES: StylePreset[] = [
     preview_image: '/styles/neon-pop.png',
     tags: ['neon', 'bold', 'bright'],
   },
+  // Natural
   {
     id: 'earth-tones',
     name: 'Earth & Clay',
@@ -85,6 +91,61 @@ const FALLBACK_STYLES: StylePreset[] = [
     colors: ['#CC7351', '#D4A574', '#8B7355', '#3D2B1F'],
     preview_image: '/styles/earth-tones.png',
     tags: ['earth', 'natural', 'organic'],
+  },
+  // Iconic (brand-inspired)
+  {
+    id: 'tech-minimal',
+    name: 'Tech Minimal',
+    category: 'iconic',
+    description: 'Ultra-clean premium tech aesthetic with perfect lighting',
+    colors: ['#FFFFFF', '#F5F5F5', '#86868B', '#1D1D1F'],
+    preview_image: '/styles/tech-minimal.png',
+    tags: ['tech', 'minimal', 'premium'],
+  },
+  {
+    id: 'athletic-energy',
+    name: 'Athletic Energy',
+    category: 'iconic',
+    description: 'Bold, dynamic, empowering sports aesthetic',
+    colors: ['#000000', '#FFFFFF', '#FF5722', '#1A1A1A'],
+    preview_image: '/styles/athletic-energy.png',
+    tags: ['athletic', 'bold', 'dynamic'],
+  },
+  {
+    id: 'sport-stripes',
+    name: 'Sport Stripes',
+    category: 'iconic',
+    description: 'Clean sporty design with iconic stripe elements',
+    colors: ['#000000', '#FFFFFF', '#1A1A1A', '#E0E0E0'],
+    preview_image: '/styles/sport-stripes.png',
+    tags: ['sporty', 'stripes', 'athletic'],
+  },
+  {
+    id: 'cosmic-dark',
+    name: 'Cosmic Dark',
+    category: 'iconic',
+    description: 'Futuristic space-age aesthetic with sleek minimalism',
+    colors: ['#0A0A0A', '#1A1A2E', '#00D4FF', '#FFFFFF'],
+    preview_image: '/styles/cosmic-dark.png',
+    tags: ['futuristic', 'space', 'tech'],
+  },
+  {
+    id: 'heritage-craft',
+    name: 'Heritage Craft',
+    category: 'iconic',
+    description: 'Timeless luxury with rich heritage patterns',
+    colors: ['#5C4033', '#D4A574', '#C9A961', '#1A1A1A'],
+    preview_image: '/styles/heritage-craft.png',
+    tags: ['luxury', 'heritage', 'elegant'],
+  },
+  {
+    id: 'playful-pop',
+    name: 'Playful Pop',
+    category: 'iconic',
+    description: 'Bright, friendly, and approachable with primary colors',
+    colors: ['#4285F4', '#EA4335', '#FBBC05', '#34A853'],
+    preview_image: '/styles/playful-pop.png',
+    tags: ['playful', 'colorful', 'friendly'],
   },
 ];
 
@@ -125,7 +186,10 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
   }, [open]);
 
   // IDs of styles that have actual preview images generated
-  const STYLES_WITH_IMAGES = ['christmas', 'clean-white', 'gold-luxe', 'neon-pop', 'earth-tones'];
+  const STYLES_WITH_IMAGES = [
+    'christmas', 'clean-white', 'gold-luxe', 'neon-pop', 'earth-tones',
+    'tech-minimal', 'athletic-energy', 'sport-stripes', 'cosmic-dark', 'heritage-craft', 'playful-pop'
+  ];
 
   // Filter styles: only show ones with preview images, then by category
   const filteredStyles = styles
@@ -211,8 +275,8 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
                       : 'border-slate-700 hover:border-slate-500'
                   )}
                 >
-                  {/* Preview image */}
-                  <div className="aspect-[4/3] relative overflow-hidden bg-slate-800">
+                  {/* Preview image - vertical strip format */}
+                  <div className="aspect-[9/16] relative overflow-hidden bg-slate-800">
                     <img
                       src={style.preview_image}
                       alt={style.name}
