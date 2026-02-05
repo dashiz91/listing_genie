@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CreditWidget } from './CreditWidget';
+import { ProfileDropdown } from './ProfileDropdown';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -71,9 +71,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Link>
         </div>
 
-        {/* Credit Widget */}
+        {/* Profile Dropdown */}
         <div className="p-3 border-b border-slate-800">
-          <CreditWidget />
+          <ProfileDropdown />
         </div>
 
         {/* Navigation */}
