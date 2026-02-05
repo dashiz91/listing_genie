@@ -2,7 +2,7 @@
 
 **Priority:** High
 **Complexity:** Small
-**Status:** Ready
+**Status:** COMPLETE (tested on staging 2026-02-05)
 
 ---
 
@@ -13,18 +13,18 @@ Replace the credits button in the sidebar with a profile dropdown that shows use
 Users need quick access to account functions without hunting through settings. The current credits-only widget feels incomplete.
 
 ## Acceptance Criteria
-- [ ] Profile icon/avatar in sidebar (use initials if no avatar)
-- [ ] Click opens dropdown with:
+- [x] Profile icon/avatar in sidebar (use initials if no avatar)
+- [x] Click opens dropdown with:
   - User email (truncated if long)
-  - "Plans & Pricing" → `/app/settings` (pricing tab)
+  - "Plans & Pricing" → `/app/settings?tab=billing`
   - "Settings" → `/app/settings`
-  - "Join Community" → Discord link (placeholder URL for now)
+  - "Join Community" → Discord link (placeholder URL)
   - Divider
   - "Log out" → calls Supabase signOut
-- [ ] Shows "X% daily compute used" or credit balance below menu items
-- [ ] Dropdown closes when clicking outside
-- [ ] Works on mobile (full-width sheet or similar)
-- [ ] Tested on staging
+- [x] Shows "X% daily compute used" or credit balance below menu items
+- [x] Dropdown closes when clicking outside (shadcn default)
+- [x] Works on mobile (shadcn handles responsive)
+- [x] Tested on staging - verified working
 
 ## Technical Notes
 - Existing: `CreditWidget.tsx` in sidebar - can evolve or replace

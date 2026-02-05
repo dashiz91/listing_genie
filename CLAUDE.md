@@ -522,6 +522,16 @@ npm run dev
 - **Database changes**: Check logs for migration success
 - **Bug fixes**: Reproduce the original issue first, then verify the fix resolves it
 
+```
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  NEVER ASK USER TO TEST - TEST IT YOURSELF                                    ║
+║                                                                               ║
+║  If Chrome MCP fails, FIX IT (kill chrome, retry). Don't punt to user.        ║
+║  If Vercel didn't deploy, DEPLOY MANUALLY and alias to staging.               ║
+║  If something blocks testing, SOLVE IT. Testing is YOUR job.                  ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+```
+
 ### Definition of Done
 A task is NOT complete until:
 1. ✅ Code is committed and pushed to `develop`
