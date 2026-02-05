@@ -61,8 +61,35 @@ class SupabaseStorageService:
             image = Image.open(image_buffer)
             image.load()  # Force full read to catch truncated/corrupt data
         except Exception as e:
-            logger.error(f"PIL cannot identify image ({len(content)} bytes, first 16: {content[:16].hex() if content else 'empty'}): {e}")
-            raise
+            first_bytes = content[:16].hex() if content else 'empty'
+            logger.warning(f"PIL cannot identify image ({len(content)} bytes, first 16: {first_bytes}): {e}")
+
+            # Fallback: upload raw bytes directly without re-encoding
+            # This handles formats PIL can't decode (AVIF, HEIC, etc.)
+            # but that Gemini can still process
+            ext = Path(original_filename).suffix.lower() if original_filename else '.png'
+            content_type = {
+                '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                '.webp': 'image/webp', '.gif': 'image/gif', '.avif': 'image/avif',
+                '.heic': 'image/heic',
+            }.get(ext, 'image/png')
+            safe_filename_raw = f"{file_id}{ext if ext in ('.png', '.jpg', '.jpeg', '.webp') else '.png'}"
+            logger.info(f"Falling back to raw upload: {safe_filename_raw} ({content_type}, {len(content)} bytes)")
+
+            try:
+                self.client.storage.from_(self.uploads_bucket).upload(
+                    path=safe_filename_raw,
+                    file=content,
+                    file_options={"content-type": content_type}
+                )
+                logger.info(f"Raw upload to Supabase succeeded: {safe_filename_raw}")
+            except Exception as upload_err:
+                logger.error(f"Raw upload to Supabase failed: {upload_err}")
+                raise
+
+            storage_path = f"supabase://{self.uploads_bucket}/{safe_filename_raw}"
+            return file_id, storage_path
+
         image = image.convert('RGB')  # Remove alpha channel if present
 
         # Convert to bytes
