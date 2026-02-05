@@ -11,9 +11,6 @@ Dump anything here messily - I'll curate it below when you ask me to clean up.
 
 PENDING
 -------
-c - Style Toggle Default ON
-    Default "Use exact style image" toggle to ON. No credits when skipping preview.
-
 C - Homepage Simplification
     Make minimal like reference screenshot, advanced button for forms,
     show preview only after first generation. Use shadcn.
@@ -38,4 +35,5 @@ COMPLETED
 ---------
 a - A+ Preview Integration (story 003)
 b - Profile Dropdown (story 001)
+c - Style Toggle Default ON + no credits when skipping preview
 e - Out of Credits Modal (story 002)

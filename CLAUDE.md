@@ -638,6 +638,12 @@ When finishing tasks or ending a session, **always clean up the todo_list folder
 
 **IMPORTANT:** Never delete `to_do.txt` or clear the RAW IDEAS section without user permission.
 
+**After completing each task**, politely ask user to wait a moment while you do housekeeping:
+- Update `to_do.txt` (move to COMPLETED)
+- Update `backlog.md` if needed
+- Update `CLAUDE.md` if architecture/workflows changed
+- Update `README.md` if user-facing features changed
+
 ---
 
 ## Deployment & Environments
@@ -840,6 +846,15 @@ curl https://reddstudio-backend-production.up.railway.app/api/health  # Detailed
 curl https://reddstudio-staging-backend-staging.up.railway.app/health
 curl https://reddstudio-staging-backend-staging.up.railway.app/api/health
 ```
+
+### Test Accounts (Staging & Production)
+
+| Role | Email | Password |
+|------|-------|----------|
+| **Admin** (unlimited credits) | `robertoxma@hotmail.com` | `S1lver951!` |
+| **Regular user** | `relojeriakairoscr@gmail.com` | `S1lver951!` |
+
+Both accounts work on staging and production (same Supabase auth).
 
 ### Database Notes
 
