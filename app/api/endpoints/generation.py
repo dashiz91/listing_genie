@@ -937,7 +937,7 @@ async def analyze_and_generate_frameworks(
             logger.info(f"Creating DesignContext with original_style_reference_path: {request.style_reference_path}")
             service.create_design_context(
                 session=session,
-                product_analysis=analysis_result,
+                product_analysis=result,
                 original_style_reference_path=request.style_reference_path,
             )
 
