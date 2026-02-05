@@ -168,7 +168,8 @@ async def get_current_user(
         )
 
     # Check email whitelist (if configured)
-    if settings.allowed_emails:
+    # "*" means allow all, empty string means allow all
+    if settings.allowed_emails and settings.allowed_emails.strip() != "*":
         allowed_list = [e.strip().lower() for e in settings.allowed_emails.split(",") if e.strip()]
         if allowed_list and (not email or email.lower() not in allowed_list):
             logger.warning(f"Access denied for email: {email} (not in whitelist)")
