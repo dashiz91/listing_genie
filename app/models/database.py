@@ -241,7 +241,7 @@ class UserSettings(Base):
     # Credits/billing
     credits_balance = Column(Integer, default=50)  # Start with free tier credits
     plan_tier = Column(String(50), default="free")  # free, starter, pro, business
-    credits_last_reset = Column(DateTime, nullable=True)  # For daily reset tracking
+    # Note: using updated_at for credits reset tracking instead of separate column
 
     # Timestamps
     created_at = Column(DateTime, default=func.now())
