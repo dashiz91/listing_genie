@@ -610,6 +610,17 @@ User value / problem being solved
 | "work on 001" | Read story, implement, test, complete |
 | "status" | List in-progress and ready stories |
 
+### Cleanup (End of Session or When Tasks Complete)
+
+When finishing tasks or ending a session, **always clean up the todo_list folder**:
+
+1. **Move completed stories** from `ready/` to `done/`
+2. **Update `backlog.md`** - move completed items to the "Completed" section at the bottom
+3. **Remove stale files** - delete any orphaned `.txt` files or duplicates in the todo_list folder
+4. **Verify `ready/` is clean** - only stories actively being worked should be here
+
+This prevents confusion about what's done vs pending and keeps the workflow organized.
+
 ---
 
 ## Deployment & Environments
