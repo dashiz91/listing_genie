@@ -169,9 +169,9 @@ class DesignFramework(BaseModel):
 class GenerationRequest(BaseModel):
     """Request to generate listing images"""
     product_title: str = Field(..., min_length=1, max_length=200)
-    feature_1: Optional[str] = Field(None, max_length=100)  # Now optional
-    feature_2: Optional[str] = Field(None, max_length=100)  # Now optional
-    feature_3: Optional[str] = Field(None, max_length=100)  # Now optional
+    feature_1: Optional[str] = Field(None, max_length=500)  # Now optional
+    feature_2: Optional[str] = Field(None, max_length=500)  # Now optional
+    feature_3: Optional[str] = Field(None, max_length=500)  # Now optional
     target_audience: Optional[str] = Field(None, max_length=150)  # Now optional
     keywords: List[KeywordInput] = Field(default_factory=list, max_length=20)
     upload_path: str = Field(..., description="Path to uploaded primary product image")
@@ -259,7 +259,7 @@ class GenerationRequest(BaseModel):
 class StylePreviewRequest(BaseModel):
     """Request to generate style preview images"""
     product_title: str = Field(..., min_length=1, max_length=200)
-    feature_1: Optional[str] = Field(None, max_length=100)
+    feature_1: Optional[str] = Field(None, max_length=500)
     upload_path: str = Field(..., description="Path to uploaded product image")
     logo_path: Optional[str] = Field(None, description="Path to uploaded brand logo image")
     brand_colors: List[str] = Field(default_factory=list)
