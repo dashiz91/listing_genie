@@ -70,27 +70,27 @@ class ColorSpec(BaseModel):
 
 class TypographySpec(BaseModel):
     """Typography specifications with exact font names and sizes"""
-    headline_font: str
-    headline_weight: str
-    headline_size: str
-    subhead_font: str
-    subhead_weight: str
-    subhead_size: str
-    body_font: str
-    body_weight: str
-    body_size: str
-    letter_spacing: str
+    headline_font: str = "Inter"
+    headline_weight: str = "Bold"
+    headline_size: str = "48px"
+    subhead_font: str = "Inter"
+    subhead_weight: str = "Medium"
+    subhead_size: str = "24px"
+    body_font: str = "Inter"
+    body_weight: str = "Regular"
+    body_size: str = "16px"
+    letter_spacing: str = "normal"
 
 
 class StoryArc(BaseModel):
     """Story arc across 6 images (Hero's Journey)"""
-    theme: str
-    hook: str       # Image 1: INTRIGUE
-    reveal: str     # Image 2: TRUST
-    proof: str      # Image 3: BELONGING
-    dream: str      # Image 4: DESIRE
-    transform: Optional[str] = None  # Image 5: TRANSFORMATION (optional for backward compat)
-    close: str      # Image 6: URGENCY
+    theme: str = "Product transformation journey"
+    hook: str = "Capture attention with hero product shot"       # Image 1: INTRIGUE
+    reveal: str = "Build trust with features and benefits"     # Image 2: TRUST
+    proof: str = "Create belonging with social proof"      # Image 3: BELONGING
+    dream: str = "Inspire desire with lifestyle context"      # Image 4: DESIRE
+    transform: Optional[str] = "Show the transformation"  # Image 5: TRANSFORMATION (optional for backward compat)
+    close: str = "Drive urgency with compelling close"      # Image 6: URGENCY
 
 
 class ImageCopy(BaseModel):
@@ -123,19 +123,19 @@ class ImageGenerationPrompt(BaseModel):
 
 class LayoutSpec(BaseModel):
     """Layout specifications"""
-    composition_style: str
-    whitespace_philosophy: str
-    product_prominence: str
-    text_placement: str
-    visual_flow: str
+    composition_style: str = "Balanced and clean"
+    whitespace_philosophy: str = "Generous breathing room"
+    product_prominence: str = "Product as hero, 60% of frame"
+    text_placement: str = "Strategic overlay with high contrast"
+    visual_flow: str = "Left to right, top to bottom"
 
 
 class VisualTreatment(BaseModel):
     """Visual treatment specifications"""
-    lighting_style: str
-    shadow_spec: str
-    background_treatment: str
-    texture: str
+    lighting_style: str = "Soft, diffused studio lighting"
+    shadow_spec: str = "Subtle drop shadow for depth"
+    background_treatment: str = "Clean gradient or solid color"
+    texture: str = "Smooth, professional finish"
     mood_keywords: List[str] = Field(default_factory=list)
 
 
