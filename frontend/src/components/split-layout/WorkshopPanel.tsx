@@ -213,34 +213,51 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
         maxImages: 3,
       });
 
-      // Update form data with imported info
-      onFormChange({
-        productTitle: result.title || '',
-        feature1: result.feature_1 || '',
-        feature2: result.feature_2 || '',
-        feature3: result.feature_3 || '',
-        brandName: result.brand_name || '',
-      });
+      // Clear input on success
+      setAsinInput('');
 
-      // Add imported images to uploads
+      // Add imported images to uploads first (instant)
       if (result.image_uploads.length > 0) {
         const newUploads: UploadWithPreview[] = result.image_uploads.map((img, idx) => ({
           upload_id: img.upload_id,
           file_path: img.file_path,
           filename: `amazon_${result.asin}_${idx + 1}.png`,
-          size: 0, // Size not available from ASIN import
+          size: 0,
           preview_url: apiClient.getFileUrl(img.file_path),
         }));
         onUploadsChange([...uploads, ...newUploads].slice(0, maxImages));
       }
 
-      // Clear input on success
-      setAsinInput('');
-
-      // Expand product section to show imported data
+      // Expand sections to show imported data
+      if (!isSectionOpen('photos') && result.image_uploads.length > 0) {
+        toggleSection('photos');
+      }
       if (!isSectionOpen('product')) {
         toggleSection('product');
       }
+      if (!isSectionOpen('brand') && result.brand_name) {
+        toggleSection('brand');
+      }
+
+      // Typing animation for text fields
+      const typeText = async (
+        field: 'productTitle' | 'feature1' | 'feature2' | 'feature3' | 'brandName',
+        text: string,
+        delay: number = 8
+      ) => {
+        for (let i = 0; i <= text.length; i++) {
+          onFormChange({ [field]: text.slice(0, i) });
+          await new Promise(r => setTimeout(r, delay));
+        }
+      };
+
+      // Animate fields sequentially with fast typing
+      if (result.title) await typeText('productTitle', result.title, 6);
+      if (result.brand_name) await typeText('brandName', result.brand_name, 10);
+      if (result.feature_1) await typeText('feature1', result.feature_1, 4);
+      if (result.feature_2) await typeText('feature2', result.feature_2, 4);
+      if (result.feature_3) await typeText('feature3', result.feature_3, 4);
+
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : 'Failed to import product';
       // Extract detail from axios error if available

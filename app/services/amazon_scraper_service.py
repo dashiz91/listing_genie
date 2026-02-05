@@ -268,39 +268,55 @@ class AmazonScraperService:
         return features[:5]
 
     def _extract_images(self, soup: BeautifulSoup) -> List[str]:
-        """Extract product image URLs"""
+        """Extract product image URLs - prioritizes hi-res sources"""
         image_urls = []
 
-        # Method 1: Main image
-        main_img = soup.find('img', {'id': 'landingImage'})
-        if main_img:
-            # Get high-res version from data-old-hires or src
-            src = main_img.get('data-old-hires') or main_img.get('src')
-            if src and 'no-image' not in src.lower():
-                # Convert to high-res URL
-                src = self._get_hires_url(src)
-                image_urls.append(src)
-
-        # Method 2: Thumbnail images (for additional angles)
-        thumb_container = soup.find('div', {'id': 'altImages'})
-        if thumb_container:
-            for img in thumb_container.find_all('img'):
-                src = img.get('src')
-                if src and 'sprite' not in src.lower() and 'no-image' not in src.lower():
-                    # Convert thumbnail to full-size
-                    src = self._get_hires_url(src)
-                    if src not in image_urls:
-                        image_urls.append(src)
-
-        # Method 3: Check for image data in scripts (newer Amazon layout)
+        # Method 1 (BEST): Extract hi-res URLs from JavaScript colorImages data
+        # This contains the actual hi-res URLs, not thumbnails
         for script in soup.find_all('script'):
             script_text = script.string or ''
-            # Look for colorImages JSON
-            match = re.search(r'"hiRes"\s*:\s*"([^"]+)"', script_text)
-            if match:
-                url = match.group(1).replace('\\/', '/')
-                if url not in image_urls:
+            # Look for colorImages JSON with hiRes URLs
+            hires_matches = re.findall(r'"hiRes"\s*:\s*"([^"]+)"', script_text)
+            for url in hires_matches:
+                url = url.replace('\\/', '/')
+                if url and 'no-image' not in url.lower() and url not in image_urls:
                     image_urls.append(url)
+
+            # Also try "large" images as fallback
+            if not image_urls:
+                large_matches = re.findall(r'"large"\s*:\s*"([^"]+)"', script_text)
+                for url in large_matches:
+                    url = url.replace('\\/', '/')
+                    if url and 'no-image' not in url.lower() and url not in image_urls:
+                        image_urls.append(url)
+
+        # Method 2: Main image with data-old-hires (often hi-res)
+        if len(image_urls) < 5:
+            main_img = soup.find('img', {'id': 'landingImage'})
+            if main_img:
+                # Prefer data-old-hires which is usually hi-res
+                src = main_img.get('data-old-hires')
+                if not src:
+                    src = main_img.get('src')
+                if src and 'no-image' not in src.lower():
+                    src = self._get_hires_url(src)
+                    if src not in image_urls:
+                        image_urls.insert(0, src)  # Main image first
+
+        # Method 3 (FALLBACK): Thumbnail images - only if we don't have enough
+        # These need URL conversion to get hi-res versions
+        if len(image_urls) < 3:
+            thumb_container = soup.find('div', {'id': 'altImages'})
+            if thumb_container:
+                for img in thumb_container.find_all('img'):
+                    src = img.get('src')
+                    if src and 'sprite' not in src.lower() and 'no-image' not in src.lower():
+                        # Convert thumbnail to full-size
+                        src = self._get_hires_url(src)
+                        if src not in image_urls:
+                            image_urls.append(src)
+                            if len(image_urls) >= 5:
+                                break
 
         # Limit to first 5 images
         return image_urls[:5]
@@ -310,14 +326,31 @@ class AmazonScraperService:
         if not url:
             return url
 
-        # Remove size constraints from URL
-        # Pattern: ._SX300_ or ._SS40_ etc
-        url = re.sub(r'\._[A-Z]{2}\d+_', '.', url)
-        url = re.sub(r'\._[A-Z]{2}\d+,[A-Z]+_', '.', url)
+        # Amazon image URL patterns (examples):
+        # https://m.media-amazon.com/images/I/71e0a9yeV9L._AC_SL1500_.jpg  (good - 1500px)
+        # https://m.media-amazon.com/images/I/41W8Zwj-mHL._AC_US100_.jpg   (bad - 100px)
+        # https://m.media-amazon.com/images/I/51Ts1n+EAFL.SY50_CR,0,0,38,50_.jpg (bad - 50px)
 
-        # Replace common low-res indicators
-        url = url.replace('._SL1500_', '.')
-        url = url.replace('._AC_UL', '._AC_SL1500')
+        # Strategy: Replace any size modifier with high-res version
+        # The pattern is: ._<modifiers>_. or .<modifiers>_.
+
+        # Pattern 1: ._AC_US100_ or ._AC_SX200_ etc -> ._AC_SL1500_
+        url = re.sub(r'\._AC_[A-Z]{2}\d+_', '._AC_SL1500_', url)
+
+        # Pattern 2: ._SX300_ or ._SS40_ or ._US100_ etc -> remove (gets original)
+        url = re.sub(r'\._[A-Z]{2}\d+_', '.', url)
+
+        # Pattern 3: .SY50_CR,0,0,38,50_ (thumbnail crop) -> remove entirely
+        url = re.sub(r'\.[A-Z]{2}\d+_CR[^.]+_', '.', url)
+
+        # Pattern 4: ._AC_UL200_ -> ._AC_SL1500_
+        url = re.sub(r'\._AC_UL\d+_', '._AC_SL1500_', url)
+
+        # Pattern 5: Remove any remaining small size indicators
+        url = re.sub(r'\._[A-Z]+\d+[^.]*_', '.', url)
+
+        # Clean up double dots
+        url = url.replace('..', '.')
 
         return url
 
