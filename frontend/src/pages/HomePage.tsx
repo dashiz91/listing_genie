@@ -167,7 +167,7 @@ export const HomePage: React.FC = () => {
   // Uploaded paths (for API calls)
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [originalStyleRefPath, setOriginalStyleRefPath] = useState<string | null>(null);
-  const [useOriginalStyleRef, setUseOriginalStyleRef] = useState(false);
+  const [useOriginalStyleRef, setUseOriginalStyleRef] = useState(true); // Default ON - use exact style reference
 
   // A+ Content modules state — default 6x full-width banners (1464x600)
   const [aplusModules, setAplusModules] = useState<AplusModule[]>(() => {
@@ -577,12 +577,16 @@ export const HomePage: React.FC = () => {
       setExpandedSections((prev) => (prev.includes('framework') ? prev : [...prev, 'framework']));
 
       // Record credit usage for toast notification
-      const numPreviews = response.frameworks.length;
-      const creditsUsed = 1 + numPreviews; // 1 for analysis + 1 per preview
+      // When skip_preview_generation is true, no preview images are generated (0 credits for previews)
+      const skippedPreviews = useOriginalStyleRef && !!effectiveStyleRefPath;
+      const numPreviews = skippedPreviews ? 0 : response.frameworks.length;
+      const creditsUsed = 1 + numPreviews; // 1 for analysis + 1 per preview (0 if skipped)
       const newBalance = isAdmin ? balance : Math.max(0, balance - creditsUsed);
 
       recordUsage({
-        operation: `Framework analysis + ${numPreviews} preview${numPreviews > 1 ? 's' : ''}`,
+        operation: skippedPreviews
+          ? 'Framework analysis (using style reference)'
+          : `Framework analysis + ${numPreviews} preview${numPreviews > 1 ? 's' : ''}`,
         creditsUsed,
         newBalance,
         isAdmin,
