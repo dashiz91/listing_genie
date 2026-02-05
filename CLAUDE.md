@@ -563,7 +563,9 @@ todo_list/
 1. **User** adds raw ideas to `backlog.md`
 2. **Before coding** - refine ONE task into a story in `ready/`
 3. **Work the story** - implement, test on staging, commit
-4. **Complete** - move story to `done/`, pick next from `ready/`
+4. **Complete** - move story to `done/`, **update backlog.md** (move item to Completed section), pick next from `ready/`
+
+**IMPORTANT:** Always update `backlog.md` when completing a task - move the item to the "Completed" section at the bottom. This prevents confusion about what's done vs pending.
 
 ### Starting a Session
 
