@@ -1518,53 +1518,12 @@ async def generate_aplus_module(
                 custom_instructions="",  # handled by AI enhancement below
             )
 
-        # === Canvas extension decision ===
+        # === Canvas extension DISABLED ===
+        # Was causing all modules to look like variations of the same image
+        # Each module is now generated independently for more variety
         use_canvas_extension = False
         canvas_image = None
         debug_canvas_path = None
-
-        # Canvas extension only for modules 3+ (index >= 3)
-        # Modules 0+1 are hero pair (one image split), module 2 is independent
-        if request.module_index >= 3 and request.previous_module_path and visual_script:
-            modules = visual_script.get("modules", [])
-            prev_idx = request.module_index - 1
-            curr_idx = request.module_index
-            if prev_idx < len(modules) and curr_idx < len(modules):
-                prev_scene = modules[prev_idx].get("scene_description")
-                curr_scene = modules[curr_idx].get("scene_description")
-                if prev_scene and curr_scene:
-                    use_canvas_extension = True
-
-                    # Build canvas from previous module
-                    compositor = CanvasCompositor()
-                    prev_image = _load_image_from_path(request.previous_module_path)
-                    canvas_image = compositor.create_canvas(prev_image)
-
-                    # Save debug canvas
-                    debug_canvas_path = storage.save_generated_image(
-                        request.session_id, f"debug_canvas_{request.module_index}", canvas_image
-                    )
-
-                    # Build combined prompt with inpainting context
-                    inpaint_context = build_canvas_inpainting_prompt(
-                        previous_scene_description=prev_scene,
-                        current_scene_description=curr_scene,
-                    )
-                    art_director_prompt = get_aplus_module_prompt(
-                        visual_script=visual_script,
-                        module_index=request.module_index,
-                        custom_instructions="",  # handled by AI enhancement below
-                    )
-                    if art_director_prompt:
-                        prompt = (
-                            f"{inpaint_context}\n\n"
-                            f"═══ ART DIRECTOR'S BRIEF FOR THE NEW MODULE (bottom portion) ═══\n\n"
-                            f"{art_director_prompt}"
-                        )
-                    else:
-                        prompt = inpaint_context
-
-                    logger.info(f"Canvas extension enabled for module {request.module_index}")
 
         # === AI-enhanced prompt rewriting when user provides feedback ===
         ai_change_summary = None

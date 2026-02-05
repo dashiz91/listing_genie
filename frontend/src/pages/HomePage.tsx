@@ -1178,10 +1178,8 @@ export const HomePage: React.FC = () => {
         // Auto-generate visual script if missing
         await ensureVisualScript(sessionId);
 
-        // Get previous module path for chaining (only for modules 3+)
-        // Modules 0+1 are hero pair (one image split), module 2 is independent
-        const prevModule = moduleIndex >= 3 ? aplusModules[moduleIndex - 1] : null;
-        const previousModulePath = prevModule ? getActiveImagePath(prevModule) : undefined;
+        // Canvas extension disabled - each module generated independently
+        const previousModulePath = undefined;
 
         // Call API to generate A+ module
         const result = await apiClient.generateAplusModule({
