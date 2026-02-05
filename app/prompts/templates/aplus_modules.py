@@ -185,23 +185,49 @@ Study the attached product photos. Notice materials, finish, scale, color.
 Your script must reflect the REAL product, not an imagined one.
 
 ═══════════════════════════════════════════════════════════════════════════════
-                    THE EMOTIONAL JOURNEY — NOT INFORMATION
+                    🎯 A+ IS THE CLOSE, NOT ANOTHER HOOK
+═══════════════════════════════════════════════════════════════════════════════
+
+CRITICAL: Listings and A+ have DIFFERENT JOBS in the conversion funnel.
+
+**LISTINGS (Images 1-6) = THE HOOK**
+Job: Get them interested enough to KEEP SCROLLING
+- Already showed: Product beauty, features, lifestyle, transformation, social proof
+- Already answered: "What is it?", "Is it quality?", "What do I get?", "Will it fit my life?"
+
+**A+ CONTENT (Modules 0-5) = THE CLOSE**
+Job: Remove final objections and get them to BUY NOW
+- Must NOT repeat listing content (they already saw it!)
+- Must go DEEPER: details they couldn't see, objections they still have, more contexts
+
+⚠️  REPETITION = WASTED REAL ESTATE
+If listings showed a before/after transformation, A+ should NOT show another before/after.
+If listings showed lifestyle context, A+ should show DIFFERENT lifestyle contexts.
+
+WHAT A+ SHOULD DO DIFFERENTLY:
+- Extreme close-ups (craftsmanship details not visible in listings)
+- Address the #1 remaining objection explicitly
+- Show MORE lifestyle contexts (different rooms, different uses)
+- Final certainty push (the "why not?" becomes "why wait?")
+
+═══════════════════════════════════════════════════════════════════════════════
+                    THE EMOTIONAL JOURNEY — DEEPEN INTO DESIRE
 ═══════════════════════════════════════════════════════════════════════════════
 
 By the time they reach A+ Content, they've seen the listing images.
-They're already INTERESTED. Now deepen that into DESIRE.
+They're already INTERESTED. Now deepen that into IRRESISTIBLE DESIRE.
 
-Each module should make them FEEL something:
+Each module should make them FEEL something NEW:
 - Not "4,900 mAh battery" → "A full day without worrying about power"
 - Not "Premium ceramic" → "The kind of object you reach for every morning"
 - Not "Modern design" → "Understated confidence on your shelf"
 
-THE EMOTIONAL ARC FOR A+:
-- Modules 0+1 (Hero): AWE — "Wow, this is beautiful"
-- Module 2: INTRIGUE — "Tell me more about this"
-- Module 3: TRUST — "I can see the quality"
-- Module 4: BELONGING — "This fits my life"
-- Module 5: CERTAINTY — "I'm ready to buy"
+THE A+ EMOTIONAL ARC (builds on listings, doesn't repeat):
+- Modules 0+1 (Hero): AWE — "Wow, this is even more beautiful up close"
+- Module 2: DEPTH — "There's more here than I realized" (details not in listings)
+- Module 3: REASSURANCE — "My concern is addressed" (objection handling)
+- Module 4: IMAGINATION — "I can see this in multiple parts of my life"
+- Module 5: CERTAINTY — "I have no more questions. I'm ready."
 
 ═══════════════════════════════════════════════════════════════════════════════
                          THE EDITORIAL DESIGN SYSTEM
@@ -563,9 +589,35 @@ def get_visual_script_prompt(
     target_audience: str,
     framework: dict,
     module_count: int = 5,
+    listing_prompts: Optional[list] = None,
 ) -> str:
-    """Build the Art Director visual script prompt."""
-    return VISUAL_SCRIPT_PROMPT.format(
+    """Build the Art Director visual script prompt with listing context."""
+
+    # Build listing context summary so A+ knows what NOT to repeat
+    listing_context = ""
+    if listing_prompts:
+        listing_summary = []
+        for p in listing_prompts:
+            img_type = p.get("image_type", "unknown")
+            job = p.get("job", p.get("emotional_beat", ""))
+            listing_summary.append(f"- Image {p.get('image_number', '?')} ({img_type}): {job}")
+
+        listing_context = f"""
+═══════════════════════════════════════════════════════════════════════════════
+                    📋 WHAT LISTINGS ALREADY COVERED (DO NOT REPEAT)
+═══════════════════════════════════════════════════════════════════════════════
+
+The listing images already showed:
+{chr(10).join(listing_summary)}
+
+⚠️  A+ Content must NOT duplicate these concepts. Go DEEPER, not WIDER.
+- If listings showed transformation → A+ shows DIFFERENT transformation or skips it
+- If listings showed lifestyle → A+ shows DIFFERENT lifestyle contexts
+- If listings showed features → A+ shows DETAILS (close-ups, craftsmanship)
+
+"""
+
+    prompt = VISUAL_SCRIPT_PROMPT.format(
         module_count=module_count,
         product_title=product_title,
         brand_name=brand_name or "Premium Brand",
@@ -580,6 +632,15 @@ def get_visual_script_prompt(
         story_arc=json.dumps(framework.get("story_arc", {})),
         visual_treatment=json.dumps(framework.get("visual_treatment", {})),
     )
+
+    # Insert listing context after the design system section
+    if listing_context:
+        # Find a good insertion point
+        insertion_marker = "Study the attached product photos."
+        if insertion_marker in prompt:
+            prompt = prompt.replace(insertion_marker, listing_context + insertion_marker)
+
+    return prompt
 
 
 def build_aplus_module_prompt(

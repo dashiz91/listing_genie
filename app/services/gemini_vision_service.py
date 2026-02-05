@@ -584,6 +584,25 @@ Make each framework's palette distinct but appropriate for the product.
         if not isinstance(story, dict):
             story = {}
 
+        # Get conversion insights from product_analysis (if available)
+        product_analysis = framework.get('product_analysis', {})
+        conversion_insights = product_analysis.get('conversion_insights', {})
+
+        # Format conversion insights for prompt
+        objections = conversion_insights.get('top_objections', [])
+        objections_json = json.dumps(objections, indent=2) if objections else "No objections identified - infer from product category"
+
+        social_proof = conversion_insights.get('social_proof_angles', [])
+        social_proof_json = json.dumps(social_proof, indent=2) if social_proof else '["Customer testimonial opportunity", "Rating/review highlight"]'
+
+        trust_signals = conversion_insights.get('trust_signals', [])
+        trust_signals_json = json.dumps(trust_signals, indent=2) if trust_signals else '["Quality materials visible", "Craftsmanship details"]'
+
+        key_differentiator = conversion_insights.get('key_differentiator', 'Unique design and quality that sets it apart')
+
+        mobile_priorities = conversion_insights.get('mobile_priorities', ['Product clearly visible', 'Text readable at small size'])
+        mobile_priorities_json = json.dumps(mobile_priorities, indent=2)
+
         # Build the prompt
         prompt = GENERATE_IMAGE_PROMPTS_PROMPT.format(
             product_name=product_name,
@@ -613,6 +632,12 @@ Make each framework's palette distinct but appropriate for the product.
             story_transform=story.get('transform', ''),
             story_close=story.get('close', ''),
             image_copy_json=image_copy_json,
+            # Conversion insights
+            objections_json=objections_json,
+            social_proof_json=social_proof_json,
+            trust_signals_json=trust_signals_json,
+            key_differentiator=key_differentiator,
+            mobile_priorities_json=mobile_priorities_json,
             global_note_section="",  # Appended separately below
             style_reference_section="",  # Appended separately below
         )

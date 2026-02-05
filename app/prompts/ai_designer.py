@@ -29,11 +29,11 @@ from .product_protection import (
 # STEP 1: FRAMEWORK ANALYSIS PROMPT
 # ============================================================================
 
-PRINCIPAL_DESIGNER_VISION_PROMPT = '''You are a Principal Designer with 20+ years at Apple, Nike, and Pentagram.
-You understand that people buy with emotion and justify with logic.
-Your job: Create visual systems that make people FEEL, not just understand.
+PRINCIPAL_DESIGNER_VISION_PROMPT = '''You are a Principal Designer AND Conversion Strategist.
+You've spent 20 years at Apple, Nike, and Pentagram — but also studied Amazon's top sellers obsessively.
+You understand: people buy with emotion, justify with logic, and abandon due to unaddressed objections.
 
-I'm showing you a PRODUCT IMAGE. Study it carefully.
+I'm showing you a PRODUCT IMAGE. Study it like a scientist AND an artist.
 
 PRODUCT CONTEXT:
 Product Name: {product_name}
@@ -42,10 +42,42 @@ Key Features: {features}
 Target Audience: {target_audience}
 Primary Color Preference: {primary_color}
 
-FIRST, ANALYZE THE PRODUCT:
+═══════════════════════════════════════════════════════════════════════════════
+                         STEP 1: DEEP PRODUCT ANALYSIS
+═══════════════════════════════════════════════════════════════════════════════
+
+VISUAL ANALYSIS:
 - What do you see? Describe the product's visual characteristics.
-- What FEELING does it evoke? What emotion does someone experience when they see it?
+- What FEELING does it evoke? What emotion does someone experience seeing it?
 - Who dreams of owning this? Not demographics — aspirations.
+
+CONVERSION ANALYSIS (Critical for sales):
+Based on this product category, INFER the following:
+
+1. **TOP 3 OBJECTIONS** - What concerns would stop someone from buying?
+   - Price objection: "Is it worth $X?"
+   - Quality objection: "Will it break/fade/wear out?"
+   - Fit objection: "Will it work for MY situation?"
+   - Trust objection: "Is this seller legitimate?"
+   Think: What would make someone hesitate at checkout?
+
+2. **SOCIAL PROOF OPPORTUNITIES** - What would build trust?
+   - Review-worthy moments: What would customers photograph/share?
+   - Testimonial angles: What transformation would they describe?
+   - Authority signals: What experts or publications would endorse this?
+
+3. **TRUST SIGNALS** - What reduces perceived risk?
+   - Quality indicators visible in the product (materials, craftsmanship)
+   - Warranty/guarantee language that would resonate
+   - Origin story elements (handmade, family-owned, etc.)
+
+4. **KEY DIFFERENTIATOR** - What makes this NOT a commodity?
+   - What would make someone choose THIS over Amazon's cheapest alternative?
+   - What's the "only" or "first" claim possible?
+
+5. **MOBILE-FIRST NOTES** - 70% of Amazon shoppers are on mobile
+   - What details might be missed on a small screen?
+   - What text MUST be large enough to read on phone?
 
 THEN, GENERATE 4 UNIQUE DESIGN FRAMEWORKS:
 
@@ -77,7 +109,24 @@ Return valid JSON with this structure:
     "product_category": "Category",
     "natural_mood": "Mood the product conveys",
     "ideal_customer": "Who would buy this",
-    "market_positioning": "Where it sits in market"
+    "market_positioning": "Where it sits in market",
+    "conversion_insights": {{
+      "top_objections": [
+        {{"objection": "Primary concern", "how_to_address": "Visual strategy to overcome it", "which_image": "infographic_1 or transformation"}},
+        {{"objection": "Secondary concern", "how_to_address": "Visual strategy", "which_image": "infographic_2 or comparison"}},
+        {{"objection": "Tertiary concern", "how_to_address": "Visual strategy", "which_image": "lifestyle or aplus"}}
+      ],
+      "social_proof_angles": [
+        "Review-worthy moment 1",
+        "Review-worthy moment 2"
+      ],
+      "trust_signals": [
+        "Visible quality indicator 1",
+        "Visible quality indicator 2"
+      ],
+      "key_differentiator": "What makes this NOT a commodity — the 'only' or 'best' claim",
+      "mobile_priorities": ["Must-see element 1", "Must-see element 2"]
+    }}
   }},
   "frameworks": [
     {{
@@ -363,6 +412,55 @@ When writing prompts, explicitly state:
 - "Background in [specific hex from palette]" not "soft blue"
 
 ═══════════════════════════════════════════════════════════════════════════════
+                    🎯 CONVERSION INSIGHTS (from product analysis)
+═══════════════════════════════════════════════════════════════════════════════
+
+**TOP OBJECTIONS TO ADDRESS:**
+{objections_json}
+
+Assign each objection to a specific image. Don't let them leave with doubts.
+- Objection 1 → Address in Image 2 or 3 (infographics)
+- Objection 2 → Address in Image 5 (transformation) or 6 (comparison)
+- Objection 3 → Address in A+ Content (don't repeat in listings)
+
+**SOCIAL PROOF OPPORTUNITIES:**
+{social_proof_json}
+
+Use in Image 6 (comparison) — reviews, ratings, "best seller" status.
+Frame as "others like you already chose this."
+
+**TRUST SIGNALS:**
+{trust_signals_json}
+
+Weave into Image 2 (quality close-ups) and Image 3 (features).
+Show, don't just claim.
+
+**KEY DIFFERENTIATOR:**
+{key_differentiator}
+
+This is your "only" claim. Make it unmissable in at least one image.
+
+═══════════════════════════════════════════════════════════════════════════════
+                    📱 MOBILE-FIRST REQUIREMENTS (70% of traffic)
+═══════════════════════════════════════════════════════════════════════════════
+
+Most shoppers view on phones. Your images MUST work at small sizes:
+
+TEXT SIZE MINIMUMS:
+- Headlines: 48px minimum (readable on phone)
+- Body copy: 24px minimum (no squinting)
+- Callouts: 20px minimum with high contrast
+
+MOBILE PRIORITIES:
+{mobile_priorities_json}
+
+DESIGN RULES:
+- Key info in TOP 1/3 of image (visible without scrolling)
+- High contrast text (dark on light OR light on dark, not mid-tones)
+- Product fills at least 40% of frame
+- No fine details that disappear at thumbnail size
+
+═══════════════════════════════════════════════════════════════════════════════
                               THE AUDIENCE
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -534,14 +632,33 @@ Return JSON:
     {{
       "image_number": 1,
       "image_type": "main",
-      "job": "What this image is HIRED to do (e.g., 'Stop the scroll, create intrigue')",
-      "success_thought": "What the shopper thinks if this image does its job",
+      "job": "What this image is HIRED to do",
+      "micro_commitment": "The 'yes' this image must earn (e.g., 'Yes, this looks interesting')",
+      "objection_addressed": "Which objection this image tackles (null if none)",
       "emotional_beat": "intrigue|trust|belonging|desire|transformation|urgency",
+      "mobile_compliance": {{
+        "headline_size": "48px+ for readability",
+        "key_info_placement": "top third of frame",
+        "product_prominence": "percentage of frame"
+      }},
       "composition_notes": "Brief notes on composition",
       "key_elements": ["element1", "element2"],
       "prompt": "Your evocative, emotion-first prompt (150-250 words)"
     }},
     // ... images 2-6
+  ],
+  "objection_coverage": {{
+    "objection_1": "Addressed in image X",
+    "objection_2": "Addressed in image Y",
+    "objection_3": "Deferred to A+ Content"
+  }},
+  "micro_commitment_flow": [
+    "Image 1: Yes, this looks interesting",
+    "Image 2: Yes, this is quality",
+    "Image 3: Yes, I know what I'm getting",
+    "Image 4: Yes, this fits my life",
+    "Image 5: Yes, this solves my problem",
+    "Image 6: Yes, others love it, I should buy"
   ]
 }}
 

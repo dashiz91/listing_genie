@@ -1278,6 +1278,8 @@ async def generate_aplus_hero_pair(
             logger.info("No visual script found, generating one for hero pair...")
             features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
             framework = session.design_framework_json or {}
+            # Get listing prompts so A+ knows what NOT to repeat
+            listing_prompts = framework.get("generation_prompts", [])
             script_prompt = get_visual_script_prompt(
                 product_title=session.product_title,
                 brand_name=session.brand_name or "",
@@ -1285,6 +1287,7 @@ async def generate_aplus_hero_pair(
                 target_audience=session.target_audience or "",
                 framework=framework,
                 module_count=6,
+                listing_prompts=listing_prompts,
             )
             image_paths = []
             if session.upload_path:
@@ -1657,8 +1660,9 @@ async def generate_aplus_visual_script(
         # Build framework dict from session
         framework = session.design_framework_json or {}
 
-        # Build prompt
+        # Build prompt with listing context so A+ doesn't repeat
         features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
+        listing_prompts = framework.get("generation_prompts", [])
         prompt = get_visual_script_prompt(
             product_title=session.product_title,
             brand_name=session.brand_name or "",
@@ -1666,6 +1670,7 @@ async def generate_aplus_visual_script(
             target_audience=session.target_audience or "",
             framework=framework,
             module_count=request.module_count,
+            listing_prompts=listing_prompts,
         )
 
         # Collect product image paths for visual context
@@ -1806,6 +1811,7 @@ async def replan_all_prompts(
             target_audience=session.target_audience or "",
             framework=framework,
             module_count=request.module_count,
+            listing_prompts=listing_prompts,  # Pass so A+ knows what NOT to repeat
         )
 
         # Collect product image paths for visual context
