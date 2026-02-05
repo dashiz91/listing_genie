@@ -458,8 +458,8 @@ class GenerationService:
         reference_image_paths: Optional[List[str]],
     ) -> ImageResult:
         """Internal implementation of generate_single_image."""
-        # Load design framework from session if not already loaded (for regeneration)
-        if session.design_framework_json and not self._current_framework:
+        # ALWAYS reload design framework from session to pick up any replan updates
+        if session.design_framework_json:
             try:
                 self._current_framework = DesignFramework(**session.design_framework_json)
                 logger.info(f"[REGENERATION] Loaded framework: {self._current_framework.framework_name}")
