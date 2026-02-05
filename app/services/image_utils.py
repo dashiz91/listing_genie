@@ -96,6 +96,41 @@ def resize_to_dimensions(
 
         return result
 
+    elif method == "contain_edge":
+        # Scale to fit inside, pad with sampled edge color (for A+ modules)
+        if orig_ratio > target_ratio:
+            new_width = target_width
+            new_height = int(orig_height * (target_width / orig_width))
+        else:
+            new_height = target_height
+            new_width = int(orig_width * (target_height / orig_height))
+
+        resized = image.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+
+        # Sample edge color: average the border pixels for seamless padding
+        pixels = list(resized.getdata())
+        w, h = resized.size
+        edge_pixels = []
+        for x in range(w):
+            edge_pixels.append(pixels[x])              # top row
+            edge_pixels.append(pixels[(h - 1) * w + x])  # bottom row
+        for y in range(h):
+            edge_pixels.append(pixels[y * w])           # left col
+            edge_pixels.append(pixels[y * w + w - 1])   # right col
+
+        avg_r = sum(p[0] for p in edge_pixels) // len(edge_pixels)
+        avg_g = sum(p[1] for p in edge_pixels) // len(edge_pixels)
+        avg_b = sum(p[2] for p in edge_pixels) // len(edge_pixels)
+        bg_color = (avg_r, avg_g, avg_b)
+
+        result = PILImage.new("RGB", (target_width, target_height), bg_color)
+        paste_x = (target_width - new_width) // 2
+        paste_y = (target_height - new_height) // 2
+        result.paste(resized, (paste_x, paste_y))
+
+        logger.info(f"contain_edge: padded with edge color {bg_color}")
+        return result
+
     elif method == "stretch":
         # Direct resize (may distort)
         return image.resize((target_width, target_height), PILImage.Resampling.LANCZOS)
@@ -126,7 +161,7 @@ def resize_for_aplus_module(
         raise ValueError(f"Unknown A+ module type: {module_type}")
 
     width, height = APLUS_DIMENSIONS[key]
-    return resize_to_dimensions(image, width, height, method="cover")
+    return resize_to_dimensions(image, width, height, method="contain_edge")
 
 
 def get_aspect_ratio_for_module(module_type: str) -> str:
