@@ -39,15 +39,17 @@ PENDING
 C - Homepage Simplification
     Make minimal like reference screenshot, advanced button for forms,
     show preview only after first generation. Use shadcn.
+    (Needs reference screenshot to proceed)
 
 d - Supabase Email Branding
-    Fix localhost URL redirect, use our domain, less generic.
+    MANUAL: Configure in Supabase dashboard:
+    1) Auth > URL Config: Set Site URL to https://reddstudio.ai
+    2) Add redirect URLs for prod+staging
+    3) Customize email templates (Pro plan required)
 
 d - Loading Animation Improvement
     Research genius loading bars for inspiration.
-
-g - Monetary Tiers Revision
-    Free = 10 credits lifetime (not daily). Phone verification to prevent exploits?
+    (Creative/design task - needs user direction)
 
 COMPLETED
 ---------
@@ -58,3 +60,10 @@ e - Out of Credits Modal (story 002)
 h - Editorial Reference Strategy Rework (JTBD + conversion focus + text guidance)
 f - ASIN Import (One-Click) - auto-fill form from Amazon product page
 i - Admin Credit Management - adjust credits by email in Settings (admin only)
+j - Fix /auth blank page on sign out - tested, works correctly
+k - Fix edit attachments - now uploads extra files before edit/regenerate
+l - Default model to Flash - cheapest model now default
+m - Model selector shows credits instead of dollar prices
+n - Monetary Tiers Revision - Free = 10 credits lifetime (implemented)
+o - Alt text generation for images - backend API added
+p - Pre-generated style library - 16 styles, 5 sample images generated
