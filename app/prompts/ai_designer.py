@@ -215,12 +215,50 @@ Return valid JSON:
         {{"hex": "#XXXXXX", "name": "Color Name", "role": "text_dark", "usage": "Dark text on light backgrounds"}},
         {{"hex": "#XXXXXX", "name": "Color Name", "role": "text_light", "usage": "Light text on dark backgrounds"}}
       ],
-      "typography": {{...}},
-      "story_arc": {{...}},
-      "image_copy": [...],
-      "brand_voice": "Matching style reference mood",
-      "layout": {{...}},
-      "visual_treatment": {{...}},
+      "typography": {{
+        "headline_font": "Font Name matching style reference feel",
+        "headline_weight": "Bold",
+        "headline_size": "48px",
+        "subhead_font": "Font Name",
+        "subhead_weight": "Regular",
+        "subhead_size": "24px",
+        "body_font": "Font Name",
+        "body_weight": "Regular",
+        "body_size": "16px",
+        "letter_spacing": "0.5px"
+      }},
+      "story_arc": {{
+        "theme": "Narrative thread inspired by style reference",
+        "hook": "Image 1 strategy (INTRIGUE - stop the scroll)",
+        "reveal": "Image 2 story (TRUST - this is real)",
+        "proof": "Image 3 demonstration (BELONGING - people like me)",
+        "dream": "Image 4 aspiration (DESIRE - I can see myself)",
+        "transform": "Image 5 journey (TRANSFORMATION - who I become)",
+        "close": "Image 6 conviction (URGENCY - don't miss this)"
+      }},
+      "image_copy": [
+        {{"image_number": 1, "image_type": "main", "headline": "", "subhead": null, "feature_callouts": [], "cta": null}},
+        {{"image_number": 2, "image_type": "infographic_1", "headline": "Headline", "subhead": "Optional", "feature_callouts": [], "cta": null}},
+        {{"image_number": 3, "image_type": "infographic_2", "headline": "Headline", "subhead": null, "feature_callouts": ["Feature 1", "Feature 2", "Feature 3"], "cta": null}},
+        {{"image_number": 4, "image_type": "lifestyle", "headline": "Aspirational headline", "subhead": null, "feature_callouts": [], "cta": null}},
+        {{"image_number": 5, "image_type": "transformation", "headline": "Transformation headline (before/after life state)", "subhead": null, "feature_callouts": [], "cta": null}},
+        {{"image_number": 6, "image_type": "comparison", "headline": "FOMO/urgency headline", "subhead": null, "feature_callouts": [], "cta": "Action CTA (Amazon-compliant)"}}
+      ],
+      "brand_voice": "Copy tone matching style reference mood",
+      "layout": {{
+        "composition_style": "e.g., centered symmetric",
+        "whitespace_philosophy": "e.g., generous breathing room",
+        "product_prominence": "e.g., hero focus at 60%",
+        "text_placement": "e.g., left-aligned blocks",
+        "visual_flow": "e.g., Z-pattern"
+      }},
+      "visual_treatment": {{
+        "lighting_style": "Lighting style from style reference",
+        "shadow_spec": "e.g., 0px 8px 24px rgba(0,0,0,0.12)",
+        "background_treatment": "Background approach from style reference",
+        "texture": "Texture/finish from style reference",
+        "mood_keywords": ["keyword1", "keyword2", "keyword3"]
+      }},
       "rationale": "Captures the style reference aesthetic",
       "target_appeal": "Users who love this visual style"
     }}
