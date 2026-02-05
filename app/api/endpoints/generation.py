@@ -49,7 +49,7 @@ from app.models.database import (
     ColorModeEnum,
 )
 from app.prompts.templates.aplus_modules import (
-    get_aplus_prompt, build_aplus_module_prompt, get_aplus_module_prompt,
+    get_aplus_prompt, build_aplus_module_prompt,
     build_canvas_inpainting_prompt, build_hero_pair_prompt,
     get_visual_script_prompt,
 )
@@ -1451,8 +1451,8 @@ async def generate_aplus_module(
         # Primary: Rich template with cinematic craft fields from visual script
         # Always use build_aplus_module_prompt — it injects lighting, depth, camera,
         # scene briefs, archetype, and all craft directions into a structured template.
-        # The old Tier 1 (get_aplus_module_prompt) returned the AI's short generation_prompt
-        # field directly, which was too short/generic to produce premium results.
+        # Always use the rich template — it injects lighting, depth, camera,
+        # scene briefs, archetype, and all craft directions from the visual script.
         if visual_script:
             prompt = build_aplus_module_prompt(
                 product_title=session.product_title,

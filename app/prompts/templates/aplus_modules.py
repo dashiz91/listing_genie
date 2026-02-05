@@ -731,23 +731,6 @@ def build_canvas_inpainting_prompt(
     )
 
 
-def get_aplus_module_prompt(visual_script: dict, module_index: int, custom_instructions: str = "") -> Optional[str]:
-    """
-    Look up pre-written generation prompt for a module from visual script.
-    Returns None if not found (caller should fall back to legacy).
-    """
-    modules = visual_script.get("modules", [])
-    if module_index >= len(modules):
-        return None
-    module = modules[module_index]
-    prompt = module.get("generation_prompt")
-    if not prompt:
-        return None
-    if custom_instructions:
-        prompt += f"\n\nCLIENT NOTE:\n{custom_instructions}"
-    return prompt
-
-
 def get_visual_script_prompt(
     product_title: str,
     brand_name: str,
