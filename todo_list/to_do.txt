@@ -1,15 +1,39 @@
-Not started:
-a-On preview, the A+ modules are completly appart from the listing preview module they should be in same wrapper so they can look more like amazon. They also have headers for A+ with cateogry of style module, but that is not what happens in amazon they are continious, lets move that category (hero image) (lifestyle)  etc to something that shows maybe when mouse over along with buttons? Not sure whats the cleanest . You decide.
-b-A profile small icon top right: with plans & pricing, Settings, Join Community [discord link tbd], Log out. .Undearneath X% daily compute used
-C- make home page look like this: "C:\Users\Rober\Downloads\Screenshot 2026-02-04 194511.jpg" instead of create with the minimalsitic settigns possible and then an advanced sleak button like that one to open up all of hte other forms. Only show preview After first generation so it looks sleek. Use shadcn components if psosible
-d- Supabase email registration looks bad sends you to a random ass URL localhost, and also cna we make it come from our domain not theirs? rn looks generic as fuck.
+================================================================================
+                              RAW IDEAS (your scratchpad)
+================================================================================
+Dump anything here messily - I'll curate it below when you ask me to clean up.
 
-c- During initial renegeration when use decides to attach a style, there is a "Use exact style image" toggle, have this by default toggled on . And say On to follow exactly, Off to have our AI Designer to create a similar more professional version. Toggling on and style should NOT take credits as it does not renerate an imagea.
-d- Improve the loading of generations, lets think about some unique loading bars that genious on this matter made, like which brands which products have stuff we can take inspiration from.
-e- add out of credits widget pop out, rn is a silent error, and maybe link to change subscription upgrade or w/e. what
-f- Streamline the form generation with an option do an easy just give an asin, our ais get amazon info on title, description, find out targeted audience and any other requirement from amzon and 2 images? and then we regenerate basically in 1 click ?
-g- Change monetary tiers, free only 10 credits per email ever not daily reset. But worried about exploiters making multiple emails and never paying, so maybe phone required? thoughts?
-h- we over did it on the editorial references, now there is no copywirte at all and it just shows the editorial as text lol, we should do small quality reference to ediotirals but thats not just it right we could use other stuff like brands, technical words,expensive cameras, expensive studio fancy stuff etc that is specific. read a pleasent text. We need to factor that in the strategy, editorial reference kinda makes sense, but it should be other things right like branding or keywords that improve quality output, appart from the fontwhats actually written and font type.
-In Progress:
-Completed
-a, b, c (style toggle), e
+
+
+================================================================================
+                              CURATED BY CLAUDE
+================================================================================
+
+PENDING
+-------
+C - Homepage Simplification
+    Make minimal like reference screenshot, advanced button for forms,
+    show preview only after first generation. Use shadcn.
+
+d - Supabase Email Branding
+    Fix localhost URL redirect, use our domain, less generic.
+
+d - Loading Animation Improvement
+    Research genius loading bars for inspiration.
+
+f - ASIN Import (One-Click)
+    Input ASIN → scrape Amazon → auto-fill form → generate in 1 click.
+
+g - Monetary Tiers Revision
+    Free = 10 credits lifetime (not daily). Phone verification to prevent exploits?
+
+h - Editorial Reference Strategy Rework
+    AI shows editorial text literally instead of using as quality cues.
+    Use brands, technical terms, expensive cameras, studio quality as modifiers.
+
+COMPLETED
+---------
+a - A+ Preview Integration (story 003)
+b - Profile Dropdown (story 001)
+c - Style toggle default ON + no credits when skipping
+e - Out of Credits Modal (story 002)

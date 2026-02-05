@@ -552,11 +552,16 @@ A task is NOT complete until:
 
 ```
 todo_list/
-├── backlog.md      ← Raw ideas (user dumps here)
+├── to_do.txt       ← User's scratchpad (top) + Claude's curated list (bottom)
+├── backlog.md      ← Detailed backlog with categories
 ├── ready/          ← Refined stories ready to implement
 │   └── 001-feature-name.md
 └── done/           ← Completed stories (for reference)
 ```
+
+**to_do.txt structure:**
+- **RAW IDEAS section (top)** — User dumps messy ideas here quickly
+- **CURATED BY CLAUDE section (bottom)** — Agent organizes pending/completed items
 
 ### How It Works
 
@@ -615,11 +620,11 @@ User value / problem being solved
 When finishing tasks or ending a session, **always clean up the todo_list folder**:
 
 1. **Move completed stories** from `ready/` to `done/`
-2. **Sync `to_do.txt` → `backlog.md`** - migrate new items from user's quick-dump file to proper backlog sections, mark completed items
-3. **Update `backlog.md`** - move completed items to the "Completed" section at the bottom
+2. **Curate `to_do.txt`** - move items from RAW IDEAS section to CURATED section, update COMPLETED
+3. **Sync to `backlog.md`** - ensure backlog has detailed versions of all curated items
 4. **Verify `ready/` is clean** - only stories actively being worked should be here
 
-**IMPORTANT:** Do NOT delete `to_do.txt` - this is the user's quick-dump file for raw ideas. Just sync its contents to `backlog.md`.
+**IMPORTANT:** Never delete `to_do.txt` or clear the RAW IDEAS section without user permission.
 
 ---
 
