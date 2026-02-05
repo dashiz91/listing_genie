@@ -232,11 +232,34 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
       {/* Amazon-style header - "From the manufacturer" section */}
       <div className="bg-gray-100 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">From the manufacturer</span>
-        {/* Viewport indicator when controlled externally (no toggle needed - main toolbar controls it) */}
-        {!onViewportChange && (
-          <span className="text-xs text-gray-500">
-            {viewportMode === 'mobile' ? '📱 Mobile' : '🖥️ Desktop'}
-          </span>
+        {/* Secondary viewport toggle for convenience (uses parent's unified handler) */}
+        {onViewportChange && (
+          <div className="flex items-center rounded-full bg-gray-200 p-0.5">
+            <button
+              onClick={() => onViewportChange('desktop')}
+              className={cn(
+                'px-3 py-1 text-xs font-medium rounded-full transition-all duration-200',
+                viewportMode === 'desktop'
+                  ? 'text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+              style={viewportMode === 'desktop' ? { backgroundColor: accentColor } : undefined}
+            >
+              Desktop
+            </button>
+            <button
+              onClick={() => onViewportChange('mobile')}
+              className={cn(
+                'px-3 py-1 text-xs font-medium rounded-full transition-all duration-200',
+                viewportMode === 'mobile'
+                  ? 'text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+              style={viewportMode === 'mobile' ? { backgroundColor: accentColor } : undefined}
+            >
+              Mobile
+            </button>
+          </div>
         )}
       </div>
 
