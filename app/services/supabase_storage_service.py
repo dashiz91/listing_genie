@@ -55,7 +55,14 @@ class SupabaseStorageService:
         safe_filename = f"{file_id}.png"
 
         # Re-encode image to strip metadata and validate
-        image = Image.open(BytesIO(content))
+        image_buffer = BytesIO(content)
+        image_buffer.seek(0)
+        try:
+            image = Image.open(image_buffer)
+            image.load()  # Force full read to catch truncated/corrupt data
+        except Exception as e:
+            logger.error(f"PIL cannot identify image ({len(content)} bytes, first 16: {content[:16].hex() if content else 'empty'}): {e}")
+            raise
         image = image.convert('RGB')  # Remove alpha channel if present
 
         # Convert to bytes
