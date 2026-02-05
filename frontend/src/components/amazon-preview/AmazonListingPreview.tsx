@@ -55,6 +55,10 @@ interface AmazonListingPreviewProps {
   // Version tracking (lifted to HomePage)
   listingVersions?: ListingVersionState;
   onVersionChange?: (imageType: string, index: number) => void;
+
+  // Controlled device mode (unified with A+ viewport)
+  deviceMode?: DeviceMode;
+  onDeviceModeChange?: (mode: DeviceMode) => void;
 }
 
 // Default image type order
@@ -86,13 +90,17 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   onStartOver,
   listingVersions,
   onVersionChange,
+  deviceMode: controlledDeviceMode,
+  onDeviceModeChange,
 }) => {
   void _onGenerateAll; // Reserved for future "Generate All" button
   // Get accent color from framework
   const frameworkColors = framework ? normalizeColors(framework.colors) : [];
   const accentColor = frameworkColors.find((c) => c.role === 'primary')?.hex || '#C85A35';
-  // Local state
-  const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
+  // Local state - supports both controlled and uncontrolled modes
+  const [internalDeviceMode, setInternalDeviceMode] = useState<DeviceMode>('desktop');
+  const deviceMode = controlledDeviceMode ?? internalDeviceMode;
+  const setDeviceMode = onDeviceModeChange ?? setInternalDeviceMode;
   const [selectedImageType, setSelectedImageType] = useState<string>('main');
   const [isDownloading, setIsDownloading] = useState(false);
   const [imageCacheKey, setImageCacheKey] = useState<Record<string, number>>({});

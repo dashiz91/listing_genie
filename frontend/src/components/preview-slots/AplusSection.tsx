@@ -201,8 +201,6 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
     return m.status;
   };
 
-  // Check if at least one desktop module is complete (for enabling mobile toggle)
-  const anyDesktopComplete = modules.some((m) => m.status === 'complete' && m.versions.length > 0);
   // Check if any mobile modules exist
   const anyMobileExists = modules.some((m) => m.mobileVersions.length > 0);
   const noMobileGenerated = !anyMobileExists;
@@ -231,39 +229,14 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
 
   return (
     <div className={cn('bg-white rounded-lg border border-gray-200 overflow-hidden', className)}>
-      {/* Amazon-style header with viewport toggle */}
+      {/* Amazon-style header - "From the manufacturer" section */}
       <div className="bg-gray-100 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">From the manufacturer</span>
-        {onViewportChange && (
-          <div className="flex items-center rounded-full bg-gray-200 p-0.5">
-            <button
-              onClick={() => onViewportChange('desktop')}
-              className={cn(
-                'px-3 py-1 text-xs font-medium rounded-full transition-all duration-200',
-                viewportMode === 'desktop'
-                  ? 'text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              )}
-              style={viewportMode === 'desktop' ? { backgroundColor: accentColor } : undefined}
-            >
-              Desktop
-            </button>
-            <button
-              onClick={() => onViewportChange('mobile')}
-              disabled={!anyDesktopComplete}
-              className={cn(
-                'px-3 py-1 text-xs font-medium rounded-full transition-all duration-200',
-                viewportMode === 'mobile'
-                  ? 'text-white shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700',
-                !anyDesktopComplete && 'opacity-40 cursor-not-allowed'
-              )}
-              style={viewportMode === 'mobile' ? { backgroundColor: accentColor } : undefined}
-              title={!anyDesktopComplete ? 'Generate desktop modules first' : undefined}
-            >
-              Mobile
-            </button>
-          </div>
+        {/* Viewport indicator when controlled externally (no toggle needed - main toolbar controls it) */}
+        {!onViewportChange && (
+          <span className="text-xs text-gray-500">
+            {viewportMode === 'mobile' ? '📱 Mobile' : '🖥️ Desktop'}
+          </span>
         )}
       </div>
 
@@ -363,17 +336,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
 
           return (
             <div key={module.id} style={moduleStyle}>
-              {/* Module role label — hide for hero bottom on desktop */}
-              {!isHeroBottom && (
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    {isMobile && idx === 0 ? `${moduleLabel} (Hero Banner)` : isHeroTop ? `${moduleLabel} (Hero Pair)` : moduleLabel}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {isMobile ? '📱 ' : ''}{isMobile ? (idx === 0 ? 1 : idx) : idx + 1}/{isMobile ? modules.length - 1 : modules.length}
-                  </span>
-                </div>
-              )}
+              {/* Module headers hidden - show only on hover via ImageActionOverlay */}
 
               {/* Mobile: "Generate Mobile" prompt overlay */}
               {showMobileGenPrompt && (
@@ -426,7 +389,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                       }}
                     />
 
-                    {/* Hover overlay with action buttons */}
+                    {/* Hover overlay with action buttons and module label */}
                     <ImageActionOverlay
                       versionInfo={{ current: activeIndex + 1, total: totalVersions }}
                       onRegenerate={() => {
@@ -436,6 +399,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                       onDownload={() => handleDownload(module, idx, viewportMode)}
                       onViewPrompt={sessionId ? () => setPromptModalIndex(idx) : undefined}
                       onMobileTransform={!isMobile && onGenerateMobileModule ? () => onGenerateMobileModule(idx) : undefined}
+                      label={moduleLabel}
                     />
 
                     {/* Version arrows */}

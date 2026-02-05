@@ -15,6 +15,8 @@ export interface ImageActionOverlayProps {
   // State
   isProcessing?: boolean;
   className?: string;
+  // Optional label shown on hover (for A+ modules)
+  label?: string;
 }
 
 export const ImageActionOverlay: React.FC<ImageActionOverlayProps> = ({
@@ -28,6 +30,7 @@ export const ImageActionOverlay: React.FC<ImageActionOverlayProps> = ({
   onMobileTransform,
   isProcessing = false,
   className,
+  label,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -43,7 +46,14 @@ export const ImageActionOverlay: React.FC<ImageActionOverlayProps> = ({
     >
       {/* Hover overlay with action buttons */}
       {isHovered && !isProcessing && (
-        <div className="absolute inset-0 bg-black/40 flex items-center justify-center gap-3 transition-opacity">
+        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-3 transition-opacity">
+          {/* Module label (if provided) */}
+          {label && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/60 rounded-full">
+              <span className="text-xs font-medium text-white uppercase tracking-wider">{label}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
           {onRegenerate && (
             <button
               onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
@@ -99,6 +109,7 @@ export const ImageActionOverlay: React.FC<ImageActionOverlayProps> = ({
               To Mobile
             </button>
           )}
+          </div>
         </div>
       )}
 

@@ -88,7 +88,7 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
   onRegenerateScript,
   onAplusVersionChange,
   onEditAplusModule,
-  aplusViewportMode,
+  aplusViewportMode: _aplusViewportMode, // Now controlled via unified viewport
   onAplusViewportChange,
   onGenerateMobileModule,
   onGenerateAllMobile,
@@ -107,6 +107,19 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
   onStartOver,
   className,
 }) => {
+  // Unified viewport mode - controls BOTH listing images AND A+ content
+  const [unifiedViewportMode, setUnifiedViewportMode] = useState<'desktop' | 'mobile'>('desktop');
+
+  // Handler that syncs both listing and A+ viewport modes
+  const handleViewportModeChange = useCallback((mode: 'desktop' | 'mobile') => {
+    setUnifiedViewportMode(mode);
+    // Also update A+ viewport if callback provided
+    if (onAplusViewportChange) {
+      onAplusViewportChange(mode);
+    }
+  }, [onAplusViewportChange]);
+
+  // Legacy deviceMode for LivePreview (non-Amazon preview states)
   const [deviceMode, setDeviceMode] = useState<'desktop' | 'mobile'>('desktop');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedImageType, setSelectedImageType] = useState('main');
@@ -175,6 +188,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
                 onStartOver={onStartOver}
                 listingVersions={listingVersions}
                 onVersionChange={onListingVersionChange}
+                deviceMode={unifiedViewportMode}
+                onDeviceModeChange={handleViewportModeChange}
               />
             </div>
           </div>
@@ -199,6 +214,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
             onStartOver={onStartOver}
             listingVersions={listingVersions}
             onVersionChange={onListingVersionChange}
+            deviceMode={unifiedViewportMode}
+            onDeviceModeChange={handleViewportModeChange}
           />
 
           {/* A+ Content Section - Show when there are modules */}
@@ -217,8 +234,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
               onRegenerateScript={onRegenerateScript}
               onVersionChange={onAplusVersionChange}
               onEditModule={onEditAplusModule}
-              viewportMode={aplusViewportMode}
-              onViewportChange={onAplusViewportChange}
+              viewportMode={unifiedViewportMode}
+              onViewportChange={undefined}
               onGenerateMobileModule={onGenerateMobileModule}
               onGenerateAllMobile={onGenerateAllMobile}
               onRegenerateMobileModule={onRegenerateMobileModule}
