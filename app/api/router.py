@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import health, generation, upload, images, projects, assets
+from app.api.endpoints import health, generation, upload, images, projects, assets, settings
 
 api_router = APIRouter(prefix="/api")
 
@@ -39,4 +39,11 @@ api_router.include_router(
     assets.router,
     prefix="/assets",
     tags=["assets"]
+)
+
+# Settings endpoints
+api_router.include_router(
+    settings.router,
+    prefix="/settings",
+    tags=["settings"]
 )

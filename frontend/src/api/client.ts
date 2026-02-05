@@ -515,6 +515,47 @@ class ApiClient {
     );
     return response.data;
   }
+
+  // ============================================================================
+  // Settings - User preferences and brand presets
+  // ============================================================================
+
+  /**
+   * Get all user settings including brand presets and usage stats
+   */
+  async getSettings(): Promise<UserSettings> {
+    const response = await this.client.get<UserSettings>('/settings/');
+    return response.data;
+  }
+
+  /**
+   * Get just the brand presets for auto-filling new projects
+   */
+  async getBrandPresets(): Promise<BrandPresets> {
+    const response = await this.client.get<BrandPresets>('/settings/brand-presets');
+    return response.data;
+  }
+
+  /**
+   * Update brand presets
+   */
+  async updateBrandPresets(updates: Partial<{
+    default_brand_name: string | null;
+    default_brand_colors: string[];
+    default_logo_path: string | null;
+    default_style_reference_path: string | null;
+  }>): Promise<BrandPresets> {
+    const response = await this.client.patch<BrandPresets>('/settings/brand-presets', updates);
+    return response.data;
+  }
+
+  /**
+   * Get usage stats
+   */
+  async getUsageStats(): Promise<UsageStats> {
+    const response = await this.client.get<UsageStats>('/settings/usage');
+    return response.data;
+  }
 }
 
 // Asset item type
@@ -526,6 +567,31 @@ export interface AssetItem {
   created_at: string;
   session_id?: string;
   image_type?: string;
+}
+
+// Settings types
+export interface BrandPresets {
+  default_brand_name: string | null;
+  default_brand_colors: string[];
+  default_logo_path: string | null;
+  default_logo_url: string | null;
+  default_style_reference_path: string | null;
+  default_style_reference_url: string | null;
+}
+
+export interface UsageStats {
+  images_generated_total: number;
+  images_generated_this_month: number;
+  projects_count: number;
+  last_generation_at: string | null;
+  credits_balance: number;
+  plan_tier: string;
+}
+
+export interface UserSettings {
+  brand_presets: BrandPresets;
+  usage: UsageStats;
+  email: string;
 }
 
 export const apiClient = new ApiClient();

@@ -215,3 +215,33 @@ class PromptHistory(Base):
 
     # Relationships
     design_context = relationship("DesignContext", back_populates="prompt_history")
+
+
+class UserSettings(Base):
+    """
+    User preferences and brand presets.
+    One row per user (Supabase user UUID).
+    """
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(36), unique=True, nullable=False, index=True)
+
+    # Brand Presets
+    default_brand_name = Column(String(100), nullable=True)
+    default_brand_colors = Column(JSON, default=list)  # List of hex colors
+    default_logo_path = Column(String(500), nullable=True)  # supabase://uploads/...
+    default_style_reference_path = Column(String(500), nullable=True)
+
+    # Usage stats (updated by generation service)
+    images_generated_total = Column(Integer, default=0)
+    images_generated_this_month = Column(Integer, default=0)
+    last_generation_at = Column(DateTime, nullable=True)
+
+    # Credits/billing (for future monetization)
+    credits_balance = Column(Integer, default=0)
+    plan_tier = Column(String(50), default="free")  # free, starter, pro, enterprise
+
+    # Timestamps
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
