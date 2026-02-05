@@ -494,6 +494,50 @@ npm run dev
 
 ---
 
+## ENGINEERING RULES (MANDATORY)
+
+```
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║  ALWAYS TEST BEFORE DECLARING COMPLETE                                        ║
+║                                                                               ║
+║  Every feature/bugfix MUST be verified:                                       ║
+║    1. Deploy to staging first (never directly to production)                  ║
+║    2. Test the change works (browser, API call, or logs)                      ║
+║    3. Get user confirmation if possible                                       ║
+║    4. Only then consider it complete                                          ║
+║                                                                               ║
+║  "Code compiles" ≠ "It works". PROVE it works.                                ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+```
+
+### Deployment Defaults
+- **ALWAYS deploy to staging** unless explicitly told to deploy to production
+- Use `railway up --service reddstudio-staging-backend --environment staging`
+- Check Railway logs after deployment: `railway logs -s reddstudio-staging-backend --environment staging`
+- Verify health: `curl https://reddstudio-staging-backend-staging.up.railway.app/health`
+
+### Testing Requirements
+- **UI changes**: Use Chrome DevTools MCP to navigate and verify visually
+- **API changes**: Hit the endpoint to verify response (curl or browser)
+- **Database changes**: Check logs for migration success
+- **Bug fixes**: Reproduce the original issue first, then verify the fix resolves it
+
+### Definition of Done
+A task is NOT complete until:
+1. ✅ Code is committed and pushed to `develop`
+2. ✅ Deployed to staging successfully
+3. ✅ Verified working (tested, not just "should work")
+4. ✅ No errors in Railway logs
+5. ✅ User approved (for significant changes)
+
+### Root Cause, Not Bandaids
+- Find and fix the actual cause, not symptoms
+- Don't add fallbacks/defaults to mask broken data
+- If AI returns incomplete data, fix the prompt
+- If enum is missing, add it properly to the database
+
+---
+
 ## Deployment & Environments
 
 ### Environment Overview
