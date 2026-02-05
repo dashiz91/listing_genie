@@ -97,7 +97,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
   onGenerateModule,
   onRegenerateModule,
   onGenerateAll,
-  onRegenerateScript,
+  onRegenerateScript: _onRegenerateScript,
   onVersionChange,
   onEditModule,
   isEnabled = true,
@@ -112,6 +112,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
   onCancelModule,
 }) => {
   const [promptModalIndex, setPromptModalIndex] = useState<number | null>(null);
+  void _onRegenerateScript; // Deprecated: now handled by unified Re-plan Art Direction button
   const [editingModuleIndex, setEditingModuleIndex] = useState<number | null>(null);
   const [editInstructions, setEditInstructions] = useState('');
   const focusImages = useFocusImages();
@@ -294,21 +295,6 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
             Generate All Mobile ({mobileNeededCount})
-          </button>
-        </div>
-      )}
-
-      {/* Re-plan Art Direction — always available when script exists */}
-      {visualScript && onRegenerateScript && !anyGenerating && !isGeneratingScript && sessionId && (
-        <div className="px-4 pt-2">
-          <button
-            onClick={() => onRegenerateScript()}
-            className="w-full py-2 text-xs text-gray-500 hover:text-gray-700 transition-colors flex items-center justify-center gap-1"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Re-plan Art Direction
           </button>
         </div>
       )}

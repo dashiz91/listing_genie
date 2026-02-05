@@ -24,6 +24,7 @@ So many tools like this popping up these days, like selluna.ai or listingoptimiz
 
 having some pre generated styles for usrs to just choose it, that wont require credits, and ppl can just browse for styles they may like. here we could have different categories like seasonal [xmas,vlentine, moms day etc], simplitic,modern,luxury, idk multi more styles, for this one we could generate the images to have em as fixed assets for all, we cna use gemini mcp to generate those styles ok?
 
+fix sending to https://staging.reddstudio.ai/auth wihch is just blank, on sign out that hapens and other stuff i think
 ================================================================================
                               CURATED BY CLAUDE
 ================================================================================
