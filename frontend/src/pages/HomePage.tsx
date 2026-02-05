@@ -1178,8 +1178,9 @@ export const HomePage: React.FC = () => {
         // Auto-generate visual script if missing
         await ensureVisualScript(sessionId);
 
-        // Get previous module path for chaining (if not first module)
-        const prevModule = moduleIndex > 0 ? aplusModules[moduleIndex - 1] : null;
+        // Get previous module path for chaining (only for modules 3+)
+        // Modules 0+1 are hero pair (one image split), module 2 is independent
+        const prevModule = moduleIndex >= 3 ? aplusModules[moduleIndex - 1] : null;
         const previousModulePath = prevModule ? getActiveImagePath(prevModule) : undefined;
 
         // Call API to generate A+ module

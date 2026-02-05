@@ -1523,7 +1523,9 @@ async def generate_aplus_module(
         canvas_image = None
         debug_canvas_path = None
 
-        if request.module_index > 1 and request.previous_module_path and visual_script:
+        # Canvas extension only for modules 3+ (index >= 3)
+        # Modules 0+1 are hero pair (one image split), module 2 is independent
+        if request.module_index >= 3 and request.previous_module_path and visual_script:
             modules = visual_script.get("modules", [])
             prev_idx = request.module_index - 1
             curr_idx = request.module_index
