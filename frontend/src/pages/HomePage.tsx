@@ -17,6 +17,7 @@ import type {
 import type { AplusModule, AplusViewportMode } from '../components/preview-slots/AplusSection';
 import { getActiveImagePath } from '../components/preview-slots/AplusSection';
 import type { SlotStatus } from '../components/preview-slots/ImageSlot';
+import { useCredits } from '../contexts/CreditContext';
 
 // Listing image version tracking (uses unified ImageVersion)
 export interface ListingVersionState {
@@ -86,6 +87,9 @@ export const HomePage: React.FC = () => {
   const projectParam = searchParams.get('project');
   const sessionParam = searchParams.get('session');
   const hasProjectToLoad = !!(projectParam || sessionParam);
+
+  // Credits
+  const { recordUsage, isAdmin, balance, refetch: refetchCredits } = useCredits();
 
   // Health check state
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -528,13 +532,29 @@ export const HomePage: React.FC = () => {
 
       // Open framework section
       setExpandedSections((prev) => (prev.includes('framework') ? prev : [...prev, 'framework']));
+
+      // Record credit usage for toast notification
+      const numPreviews = response.frameworks.length;
+      const creditsUsed = 1 + numPreviews; // 1 for analysis + 1 per preview
+      const newBalance = isAdmin ? balance : Math.max(0, balance - creditsUsed);
+
+      recordUsage({
+        operation: `Framework analysis + ${numPreviews} preview${numPreviews > 1 ? 's' : ''}`,
+        creditsUsed,
+        newBalance,
+        isAdmin,
+        timestamp: Date.now(),
+      });
+
+      // Refetch credits to sync with server
+      refetchCredits();
     } catch (err: any) {
       console.error('Framework analysis failed:', err);
       setError(extractErrorMessage(err, 'Failed to analyze product. Please try again.'));
     } finally {
       setIsAnalyzing(false);
     }
-  }, [uploads, formData, useOriginalStyleRef, updateSessionId, setSearchParams]);
+  }, [uploads, formData, useOriginalStyleRef, updateSessionId, setSearchParams, isAdmin, balance, recordUsage, refetchCredits]);
 
   // Handle framework select
   const handleSelectFramework = useCallback((framework: DesignFramework) => {
@@ -720,13 +740,33 @@ export const HomePage: React.FC = () => {
 
     // Check if any failed
     const anyFailed = results.some((r) => r.status === 'rejected');
+    const successCount = results.filter((r) => r.status === 'fulfilled').length;
+
     if (anyFailed) {
       setGenerationStatus('partial');
     } else {
       setGenerationStatus('complete');
     }
     setIsGenerating(false);
-  }, [uploads, selectedFramework, handleGenerateSingle]);
+
+    // Record credit usage for toast notification
+    if (successCount > 0) {
+      const modelCost = formData.imageModel.includes('flash') ? 1 : 3;
+      const creditsUsed = successCount * modelCost;
+      const newBalance = isAdmin ? balance : Math.max(0, balance - creditsUsed);
+
+      recordUsage({
+        operation: `${successCount} listing image${successCount > 1 ? 's' : ''} generated`,
+        creditsUsed,
+        newBalance,
+        isAdmin,
+        timestamp: Date.now(),
+      });
+
+      // Refetch credits to sync with server
+      refetchCredits();
+    }
+  }, [uploads, selectedFramework, handleGenerateSingle, formData.imageModel, isAdmin, balance, recordUsage, refetchCredits]);
 
   // Handle retry
   const handleRetry = useCallback(async () => {

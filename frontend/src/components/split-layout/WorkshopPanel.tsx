@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { apiClient } from '@/api/client';
 import type { DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
+import { useCredits } from '@/contexts/CreditContext';
 
 // Collapsible section component
 interface CollapsibleSectionProps {
@@ -145,6 +146,24 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
   onSectionToggle,
   className,
 }) => {
+  // Credits
+  const { balance, isAdmin } = useCredits();
+
+  // Calculate costs for current operations
+  const analyzeCost = useMemo(() => {
+    const numPreviews = formData.styleCount;
+    return 1 + numPreviews; // 1 for analysis + previews
+  }, [formData.styleCount]);
+
+  const generateCost = useMemo(() => {
+    const model = formData.imageModel;
+    const modelCost = model.includes('flash') ? 1 : 3;
+    return 6 * modelCost; // 6 listing images
+  }, [formData.imageModel]);
+
+  const canAffordAnalyze = isAdmin || balance >= analyzeCost;
+  const canAffordGenerate = isAdmin || balance >= generateCost;
+
   // Internal expanded sections state (if not controlled)
   const [internalExpandedSections, setInternalExpandedSections] = useState<string[]>(['photos', 'product']);
 
@@ -1079,10 +1098,10 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             {/* Analyze button */}
             <button
               onClick={onAnalyze}
-              disabled={!canAnalyze || isAnalyzing}
+              disabled={!canAnalyze || isAnalyzing || (!isAdmin && !canAffordAnalyze)}
               className={cn(
                 'w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all',
-                canAnalyze && !isAnalyzing
+                canAnalyze && !isAnalyzing && (isAdmin || canAffordAnalyze)
                   ? 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20'
                   : 'bg-slate-700 cursor-not-allowed'
               )}
@@ -1098,6 +1117,25 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                   : `Preview ${formData.styleCount} Design Style${formData.styleCount > 1 ? 's' : ''}`
               )}
             </button>
+
+            {/* Cost preview for Analyze */}
+            {!isAnalyzing && canAnalyze && (
+              <div className="text-center">
+                {isAdmin ? (
+                  <p className="text-xs text-amber-400/80 flex items-center justify-center gap-1">
+                    <span>👑</span> No credits used (Admin)
+                  </p>
+                ) : canAffordAnalyze ? (
+                  <p className="text-xs text-slate-400">
+                    <span className="text-redd-400 font-medium">{analyzeCost}</span> credits
+                  </p>
+                ) : (
+                  <p className="text-xs text-orange-400">
+                    Need {analyzeCost} credits (you have {balance})
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -1118,10 +1156,10 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             {/* Generate button */}
             <button
               onClick={onGenerate}
-              disabled={!canGenerate || isGenerating}
+              disabled={!canGenerate || isGenerating || (!isAdmin && !canAffordGenerate)}
               className={cn(
                 'w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all',
-                canGenerate && !isGenerating
+                canGenerate && !isGenerating && (isAdmin || canAffordGenerate)
                   ? 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20'
                   : 'bg-slate-700 cursor-not-allowed'
               )}
@@ -1137,6 +1175,36 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                 'Select a Framework'
               )}
             </button>
+
+            {/* Cost preview for Generate */}
+            {!isGenerating && selectedFramework && (
+              <div className="text-center space-y-1">
+                {isAdmin ? (
+                  <p className="text-xs text-amber-400/80 flex items-center justify-center gap-1">
+                    <span>👑</span> No credits used (Admin)
+                  </p>
+                ) : canAffordGenerate ? (
+                  <p className="text-xs text-slate-400">
+                    <span className="text-redd-400 font-medium">{generateCost}</span> credits
+                    <span className="text-slate-500"> • {balance - generateCost} remaining after</span>
+                  </p>
+                ) : (
+                  <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2">
+                    <p className="text-xs text-orange-400 font-medium">
+                      Need {generateCost} credits (you have {balance})
+                    </p>
+                    {formData.imageModel.includes('pro') && balance >= 6 && (
+                      <button
+                        onClick={() => onFormChange({ imageModel: 'gemini-2.5-flash-image' })}
+                        className="text-xs text-redd-400 hover:text-redd-300 underline mt-1"
+                      >
+                        Switch to Flash (6 credits) →
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Re-plan Styles button */}
             <button

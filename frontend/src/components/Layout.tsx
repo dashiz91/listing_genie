@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { CreditWidget } from './CreditWidget';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -68,6 +69,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="w-10 h-10"
             />
           </Link>
+        </div>
+
+        {/* Credit Widget */}
+        <div className="p-3 border-b border-slate-800">
+          <CreditWidget />
         </div>
 
         {/* Navigation */}
