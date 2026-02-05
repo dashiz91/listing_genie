@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { cn, normalizeColors } from '@/lib/utils';
-import { apiClient } from '@/api/client';
+import { apiClient, ASINImportResponse } from '@/api/client';
 import type { DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
 import { useCredits } from '@/contexts/CreditContext';
@@ -192,6 +192,64 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
   const [brandColorInput, setBrandColorInput] = useState('#4CAF50');
   const [paletteColorInput, setPaletteColorInput] = useState('#2196F3');
 
+  // ASIN Import state
+  const [asinInput, setAsinInput] = useState('');
+  const [isImportingAsin, setIsImportingAsin] = useState(false);
+  const [asinError, setAsinError] = useState<string | null>(null);
+
+  // Handle ASIN import
+  const handleAsinImport = async () => {
+    if (!asinInput.trim()) {
+      setAsinError('Please enter an ASIN');
+      return;
+    }
+
+    setIsImportingAsin(true);
+    setAsinError(null);
+
+    try {
+      const result: ASINImportResponse = await apiClient.importFromAsin(asinInput.trim(), {
+        downloadImages: true,
+        maxImages: 3,
+      });
+
+      // Update form data with imported info
+      onFormChange({
+        productTitle: result.title || '',
+        feature1: result.feature_1 || '',
+        feature2: result.feature_2 || '',
+        feature3: result.feature_3 || '',
+        brandName: result.brand_name || '',
+      });
+
+      // Add imported images to uploads
+      if (result.image_uploads.length > 0) {
+        const newUploads: UploadWithPreview[] = result.image_uploads.map((img, idx) => ({
+          upload_id: img.upload_id,
+          file_path: img.file_path,
+          preview_url: apiClient.getFileUrl(img.file_path),
+          original_filename: `amazon_${result.asin}_${idx + 1}.png`,
+        }));
+        onUploadsChange([...uploads, ...newUploads].slice(0, maxImages));
+      }
+
+      // Clear input on success
+      setAsinInput('');
+
+      // Expand product section to show imported data
+      if (!isSectionOpen('product')) {
+        toggleSection('product');
+      }
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : 'Failed to import product';
+      // Extract detail from axios error if available
+      const axiosError = error as { response?: { data?: { detail?: string } } };
+      setAsinError(axiosError.response?.data?.detail || errMsg);
+    } finally {
+      setIsImportingAsin(false);
+    }
+  };
+
   // Handle file upload for logo
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -314,6 +372,56 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
           >
             Start Over
           </button>
+        )}
+      </div>
+
+      {/* ASIN Import - Quick import from Amazon */}
+      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span className="text-sm font-medium text-white">Import from Amazon</span>
+          <span className="text-xs text-slate-400">(auto-fill form)</span>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={asinInput}
+            onChange={(e) => {
+              setAsinInput(e.target.value);
+              setAsinError(null);
+            }}
+            placeholder="Enter ASIN (e.g., B09V3K6QFP)"
+            className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            disabled={isImportingAsin}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAsinImport();
+              }
+            }}
+          />
+          <button
+            onClick={handleAsinImport}
+            disabled={isImportingAsin || !asinInput.trim()}
+            className="px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+          >
+            {isImportingAsin ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Importing...
+              </>
+            ) : (
+              'Import'
+            )}
+          </button>
+        </div>
+        {asinError && (
+          <p className="mt-2 text-xs text-red-400">{asinError}</p>
         )}
       </div>
 

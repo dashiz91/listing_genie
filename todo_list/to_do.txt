@@ -3,6 +3,7 @@
 ================================================================================
 Dump anything here messily - I'll curate it below when you ask me to clean up.
 
+on admin accounts, give me a way to send credits to an email account i choose (to increase and/or decrease)
 
 
 ================================================================================
@@ -27,13 +28,10 @@ f - ASIN Import (One-Click)
 g - Monetary Tiers Revision
     Free = 10 credits lifetime (not daily). Phone verification to prevent exploits?
 
-h - Editorial Reference Strategy Rework
-    AI shows editorial text literally instead of using as quality cues.
-    Use brands, technical terms, expensive cameras, studio quality as modifiers.
-
 COMPLETED
 ---------
 a - A+ Preview Integration (story 003)
 b - Profile Dropdown (story 001)
 c - Style Toggle Default ON + no credits when skipping preview
 e - Out of Credits Modal (story 002)
+h - Editorial Reference Strategy Rework (JTBD + conversion focus + text guidance)

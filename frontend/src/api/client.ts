@@ -596,6 +596,51 @@ class ApiClient {
     const response = await this.client.get<ModelCosts>('/settings/credits/model-costs');
     return response.data;
   }
+
+  // ============================================================================
+  // ASIN Import - Auto-fill form from Amazon product
+  // ============================================================================
+
+  /**
+   * Import product data from Amazon by ASIN
+   */
+  async importFromAsin(
+    asin: string,
+    options: {
+      marketplace?: string;
+      downloadImages?: boolean;
+      maxImages?: number;
+    } = {}
+  ): Promise<ASINImportResponse> {
+    const response = await this.client.post<ASINImportResponse>('/asin/import', {
+      asin,
+      marketplace: options.marketplace || 'com',
+      download_images: options.downloadImages ?? true,
+      max_images: options.maxImages || 3,
+    });
+    return response.data;
+  }
+
+  /**
+   * Validate ASIN format
+   */
+  async validateAsin(asin: string): Promise<{ valid: boolean; asin?: string; error?: string }> {
+    const response = await this.client.get(`/asin/validate/${encodeURIComponent(asin)}`);
+    return response.data;
+  }
+}
+
+// ASIN Import types
+export interface ASINImportResponse {
+  asin: string;
+  title: string | null;
+  brand_name: string | null;
+  feature_1: string | null;
+  feature_2: string | null;
+  feature_3: string | null;
+  category: string | null;
+  image_uploads: Array<{ upload_id: string; file_path: string }>;
+  source_image_urls: string[];
 }
 
 // Asset item type
