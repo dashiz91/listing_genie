@@ -795,14 +795,20 @@ export const HomePage: React.FC = () => {
       { type: 'comparison', status: 'pending', label: 'Comparison' },
     ]);
 
-    // Fire all 6 generations concurrently (same as clicking all 6 slots)
-    // handleGenerateSingle will handle session creation via ensureSession (with mutex)
+    // Generate images in batches of 2 to avoid overwhelming the backend.
+    // 6 concurrent Gemini API calls (~60s each) saturate the server and cause
+    // timeouts on all other requests (polling, image loading, project loading).
     const imageTypes = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
+    const BATCH_SIZE = 2;
+    const results: PromiseSettledResult<void>[] = [];
 
-    // Wait for all to complete (but they run concurrently)
-    const results = await Promise.allSettled(
-      imageTypes.map((type) => handleGenerateSingle(type))
-    );
+    for (let i = 0; i < imageTypes.length; i += BATCH_SIZE) {
+      const batch = imageTypes.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map((type) => handleGenerateSingle(type))
+      );
+      results.push(...batchResults);
+    }
 
     // Check if any failed
     const anyFailed = results.some((r) => r.status === 'rejected');
