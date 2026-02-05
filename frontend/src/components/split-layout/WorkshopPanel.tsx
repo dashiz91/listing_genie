@@ -668,8 +668,8 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                 </p>
                 <p className="text-[10px] text-slate-500">
                   {useOriginalStyleRef
-                    ? 'Skip AI style preview — your image is the reference for all generations'
-                    : 'AI will generate a style preview first, then use it as reference'}
+                    ? '0 preview credits — your image is used directly as reference'
+                    : '1-4 preview credits — AI generates styled previews first'}
                 </p>
               </div>
             </button>
