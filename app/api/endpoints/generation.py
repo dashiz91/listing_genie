@@ -1444,23 +1444,16 @@ async def generate_aplus_module(
         visual_script = session.aplus_visual_script
         is_chained = bool(request.previous_module_path)
 
-        # === Build prompt (3-tier fallback) ===
+        # === Build prompt ===
         prompt = None
         use_named_images = False
 
-        # Tier 1: Art Director pre-written prompt
+        # Primary: Rich template with cinematic craft fields from visual script
+        # Always use build_aplus_module_prompt — it injects lighting, depth, camera,
+        # scene briefs, archetype, and all craft directions into a structured template.
+        # The old Tier 1 (get_aplus_module_prompt) returned the AI's short generation_prompt
+        # field directly, which was too short/generic to produce premium results.
         if visual_script:
-            prompt = get_aplus_module_prompt(
-                visual_script=visual_script,
-                module_index=request.module_index,
-                custom_instructions="",  # handled by AI enhancement below
-            )
-            if prompt:
-                use_named_images = True
-                logger.info(f"Using Art Director pre-written prompt for module {request.module_index}")
-
-        # Tier 2: Legacy visual script format
-        if not prompt and visual_script:
             prompt = build_aplus_module_prompt(
                 product_title=session.product_title,
                 brand_name=session.brand_name or "",
@@ -1473,6 +1466,9 @@ async def generate_aplus_module(
                 custom_instructions="",  # handled by AI enhancement below
                 is_chained=is_chained,
             )
+            if prompt:
+                use_named_images = True
+                logger.info(f"Using rich template prompt for module {request.module_index}")
 
         # Tier 3: No visual script fallback
         if not prompt:
