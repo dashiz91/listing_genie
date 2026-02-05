@@ -86,6 +86,24 @@ def init_db():
         except Exception as e:
             logger.warning(f"Could not add columns to prompt_history: {e}")
 
+    # Add email column to user_settings (for admin lookup by email)
+    if "user_settings" in table_names:
+        try:
+            us_columns = [col["name"] for col in inspector.get_columns("user_settings")]
+            if "email" not in us_columns:
+                with engine.connect() as conn:
+                    if "postgresql" in SQLALCHEMY_DATABASE_URL:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS email VARCHAR(255)"))
+                        # Create index for email lookup
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_settings_email ON user_settings(email)"))
+                    else:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN email VARCHAR(255)"))
+                        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_user_settings_email ON user_settings(email)"))
+                    conn.commit()
+                    logger.info("Added email column to user_settings")
+        except Exception as e:
+            logger.warning(f"Could not add email column to user_settings: {e}")
+
 
 def get_db():
     """Dependency injection for database sessions"""

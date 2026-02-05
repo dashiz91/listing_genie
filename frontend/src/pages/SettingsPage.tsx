@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { apiClient, UserSettings, AssetItem, PlanInfo, CreditsInfo } from '../api/client';
+import { apiClient, UserSettings, AssetItem, PlanInfo, CreditsInfo, CreditAdjustmentResponse } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
 export const SettingsPage: React.FC = () => {
@@ -31,6 +31,14 @@ export const SettingsPage: React.FC = () => {
 
   // Credits state
   const [creditsInfo, setCreditsInfo] = useState<CreditsInfo | null>(null);
+
+  // Admin credit adjustment state
+  const [adminTargetEmail, setAdminTargetEmail] = useState('');
+  const [adminAmount, setAdminAmount] = useState('');
+  const [adminReason, setAdminReason] = useState('');
+  const [adminAdjusting, setAdminAdjusting] = useState(false);
+  const [adminResult, setAdminResult] = useState<CreditAdjustmentResponse | null>(null);
+  const [adminError, setAdminError] = useState<string | null>(null);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -426,6 +434,133 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Admin Credit Management Section - Only visible to admins */}
+      {creditsInfo?.is_admin && (
+        <section className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+            </svg>
+            Admin: Credit Management
+            <span className="ml-auto px-2 py-0.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-xs font-bold rounded-full">
+              ADMIN ONLY
+            </span>
+          </h2>
+          <p className="text-sm text-slate-400 mb-6">
+            Adjust credits for any user by their email address. Use positive numbers to add credits, negative to subtract.
+          </p>
+
+          {adminError && (
+            <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-3 text-red-400 text-sm mb-4">
+              {adminError}
+            </div>
+          )}
+
+          {adminResult && (
+            <div className="bg-green-500/10 border border-green-500/50 rounded-lg p-3 text-green-400 text-sm mb-4">
+              <strong>Success!</strong> Adjusted {adminResult.email}: {adminResult.previous_balance} → {adminResult.new_balance}
+              ({adminResult.amount_adjusted > 0 ? '+' : ''}{adminResult.amount_adjusted} credits)
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  User Email
+                </label>
+                <Input
+                  type="email"
+                  value={adminTargetEmail}
+                  onChange={(e) => setAdminTargetEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Amount
+                </label>
+                <Input
+                  type="number"
+                  value={adminAmount}
+                  onChange={(e) => setAdminAmount(e.target.value)}
+                  placeholder="e.g., 100 or -50"
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+                <p className="text-xs text-slate-500 mt-1">Positive = add, Negative = subtract</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Reason (optional)
+                </label>
+                <Input
+                  value={adminReason}
+                  onChange={(e) => setAdminReason(e.target.value)}
+                  placeholder="e.g., Beta tester bonus"
+                  className="bg-slate-900 border-slate-700 text-white"
+                />
+              </div>
+            </div>
+
+            <Button
+              onClick={async () => {
+                if (!adminTargetEmail || !adminAmount) {
+                  setAdminError('Please enter both email and amount');
+                  return;
+                }
+
+                const amount = parseInt(adminAmount, 10);
+                if (isNaN(amount)) {
+                  setAdminError('Amount must be a valid number');
+                  return;
+                }
+
+                setAdminAdjusting(true);
+                setAdminError(null);
+                setAdminResult(null);
+
+                try {
+                  const result = await apiClient.adjustUserCredits(
+                    adminTargetEmail.trim(),
+                    amount,
+                    adminReason.trim()
+                  );
+                  setAdminResult(result);
+                  setAdminTargetEmail('');
+                  setAdminAmount('');
+                  setAdminReason('');
+                } catch (err: unknown) {
+                  const error = err as { response?: { data?: { detail?: string } } };
+                  setAdminError(error.response?.data?.detail || 'Failed to adjust credits');
+                } finally {
+                  setAdminAdjusting(false);
+                }
+              }}
+              disabled={adminAdjusting || !adminTargetEmail || !adminAmount}
+              className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
+            >
+              {adminAdjusting ? (
+                <>
+                  <svg className="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Adjusting...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Adjust Credits
+                </>
+              )}
+            </Button>
+          </div>
+        </section>
+      )}
 
       {/* Pricing Plans Section */}
       <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">

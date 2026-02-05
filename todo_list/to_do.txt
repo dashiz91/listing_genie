@@ -3,9 +3,7 @@
 ================================================================================
 Dump anything here messily - I'll curate it below when you ask me to clean up.
 
-on admin accounts, give me a way to send credits to an email account i choose (to increase and/or decrease)
-
-
+[
 lets make sure we tackle all of these:
 These are just 5 images this tool generates, right? Based on one input image? Does it at least pull the URL/ASIN to get info about the product?
 
@@ -22,7 +20,9 @@ It doesn’t generate images in a way that they “stitch together”
 To me it just looks like a random assortment of 5 AI generated images on the topic of a product, without any strategy or structure behind it. I wouldn’t be your customer.
 
 So many tools like this popping up these days, like selluna.ai or listingoptimization.ai - this capability isn’t new. You need to tell me what your tool does better than the big number of other AI wrappers out there already
+]
 
+having some pre generated styles for usrs to just choose it, that wont require credits, and ppl can just browse for styles they may like. here we could have different categories like seasonal [xmas,vlentine, moms day etc], simplitic,modern,luxury, idk multi more styles, for this one we could generate the images to have em as fixed assets for all, we cna use gemini mcp to generate those styles ok?
 
 ================================================================================
                               CURATED BY CLAUDE
@@ -51,3 +51,4 @@ c - Style Toggle Default ON + no credits when skipping preview
 e - Out of Credits Modal (story 002)
 h - Editorial Reference Strategy Rework (JTBD + conversion focus + text guidance)
 f - ASIN Import (One-Click) - auto-fill form from Amazon product page
+i - Admin Credit Management - adjust credits by email in Settings (admin only)

@@ -628,6 +628,43 @@ class ApiClient {
     const response = await this.client.get(`/asin/validate/${encodeURIComponent(asin)}`);
     return response.data;
   }
+
+  // ============================================================================
+  // Admin - Credit management (admin only)
+  // ============================================================================
+
+  /**
+   * Adjust a user's credits by email (admin only)
+   */
+  async adjustUserCredits(
+    email: string,
+    amount: number,
+    reason: string = ''
+  ): Promise<CreditAdjustmentResponse> {
+    const response = await this.client.post<CreditAdjustmentResponse>('/admin/credits/adjust', {
+      email,
+      amount,
+      reason,
+    });
+    return response.data;
+  }
+
+  /**
+   * Search users by email (admin only)
+   */
+  async searchUsers(email?: string): Promise<UserSearchResponse> {
+    const params = email ? `?email=${encodeURIComponent(email)}` : '';
+    const response = await this.client.get<UserSearchResponse>(`/admin/users/search${params}`);
+    return response.data;
+  }
+
+  /**
+   * Get a specific user's credits by user_id (admin only)
+   */
+  async getUserCredits(userId: string): Promise<AdminUserCredits> {
+    const response = await this.client.get<AdminUserCredits>(`/admin/users/${userId}/credits`);
+    return response.data;
+  }
 }
 
 // ASIN Import types
@@ -713,6 +750,35 @@ export interface CostEstimate {
 export interface ModelCosts {
   models: Record<string, { name: string; cost: number; description: string }>;
   operations: Record<string, { cost: number; description: string }>;
+}
+
+// Admin types
+export interface CreditAdjustmentResponse {
+  success: boolean;
+  email: string;
+  previous_balance: number;
+  new_balance: number;
+  amount_adjusted: number;
+  reason: string;
+}
+
+export interface AdminUserSearchResult {
+  email: string;
+  user_id: string;
+  credits_balance: number;
+  plan_tier: string;
+}
+
+export interface UserSearchResponse {
+  users: AdminUserSearchResult[];
+  total: number;
+}
+
+export interface AdminUserCredits {
+  user_id: string;
+  email: string | null;
+  credits_balance: number;
+  plan_tier: string;
 }
 
 export const apiClient = new ApiClient();

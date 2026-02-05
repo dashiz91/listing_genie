@@ -320,7 +320,8 @@ async def get_credits(
     Get current credits balance and plan info.
     """
     credits_service = CreditsService(db)
-    user_settings = credits_service.get_user_settings(user.id)
+    # Pass email to store/update it in user settings for admin lookup
+    user_settings = credits_service.get_user_settings(user.id, email=user.email)
     plan_info = credits_service.get_plan_info(user_settings.plan_tier)
     is_admin = credits_service.is_admin(user.id, user.email)
 

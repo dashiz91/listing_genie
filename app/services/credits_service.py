@@ -147,8 +147,8 @@ class CreditsService:
         """Check if a user has admin privileges (unlimited credits)."""
         return self.is_admin_email(email)
 
-    def get_user_settings(self, user_id: str) -> UserSettings:
-        """Get or create user settings."""
+    def get_user_settings(self, user_id: str, email: Optional[str] = None) -> UserSettings:
+        """Get or create user settings. If email provided, update it."""
         settings = self.db.query(UserSettings).filter(
             UserSettings.user_id == user_id
         ).first()
@@ -156,13 +156,19 @@ class CreditsService:
         if not settings:
             settings = UserSettings(
                 user_id=user_id,
+                email=email.lower() if email else None,
                 credits_balance=PLANS["free"]["credits_per_period"],
                 plan_tier="free",
             )
             self.db.add(settings)
             self.db.commit()
             self.db.refresh(settings)
-            logger.info(f"Created new user settings for {user_id} with {settings.credits_balance} credits")
+            logger.info(f"Created new user settings for {user_id} ({email}) with {settings.credits_balance} credits")
+        elif email and (not settings.email or settings.email != email.lower()):
+            # Update email if changed or not set
+            settings.email = email.lower()
+            self.db.commit()
+            logger.debug(f"Updated email for user {user_id} to {email}")
 
         return settings
 

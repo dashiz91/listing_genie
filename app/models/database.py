@@ -226,6 +226,7 @@ class UserSettings(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(36), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=True, index=True)  # User's email for admin lookup
 
     # Brand Presets
     default_brand_name = Column(String(100), nullable=True)

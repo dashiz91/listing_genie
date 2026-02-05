@@ -790,16 +790,27 @@ railway variables set KEY=value -s reddstudio-backend --environment production
 # Login
 vercel login
 
-# Deploy to STAGING (uses Preview env vars → staging backend)
-cd frontend && vercel
-vercel alias <deployment-url> staging.reddstudio.ai
+# ═══════════════════════════════════════════════════════════════════════════
+# PREFERRED: Let auto-deploy handle it (push to develop → auto-deploy preview)
+# ═══════════════════════════════════════════════════════════════════════════
+# Vercel auto-deploys on push, but to unique URLs (not staging.reddstudio.ai)
+# After auto-deploy, run the alias command to update staging domain:
+vercel alias <auto-deploy-url> staging.reddstudio.ai
 
-# Deploy to PRODUCTION (uses Production env vars → prod backend)
+# ═══════════════════════════════════════════════════════════════════════════
+# MANUAL DEPLOY (only if auto-deploy fails or for urgent hotfix)
+# ═══════════════════════════════════════════════════════════════════════════
+# Staging (Preview env → staging backend)
+cd frontend && vercel && vercel alias <url> staging.reddstudio.ai
+
+# Production (Production env → prod backend)
 cd frontend && vercel --prod
 
-# IMPORTANT: Preview vs Production environments
-# - Preview env: VITE_API_URL = https://reddstudio-staging-backend-staging.up.railway.app
-# - Production env: VITE_API_URL = https://reddstudio-backend-production.up.railway.app
+# ═══════════════════════════════════════════════════════════════════════════
+# IMPORTANT: Environment variables
+# ═══════════════════════════════════════════════════════════════════════════
+# Preview env:  VITE_API_URL = https://reddstudio-staging-backend-staging.up.railway.app
+# Production:   VITE_API_URL = https://reddstudio-backend-production.up.railway.app
 # Never use `vercel --prod` for staging! It bakes in production API URLs.
 
 # Set environment variable

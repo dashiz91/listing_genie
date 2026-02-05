@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import health, generation, upload, images, projects, assets, settings, asin
+from app.api.endpoints import health, generation, upload, images, projects, assets, settings, asin, admin
 
 api_router = APIRouter(prefix="/api")
 
@@ -53,4 +53,11 @@ api_router.include_router(
     asin.router,
     prefix="/asin",
     tags=["asin"]
+)
+
+# Admin endpoints (credit management, user lookup)
+api_router.include_router(
+    admin.router,
+    prefix="/admin",
+    tags=["admin"]
 )
