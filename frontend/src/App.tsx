@@ -20,8 +20,9 @@ function App() {
           {/* Landing Page - marketing site */}
           <Route path="/" element={<LandingPage />} />
 
-          {/* Auth Page - login/signup */}
+          {/* Auth Page - login/signup (supports both /login and /auth) */}
           <Route path="/login" element={<AuthPage />} />
+          <Route path="/auth" element={<AuthPage />} />
 
           {/* App - protected, requires authentication */}
           <Route
