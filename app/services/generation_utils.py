@@ -306,7 +306,7 @@ class GenerationContext:
             operation="generate",
             prompt=prompt,
             reference_images=reference_images,
-            aspect_ratio="4:3" if module_type == "full_image" else "1:1",
+            aspect_ratio="16:9" if module_type == "full_image" else "1:1",
             target_dimensions=dims,
             module_index=module_index,
             storage_key=custom_storage_key or f"aplus_{module_type}_{module_index}",
