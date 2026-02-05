@@ -1,11 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import { SplitScreenLayout, WorkshopPanel, ShowroomPanel } from '../components/split-layout';
-import type { WorkshopFormData } from '../components/split-layout';
+import type { WorkshopFormData } from '../components/split-layout/WorkshopPanel';
 import type { UploadWithPreview } from '../components/ImageUploader';
 import type { ReferenceImage } from '../api/types';
-import type { PreviewState } from '../components/live-preview';
 import type {
   HealthResponse,
   SessionImage,
@@ -18,6 +16,7 @@ import type { AplusModule, AplusViewportMode } from '../components/preview-slots
 import type { SlotStatus } from '../components/preview-slots/ImageSlot';
 import { useCredits } from '../contexts/CreditContext';
 import { OutOfCreditsModal } from '../components/OutOfCreditsModal';
+import { CreatorView, AdvancedSettingsSheet, ResultsView } from '../components/creator';
 
 // Listing image version tracking (uses unified ImageVersion)
 export interface ListingVersionState {
@@ -145,8 +144,11 @@ export const HomePage: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expandedSections, setExpandedSections] = useState<string[]>(['photos', 'product']);
   const [isLoadingProject, setIsLoadingProject] = useState(hasProjectToLoad);
+
+  // View state: 'create' for the clean editor, 'results' for full-width Amazon preview
+  const [view, setView] = useState<'create' | 'results'>(hasProjectToLoad ? 'results' : 'create');
+  const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
 
   // Out of credits modal state
   const [outOfCreditsOpen, setOutOfCreditsOpen] = useState(false);
@@ -360,6 +362,14 @@ export const HomePage: React.FC = () => {
           );
         }
 
+        // Switch to results view if project has generated images
+        const hasCompletedImages = sessionImages.some(img => img.status === 'complete');
+        if (hasCompletedImages || project.status === 'processing') {
+          setView('results');
+        } else {
+          setView('create');
+        }
+
         // Persist session in URL (replace ?project= with ?session=)
         setSearchParams({ session: project.session_id }, { replace: true });
       } catch (err) {
@@ -433,31 +443,18 @@ export const HomePage: React.FC = () => {
     return () => clearInterval(interval);
   }, [sessionId, generationStatus, isGenerating]);
 
-  // Calculate preview state
-  const previewState: PreviewState = useMemo(() => {
-    if (isGenerating || (generationStatus !== 'pending' && images.some((img) => img.status === 'processing'))) {
-      return 'generating';
-    }
-    if (generationStatus === 'complete' || generationStatus === 'partial') {
-      return 'complete';
-    }
-    if (selectedFramework) {
-      return 'framework_selected';
-    }
-    if (uploads.length === 0) {
-      return 'empty';
-    }
-    if (!formData.productTitle.trim()) {
-      return 'photos_only';
-    }
-    return 'filling';
-  }, [uploads.length, formData.productTitle, selectedFramework, isGenerating, generationStatus, images]);
-
-  // Features array for preview
+  // Features array for results view
   const features = useMemo(
     () => [formData.feature1, formData.feature2, formData.feature3],
     [formData.feature1, formData.feature2, formData.feature3]
   );
+
+  // Auto-switch to results view when generation starts
+  useEffect(() => {
+    if (isGenerating && view === 'create') {
+      setView('results');
+    }
+  }, [isGenerating, view]);
 
   // Can analyze?
   const canAnalyze = uploads.length > 0 && formData.productTitle.trim().length > 0 && !isAnalyzing;
@@ -468,13 +465,6 @@ export const HomePage: React.FC = () => {
   // Handle form changes (real-time)
   const handleFormChange = useCallback((partial: Partial<WorkshopFormData>) => {
     setFormData((prev) => ({ ...prev, ...partial }));
-  }, []);
-
-  // Handle section toggle
-  const handleSectionToggle = useCallback((section: string) => {
-    setExpandedSections((prev) =>
-      prev.includes(section) ? prev.filter((s) => s !== section) : [...prev, section]
-    );
   }, []);
 
   // Handle uploads change
@@ -572,9 +562,6 @@ export const HomePage: React.FC = () => {
       // without image records for main/infographic/etc. ensureSession() would reuse it
       // and /generate/single would fail with 400. The analyze session is saved in the DB
       // so it still appears in projects.
-
-      // Open framework section
-      setExpandedSections((prev) => (prev.includes('framework') ? prev : [...prev, 'framework']));
 
       // Record credit usage for toast notification
       // When skip_preview_generation is true, no preview images are generated (0 credits for previews)
@@ -1739,7 +1726,7 @@ export const HomePage: React.FC = () => {
     setOriginalStyleRefPath(null);
     setUseOriginalStyleRef(false);
     setError(null);
-    setExpandedSections(['photos', 'product']);
+    setView('create');
     // Clear session from URL
     setSearchParams({}, { replace: true });
     // Reset listing versions
@@ -1808,7 +1795,7 @@ export const HomePage: React.FC = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-80px)]">
+    <div className="h-[calc(100vh-80px)] flex flex-col">
       {/* Health Status Warning */}
       {!healthLoading && (healthError || !isGeminiConfigured) && (
         <div className="mx-6 mt-4 bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4">
@@ -1831,74 +1818,79 @@ export const HomePage: React.FC = () => {
         </div>
       )}
 
-      {/* Split Screen Layout */}
-      <SplitScreenLayout
-        leftPanel={
-          <WorkshopPanel
-            uploads={uploads}
-            onUploadsChange={handleUploadsChange}
-            maxImages={5}
-            formData={formData}
-            onFormChange={handleFormChange}
-            frameworks={frameworks}
-            selectedFramework={selectedFramework}
-            onSelectFramework={handleSelectFramework}
-            isAnalyzing={isAnalyzing}
-            productAnalysis={productAnalysis}
-            onAnalyze={handleAnalyze}
-            onGenerate={handleGenerate}
-            onStartOver={handleStartOver}
-            isGenerating={isGenerating}
-            canAnalyze={canAnalyze}
-            canGenerate={canGenerate}
-            expandedSections={expandedSections}
-            onSectionToggle={handleSectionToggle}
-            useOriginalStyleRef={useOriginalStyleRef}
-            onToggleOriginalStyleRef={setUseOriginalStyleRef}
-          />
-        }
-        rightPanel={
-          <ShowroomPanel
-            previewState={previewState}
-            productTitle={formData.productTitle}
-            brandName={formData.brandName}
-            features={features}
-            targetAudience={formData.targetAudience}
-            productImages={uploads}
-            selectedFramework={selectedFramework || undefined}
-            isAnalyzing={isAnalyzing}
-            sessionId={sessionId || undefined}
-            images={images}
-            aplusModules={aplusModules}
-            aplusVisualScript={aplusVisualScript}
-            isGeneratingScript={isGeneratingScript}
-            onGenerateAplusModule={handleGenerateAplusModule}
-            onRegenerateAplusModule={handleRegenerateAplusModule}
-            onGenerateAllAplus={handleGenerateAllAplus}
-            onRegenerateScript={regenerateVisualScript}
-            onReplanAll={replanAll}
-            isReplanning={isReplanning}
-            onAplusVersionChange={handleAplusViewportVersionChange}
-            onEditAplusModule={handleEditAplusModule}
-            aplusViewportMode={aplusViewportMode}
-            onAplusViewportChange={setAplusViewportMode}
-            onGenerateMobileModule={handleGenerateMobileModule}
-            onGenerateAllMobile={handleGenerateAllMobile}
-            onRegenerateMobileModule={handleRegenerateMobileModule}
-            onEditMobileModule={handleEditMobileModule}
-            onCancelAplusModule={handleCancelAplusModule}
-            listingVersions={listingVersions}
-            onListingVersionChange={handleListingVersionChange}
-            onGenerateSingle={handleGenerateSingle}
-            onGenerateAll={handleGenerate}
-            onRegenerateSingle={handleRegenerateSingle}
-            onEditSingle={handleEditSingle}
-            onCancelGeneration={handleCancelGeneration}
-            availableReferenceImages={availableReferenceImages}
-            onRetry={handleRetry}
-            onStartOver={handleStartOver}
-          />
-        }
+      {/* View-based rendering */}
+      {view === 'create' ? (
+        <CreatorView
+          uploads={uploads}
+          onUploadsChange={handleUploadsChange}
+          maxImages={5}
+          formData={formData}
+          onFormChange={handleFormChange}
+          frameworks={frameworks}
+          selectedFramework={selectedFramework}
+          onSelectFramework={handleSelectFramework}
+          productAnalysis={productAnalysis}
+          onAnalyze={handleAnalyze}
+          onGenerate={handleGenerate}
+          canAnalyze={canAnalyze}
+          canGenerate={canGenerate}
+          isAnalyzing={isAnalyzing}
+          isGenerating={isGenerating}
+          useOriginalStyleRef={useOriginalStyleRef}
+          onToggleOriginalStyleRef={setUseOriginalStyleRef}
+          onOpenAdvancedSettings={() => setAdvancedSettingsOpen(true)}
+          onStartOver={handleStartOver}
+        />
+      ) : (
+        <ResultsView
+          productTitle={formData.productTitle}
+          brandName={formData.brandName}
+          features={features}
+          targetAudience={formData.targetAudience}
+          sessionId={sessionId || undefined}
+          images={images}
+          selectedFramework={selectedFramework || undefined}
+          aplusModules={aplusModules}
+          aplusVisualScript={aplusVisualScript}
+          isGeneratingScript={isGeneratingScript}
+          onGenerateAplusModule={handleGenerateAplusModule}
+          onRegenerateAplusModule={handleRegenerateAplusModule}
+          onGenerateAllAplus={handleGenerateAllAplus}
+          onRegenerateScript={regenerateVisualScript}
+          onReplanAll={replanAll}
+          isReplanning={isReplanning}
+          onAplusVersionChange={handleAplusViewportVersionChange}
+          onEditAplusModule={handleEditAplusModule}
+          aplusViewportMode={aplusViewportMode}
+          onAplusViewportChange={setAplusViewportMode}
+          onGenerateMobileModule={handleGenerateMobileModule}
+          onGenerateAllMobile={handleGenerateAllMobile}
+          onRegenerateMobileModule={handleRegenerateMobileModule}
+          onEditMobileModule={handleEditMobileModule}
+          onCancelAplusModule={handleCancelAplusModule}
+          listingVersions={listingVersions}
+          onListingVersionChange={handleListingVersionChange}
+          onGenerateSingle={handleGenerateSingle}
+          onGenerateAll={handleGenerate}
+          onRegenerateSingle={handleRegenerateSingle}
+          onEditSingle={handleEditSingle}
+          onCancelGeneration={handleCancelGeneration}
+          availableReferenceImages={availableReferenceImages}
+          onRetry={handleRetry}
+          onBackToEditor={() => setView('create')}
+          onOpenAdvancedSettings={() => setAdvancedSettingsOpen(true)}
+          onStartOver={handleStartOver}
+        />
+      )}
+
+      {/* Advanced Settings Sheet (always mounted, controlled by open state) */}
+      <AdvancedSettingsSheet
+        open={advancedSettingsOpen}
+        onClose={() => setAdvancedSettingsOpen(false)}
+        formData={formData}
+        onFormChange={handleFormChange}
+        useOriginalStyleRef={useOriginalStyleRef}
+        onToggleOriginalStyleRef={setUseOriginalStyleRef}
       />
 
       {/* Out of Credits Modal */}
