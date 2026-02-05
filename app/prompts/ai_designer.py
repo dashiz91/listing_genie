@@ -208,7 +208,13 @@ Return valid JSON:
       "framework_name": "Style Reference Match",
       "framework_type": "style_reference",
       "design_philosophy": "Channels the style reference essence",
-      "colors": [...],
+      "colors": [
+        {{"hex": "#XXXXXX", "name": "Color Name", "role": "primary", "usage": "60% - Main brand color from style reference"}},
+        {{"hex": "#XXXXXX", "name": "Color Name", "role": "secondary", "usage": "30% - Supporting color from style reference"}},
+        {{"hex": "#XXXXXX", "name": "Color Name", "role": "accent", "usage": "10% - Pop color from style reference"}},
+        {{"hex": "#XXXXXX", "name": "Color Name", "role": "text_dark", "usage": "Dark text on light backgrounds"}},
+        {{"hex": "#XXXXXX", "name": "Color Name", "role": "text_light", "usage": "Light text on dark backgrounds"}}
+      ],
       "typography": {{...}},
       "story_arc": {{...}},
       "image_copy": [...],
