@@ -10,7 +10,14 @@ Philosophy: Teach the AI to think like a master designer, not follow a checklist
 Use vocabulary triggers that activate quality distributions in the model.
 """
 
-from .vocabulary import get_listing_quality_standard, get_storytelling_standard, EMOTIONAL_ARC
+from .vocabulary import (
+    get_listing_quality_standard,
+    get_storytelling_standard,
+    get_heatmap_principles,
+    get_conversion_principles,
+    EMOTIONAL_ARC,
+    SHOPPER_QUESTIONS,
+)
 from .product_protection import (
     PRODUCT_PROTECTION_DIRECTIVE,
     PRODUCT_REFERENCE_INSTRUCTION,
@@ -357,12 +364,24 @@ Visual Treatment:
 - Background: {background_treatment}
 - Mood: {mood_keywords}
 
-Headlines available (use sparingly, let images speak):
+COPY & TEXT ELEMENTS (Use strategically per image type):
 {image_copy_json}
+
+For INFOGRAPHIC images (2, 3): Text is ESSENTIAL — callouts, headlines, feature highlights.
+For LIFESTYLE images (4): Text is OPTIONAL — use if it adds value, skip if image speaks.
+For TRANSFORMATION (5): Labels are HELPFUL — "Before/After", "Problem/Solution".
+For COMPARISON (6): Text DRIVES action — numbers, differentiators, urgency.
+
+Text should be INTEGRATED into the design, not slapped on.
+Think Apple product page, not cheap Amazon template.
 
 ''' + get_listing_quality_standard() + '''
 
 ''' + get_storytelling_standard() + '''
+
+''' + get_heatmap_principles() + '''
+
+''' + get_conversion_principles() + '''
 
 ═══════════════════════════════════════════════════════════════════════════════
                     THE EMOTIONAL ARC - 6 IMAGES, 6 FEELINGS
@@ -380,36 +399,81 @@ Hasselblad H6D-100c. Pure white background. The product doesn't need to explain 
 It simply IS — beautiful, present, mysterious in its perfection.
 The viewer's unconscious thought: "I want to know more."
 
-**IMAGE 2: TRUST** — "This is real, this is well-made"
+**IMAGE 2: TRUST (Infographic 1)** — "This is real, this is well-made"
+SHOPPER'S QUESTION: "Is this quality? Can I trust this brand?"
+
 Show the craft that earns respect. Close-ups that reveal quality.
-Not "features" — the texture of materials, the precision of details.
 Light catching edges that prove meticulous craftsmanship.
-The viewer's unconscious thought: "I can trust this."
 
-**IMAGE 3: BELONGING** — "People like me choose this"
-Create identity connection. Show the product in a curated context that
-says something about the person who owns it. Not generic lifestyle —
-a specific, aspirational world the viewer wants to inhabit.
-The viewer's unconscious thought: "This is for someone like me."
+TEXT ELEMENTS (Essential):
+- Headline highlighting quality/craftsmanship
+- 2-4 callouts with arrows pointing to quality details
+- Material specs, certifications, or process highlights
+Think Dyson's technical callouts or Apple's material close-ups.
 
-**IMAGE 4: DESIRE** — "I can see myself with this"
+Quality anchor: "Shot like a Sotheby's catalog detail. Every texture visible."
+The viewer's thought: "Oh, this is actually well-made. Not cheap."
+
+**IMAGE 3: BELONGING (Infographic 2)** — "What do I get?"
+SHOPPER'S QUESTION: "What are the features? What's included?"
+
+Answer the practical questions. Show what they're buying.
+This is the "specs at a glance" image.
+
+TEXT ELEMENTS (Essential):
+- Feature grid or icon list with key benefits
+- Dimensions, quantities, or "what's in the box"
+- 3-5 key selling points with visual hierarchy
+Think Apple's feature comparison or Dyson's specification layouts.
+
+Quality anchor: "Clean infographic design. Readable at thumbnail size."
+The viewer's thought: "Now I know exactly what I'm getting."
+
+**IMAGE 4: DESIRE (Lifestyle)** — "I can see myself with this"
+SHOPPER'S QUESTION: "Will this fit my life? Is this for someone like me?"
+
 Kinfolk magazine editorial. Real human interaction — hands reaching,
 arranging, enjoying. Natural window light (~5200K). A moment they
 can imagine themselves in. Not posed. Lived.
-The viewer's unconscious thought: "I want this feeling."
+
+TEXT ELEMENTS (Optional):
+- One aspirational headline if it adds value
+- Skip text entirely if the lifestyle image speaks for itself
+Think Glossier's lifestyle shots — product in real context.
+
+Quality anchor: "Kinfolk editorial. Warm, lived-in, aspirational but attainable."
+The viewer's thought: "I want this feeling. This is my life upgraded."
 
 **IMAGE 5: TRANSFORMATION** — "This is who I become"
+SHOPPER'S QUESTION: "What changes if I buy this? What problem does it solve?"
+
 The hero's journey climax. Show the customer's life state BEFORE vs AFTER.
 Not a product comparison — a LIFE comparison. The job getting DONE.
-Clayton Christensen's insight: They're not buying a product, they're hiring
-a solution to a problem. Show the problem SOLVED.
-The viewer's unconscious thought: "I want to go from there to here."
+Clayton Christensen's insight: They're hiring a solution to a problem.
 
-**IMAGE 6: URGENCY** — "I don't want to miss this"
-The final FOMO push. Create emotional urgency through aspiration, not pressure.
-Social proof that others are already living this upgraded reality.
-The gap between their current life and the life that's one click away.
-The viewer's unconscious thought: "Others have this. Why don't I?"
+TEXT ELEMENTS (Helpful):
+- Clear "Before / After" or "Without / With" labels
+- Problem statement → Solution statement
+- The transformation should be OBVIOUS even without text
+Think weight loss ads, home makeovers, productivity tool demos.
+
+Quality anchor: "Split composition. Clear contrast. The change is undeniable."
+The viewer's thought: "I want to go from THERE to HERE."
+
+**IMAGE 6: URGENCY (Comparison/Social Proof)** — "Why buy NOW?"
+SHOPPER'S QUESTION: "Why this one? Why should I decide today?"
+
+Create emotional urgency through aspiration and social proof.
+Show why THIS product wins and why waiting is losing.
+
+TEXT ELEMENTS (Drives Action):
+- Numbers: "10,000+ Happy Customers" / "4.8★ Rating"
+- Differentiators: "Only one with X" / "Unlike others, we..."
+- Urgency: "Limited Edition" / "Best Seller" / "Award Winner"
+Think Amazon's Best Seller badges, review highlights, comparison charts.
+
+Quality anchor: "Confident, not desperate. Premium urgency, not discount store."
+The viewer's thought: "Others have this. I don't want to miss out."
 
 ═══════════════════════════════════════════════════════════════════════════════
                               PROMPT CRAFT
