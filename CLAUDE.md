@@ -539,6 +539,10 @@ A task is NOT complete until:
 3. ✅ Verified working (tested, not just "should work")
 4. ✅ No errors in Railway logs
 5. ✅ User approved (for significant changes)
+6. ✅ Documentation updated (if relevant):
+   - `CLAUDE.md` — update if architecture, workflows, or key files changed
+   - `README.md` — update if user-facing features or setup changed
+   - `todo_list/` — update to_do.txt and backlog.md with completion status
 
 ### Root Cause, Not Bandaids
 - Find and fix the actual cause, not symptoms
