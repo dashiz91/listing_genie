@@ -790,14 +790,21 @@ railway variables set KEY=value -s reddstudio-backend --environment production
 # Login
 vercel login
 
-# Deploy preview (staging)
+# Deploy to STAGING (uses Preview env vars → staging backend)
 cd frontend && vercel
+vercel alias <deployment-url> staging.reddstudio.ai
 
-# Deploy production
+# Deploy to PRODUCTION (uses Production env vars → prod backend)
 cd frontend && vercel --prod
 
+# IMPORTANT: Preview vs Production environments
+# - Preview env: VITE_API_URL = https://reddstudio-staging-backend-staging.up.railway.app
+# - Production env: VITE_API_URL = https://reddstudio-backend-production.up.railway.app
+# Never use `vercel --prod` for staging! It bakes in production API URLs.
+
 # Set environment variable
-vercel env add VITE_API_URL production
+vercel env add VITE_API_URL preview     # For staging
+vercel env add VITE_API_URL production  # For production
 ```
 
 ### Environment Variables by Environment

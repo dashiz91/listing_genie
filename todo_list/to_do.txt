@@ -6,6 +6,24 @@ Dump anything here messily - I'll curate it below when you ask me to clean up.
 on admin accounts, give me a way to send credits to an email account i choose (to increase and/or decrease)
 
 
+lets make sure we tackle all of these:
+These are just 5 images this tool generates, right? Based on one input image? Does it at least pull the URL/ASIN to get info about the product?
+
+It doesn’t help me with the headache of actually setting it up in admin?
+
+It doesn’t help me with Mobile in parallel?
+
+It doesn’t help me with adding alt text?
+
+It doesn’t help me with other types of sections?
+
+It doesn’t generate images in a way that they “stitch together”
+
+To me it just looks like a random assortment of 5 AI generated images on the topic of a product, without any strategy or structure behind it. I wouldn’t be your customer.
+
+So many tools like this popping up these days, like selluna.ai or listingoptimization.ai - this capability isn’t new. You need to tell me what your tool does better than the big number of other AI wrappers out there already
+
+
 ================================================================================
                               CURATED BY CLAUDE
 ================================================================================
@@ -22,9 +40,6 @@ d - Supabase Email Branding
 d - Loading Animation Improvement
     Research genius loading bars for inspiration.
 
-f - ASIN Import (One-Click)
-    Input ASIN → scrape Amazon → auto-fill form → generate in 1 click.
-
 g - Monetary Tiers Revision
     Free = 10 credits lifetime (not daily). Phone verification to prevent exploits?
 
@@ -35,3 +50,4 @@ b - Profile Dropdown (story 001)
 c - Style Toggle Default ON + no credits when skipping preview
 e - Out of Credits Modal (story 002)
 h - Editorial Reference Strategy Rework (JTBD + conversion focus + text guidance)
+f - ASIN Import (One-Click) - auto-fill form from Amazon product page
