@@ -518,6 +518,7 @@ npm run dev
 
 ### Testing Requirements
 - **UI changes**: Use Chrome DevTools MCP to navigate and verify visually
+- **Image uploads**: Use `mcp__chrome-devtools__upload_file` to upload test images from `frontend/public/` or project root
 - **API changes**: Hit the endpoint to verify response (curl or browser)
 - **Database changes**: Check logs for migration success
 - **Bug fixes**: Reproduce the original issue first, then verify the fix resolves it
