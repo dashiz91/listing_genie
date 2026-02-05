@@ -5,6 +5,7 @@ import { APLUS_DIMENSIONS, APLUS_MOBILE_DIMENSIONS } from '@/api/types';
 import { PromptModal } from '@/components/PromptModal';
 import { ImageActionOverlay } from '@/components/shared/ImageActionOverlay';
 import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import type { SlotStatus } from './ImageSlot';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -575,30 +576,44 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
         />
       )}
 
-      {/* Regenerate Note Panel — slide-up overlay */}
-      {regenModuleIndex !== null && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30" onClick={() => setRegenModuleIndex(null)}>
-          <div
-            className="w-full max-w-lg bg-white rounded-t-xl shadow-xl p-6 space-y-4 animate-in slide-in-from-bottom"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Regenerate {regenModuleIndex <= 1 ? 'Hero Pair' : `Module ${regenModuleIndex + 1}`}
-              </h3>
-              <button onClick={() => setRegenModuleIndex(null)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+      {/* Regenerate Panel (Sheet) */}
+      <Sheet open={regenModuleIndex !== null} onOpenChange={(open) => !open && setRegenModuleIndex(null)}>
+        <SheetContent className="bg-slate-900 border-slate-700">
+          <SheetHeader>
+            <SheetTitle className="text-white">
+              Regenerate {regenModuleIndex !== null && regenModuleIndex <= 1 ? 'Hero Pair' : `Module ${(regenModuleIndex ?? 0) + 1}`}
+            </SheetTitle>
+            <SheetDescription className="text-slate-400">
+              Optionally describe what you'd like different. Leave empty to regenerate freely.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* Preview of module being regenerated */}
+            {regenModuleIndex !== null && modules[regenModuleIndex] && (
+              <div className="rounded-lg overflow-hidden border border-slate-700">
+                <img
+                  src={getActiveImageUrl(modules[regenModuleIndex], viewportMode)}
+                  alt="Module to regenerate"
+                  className="w-full h-48 object-contain bg-white"
+                />
+              </div>
+            )}
+
+            {/* Regen note */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Regeneration Notes (Optional)
+              </label>
+              <textarea
+                value={regenNote}
+                onChange={(e) => setRegenNote(e.target.value)}
+                placeholder="e.g., 'Try a more minimal style' or 'Make it more vibrant'"
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-redd-500 focus:border-transparent resize-none"
+                rows={4}
+              />
             </div>
-            <textarea
-              value={regenNote}
-              onChange={(e) => setRegenNote(e.target.value)}
-              placeholder="Optionally describe what you'd like different... e.g. 'Try a more minimal style' or 'Make it more vibrant'"
-              className="w-full h-28 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-redd-500/50 resize-none"
-              autoFocus
-            />
+
             {/* Focus Images for regen */}
             {regenFocusAvailableImages && regenFocusAvailableImages.length > 0 && (
               <FocusImagePicker
@@ -608,16 +623,12 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                 extraFile={regenFocusImages.extraFile}
                 onExtraFile={regenFocusImages.addExtra}
                 onRemoveExtra={regenFocusImages.removeExtra}
-                variant="light"
+                variant="dark"
               />
             )}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setRegenModuleIndex(null)}
-                className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
+
+            {/* Action buttons */}
+            <div className="flex gap-3 pt-4">
               <button
                 onClick={() => {
                   if (regenModuleIndex !== null) {
@@ -632,40 +643,61 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                     setRegenNote('');
                   }
                 }}
-                className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white transition-colors"
-                style={{ backgroundColor: accentColor }}
+                className="flex-1 px-4 py-2 bg-redd-500 text-white font-medium rounded-lg hover:bg-redd-600 transition-colors"
               >
                 Regenerate
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Panel — slide-up overlay */}
-      {editingModuleIndex !== null && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30" onClick={() => setEditingModuleIndex(null)}>
-          <div
-            className="w-full max-w-lg bg-white rounded-t-xl shadow-xl p-6 space-y-4 animate-in slide-in-from-bottom"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Edit Module {editingModuleIndex + 1}
-              </h3>
-              <button onClick={() => setEditingModuleIndex(null)} className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button
+                onClick={() => setRegenModuleIndex(null)}
+                className="px-4 py-2 bg-slate-800 text-slate-300 font-medium rounded-lg hover:bg-slate-700 border border-slate-700 transition-colors"
+              >
+                Cancel
               </button>
             </div>
-            <textarea
-              value={editInstructions}
-              onChange={(e) => setEditInstructions(e.target.value)}
-              placeholder="Describe what you'd like to change... e.g. 'Make the background darker' or 'Add more product detail on the left side'"
-              className="w-full h-28 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-redd-500/50 resize-none"
-              autoFocus
-            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Edit Panel (Sheet) */}
+      <Sheet open={editingModuleIndex !== null} onOpenChange={(open) => !open && setEditingModuleIndex(null)}>
+        <SheetContent className="bg-slate-900 border-slate-700">
+          <SheetHeader>
+            <SheetTitle className="text-white">
+              Edit Module {(editingModuleIndex ?? 0) + 1}
+            </SheetTitle>
+            <SheetDescription className="text-slate-400">
+              Describe what changes you'd like to make. This will create a new version.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {/* Preview of module being edited */}
+            {editingModuleIndex !== null && modules[editingModuleIndex] && (
+              <div className="rounded-lg overflow-hidden border border-slate-700">
+                <img
+                  src={getActiveImageUrl(modules[editingModuleIndex], viewportMode)}
+                  alt="Module to edit"
+                  className="w-full h-48 object-contain bg-white"
+                />
+              </div>
+            )}
+
+            {/* Edit instructions */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Edit Instructions
+              </label>
+              <textarea
+                value={editInstructions}
+                onChange={(e) => setEditInstructions(e.target.value)}
+                placeholder="e.g., 'Make the background darker' or 'Add more product detail on the left side'"
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-redd-500 focus:border-transparent resize-none"
+                rows={4}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Minimum 5 characters required
+              </p>
+            </div>
 
             {/* Focus images — select which references to send with edit */}
             {editFocusAvailableImages.length > 0 && (
@@ -676,20 +708,15 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                 extraFile={focusImages.extraFile}
                 onExtraFile={focusImages.addExtra}
                 onRemoveExtra={focusImages.removeExtra}
-                variant="light"
+                variant="dark"
               />
             )}
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => setEditingModuleIndex(null)}
-                className="flex-1 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
+            {/* Action buttons */}
+            <div className="flex gap-3 pt-4">
               <button
                 onClick={() => {
-                  if (editInstructions.trim() && editingModuleIndex !== null) {
+                  if (editInstructions.trim().length >= 5 && editingModuleIndex !== null) {
                     const refPaths = focusImages.getSelectedPaths();
                     const refs = refPaths.length > 0 ? refPaths : undefined;
                     if (isMobile) {
@@ -702,16 +729,21 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                     focusImages.reset();
                   }
                 }}
-                disabled={!editInstructions.trim()}
-                className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50"
-                style={{ backgroundColor: accentColor }}
+                disabled={editInstructions.trim().length < 5}
+                className="flex-1 px-4 py-2 bg-redd-500 text-white font-medium rounded-lg hover:bg-redd-600 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
               >
                 Apply Edit
               </button>
+              <button
+                onClick={() => setEditingModuleIndex(null)}
+                className="px-4 py-2 bg-slate-800 text-slate-300 font-medium rounded-lg hover:bg-slate-700 border border-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };
