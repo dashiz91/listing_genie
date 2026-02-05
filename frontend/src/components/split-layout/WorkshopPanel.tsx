@@ -227,8 +227,9 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
         const newUploads: UploadWithPreview[] = result.image_uploads.map((img, idx) => ({
           upload_id: img.upload_id,
           file_path: img.file_path,
+          filename: `amazon_${result.asin}_${idx + 1}.png`,
+          size: 0, // Size not available from ASIN import
           preview_url: apiClient.getFileUrl(img.file_path),
-          original_filename: `amazon_${result.asin}_${idx + 1}.png`,
         }));
         onUploadsChange([...uploads, ...newUploads].slice(0, maxImages));
       }
