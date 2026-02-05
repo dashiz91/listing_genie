@@ -538,6 +538,68 @@ A task is NOT complete until:
 
 ---
 
+## STORY QUEUE WORKFLOW
+
+```
+todo_list/
+├── backlog.md      ← Raw ideas (user dumps here)
+├── ready/          ← Refined stories ready to implement
+│   └── 001-feature-name.md
+└── done/           ← Completed stories (for reference)
+```
+
+### How It Works
+
+1. **User** adds raw ideas to `backlog.md`
+2. **Before coding** - refine ONE task into a story in `ready/`
+3. **Work the story** - implement, test on staging, commit
+4. **Complete** - move story to `done/`, pick next from `ready/`
+
+### Starting a Session
+
+```
+1. Check `todo_list/ready/` for stories ready to implement
+2. If empty, ask user which backlog item to refine
+3. Work ONE story at a time to completion
+4. Follow Definition of Done (deploy staging, test, verify)
+```
+
+### Story Format (in `ready/`)
+
+```markdown
+# NNN: Feature Name
+
+**Priority:** High/Medium/Low
+**Complexity:** Small/Medium/Large
+
+## What
+Clear description of the change
+
+## Why
+User value / problem being solved
+
+## Acceptance Criteria
+- [ ] Checkable requirements
+- [ ] Tested on staging
+
+## Files Likely Touched
+- path/to/file.tsx
+
+## Out of Scope
+- What this story does NOT include
+```
+
+### Commands for Workflow
+
+| User Says | Agent Does |
+|-----------|------------|
+| "refine task X" | Create story in `ready/` from backlog item |
+| "what's next" | Check `ready/` folder, pick highest priority |
+| "work on 001" | Read story, implement, test, complete |
+| "status" | List in-progress and ready stories |
+
+---
+
 ## Deployment & Environments
 
 ### Environment Overview
