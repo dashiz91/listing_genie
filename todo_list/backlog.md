@@ -32,6 +32,21 @@ Change free tier: only 10 credits per email ever (no daily reset). Concern about
 
 ---
 
+## AI/Prompts
+
+### Editorial Reference Strategy Rework
+Current problem: AI takes editorial references too literally and shows them as actual text in images instead of using them for style/quality guidance.
+
+**Fix needed:** Rework prompt strategy to use editorial references as quality cues:
+- Brand names (for quality association)
+- Technical photography terms (expensive cameras, studio lighting)
+- High-end production keywords
+- Style direction without literal text
+
+The reference should inform visual quality, not become visible copy. Keep actual copywriting separate from quality/style modifiers.
+
+---
+
 ## Completed (reference)
 
 - Style reference toggle default ON + no credits when skipping preview
