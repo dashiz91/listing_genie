@@ -78,10 +78,43 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // Loading animations
+        "shimmer": {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { opacity: "0.4", transform: "scale(1)" },
+          "50%": { opacity: "0.7", transform: "scale(1.1)" },
+        },
+        "gradient-flow": {
+          "0%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+          "100%": { backgroundPosition: "0% 50%" },
+        },
+        "progress-glow": {
+          "0%": { boxShadow: "0 0 5px currentColor, 0 0 10px currentColor" },
+          "50%": { boxShadow: "0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor" },
+          "100%": { boxShadow: "0 0 5px currentColor, 0 0 10px currentColor" },
+        },
+        "float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        "spin-slow": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "shimmer": "shimmer 2s linear infinite",
+        "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+        "gradient-flow": "gradient-flow 3s ease infinite",
+        "progress-glow": "progress-glow 1.5s ease-in-out infinite",
+        "float": "float 3s ease-in-out infinite",
+        "spin-slow": "spin-slow 3s linear infinite",
       },
     },
   },
