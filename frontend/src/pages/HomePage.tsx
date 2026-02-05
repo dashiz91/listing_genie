@@ -18,6 +18,7 @@ import type { AplusModule, AplusViewportMode } from '../components/preview-slots
 import { getActiveImagePath } from '../components/preview-slots/AplusSection';
 import type { SlotStatus } from '../components/preview-slots/ImageSlot';
 import { useCredits } from '../contexts/CreditContext';
+import { OutOfCreditsModal } from '../components/OutOfCreditsModal';
 
 // Listing image version tracking (uses unified ImageVersion)
 export interface ListingVersionState {
@@ -26,6 +27,26 @@ export interface ListingVersionState {
     activeIndex: number;
   };
 }
+
+// Helper to detect and parse credit-related errors
+// Returns { isCreditsError: true, required: number } or { isCreditsError: false }
+const parseCreditsError = (err: any): { isCreditsError: boolean; required?: number } => {
+  // Check for 402 Payment Required status
+  if (err?.response?.status !== 402) {
+    return { isCreditsError: false };
+  }
+
+  const detail = err?.response?.data?.detail;
+  if (typeof detail !== 'string' || !detail.includes('Insufficient credits')) {
+    return { isCreditsError: false };
+  }
+
+  // Parse "Need X" from the error message
+  const needMatch = detail.match(/Need (\d+)/);
+  const required = needMatch ? parseInt(needMatch[1], 10) : undefined;
+
+  return { isCreditsError: true, required };
+};
 
 // Helper to extract error message from various error formats
 const extractErrorMessage = (err: any, fallback: string): string => {
@@ -127,6 +148,21 @@ export const HomePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<string[]>(['photos', 'product']);
   const [isLoadingProject, setIsLoadingProject] = useState(hasProjectToLoad);
+
+  // Out of credits modal state
+  const [outOfCreditsOpen, setOutOfCreditsOpen] = useState(false);
+  const [outOfCreditsRequired, setOutOfCreditsRequired] = useState<number | undefined>(undefined);
+
+  // Helper to handle errors - shows modal for credit errors, otherwise sets error state
+  const handleError = useCallback((err: any, fallbackMessage: string) => {
+    const creditError = parseCreditsError(err);
+    if (creditError.isCreditsError) {
+      setOutOfCreditsRequired(creditError.required);
+      setOutOfCreditsOpen(true);
+    } else {
+      setError(extractErrorMessage(err, fallbackMessage));
+    }
+  }, []);
 
   // Uploaded paths (for API calls)
   const [logoPath, setLogoPath] = useState<string | null>(null);
@@ -557,11 +593,11 @@ export const HomePage: React.FC = () => {
       refetchCredits();
     } catch (err: any) {
       console.error('Framework analysis failed:', err);
-      setError(extractErrorMessage(err, 'Failed to analyze product. Please try again.'));
+      handleError(err, 'Failed to analyze product. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
-  }, [uploads, formData, useOriginalStyleRef, updateSessionId, setSearchParams, isAdmin, balance, recordUsage, refetchCredits]);
+  }, [uploads, formData, useOriginalStyleRef, updateSessionId, setSearchParams, isAdmin, balance, recordUsage, refetchCredits, handleError]);
 
   // Handle framework select
   const handleSelectFramework = useCallback((framework: DesignFramework) => {
@@ -706,10 +742,16 @@ export const HomePage: React.FC = () => {
         }
       } catch (err: any) {
         console.error('Single image generation failed:', err);
+        // Check for credit error and show modal
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setImages((prev) =>
           prev.map((img) =>
             img.type === imageType
-              ? { ...img, status: 'failed' as const, error: err.message || 'Generation failed' }
+              ? { ...img, status: 'failed' as const, error: creditError.isCreditsError ? 'Insufficient credits' : (err.message || 'Generation failed') }
               : img
           )
         );
@@ -794,9 +836,9 @@ export const HomePage: React.FC = () => {
       setImages(sessionImages);
     } catch (err: any) {
       console.error('Retry failed:', err);
-      setError(extractErrorMessage(err, 'Failed to retry. Please try again.'));
+      handleError(err, 'Failed to retry. Please try again.');
     }
-  }, [sessionId]);
+  }, [sessionId, handleError]);
 
   // Handle regenerate single
   const handleRegenerateSingle = useCallback(
@@ -838,9 +880,17 @@ export const HomePage: React.FC = () => {
         }
       } catch (err: any) {
         console.error('Single image regeneration failed:', err);
+        // Check for credit error and show modal
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setImages((prev) =>
           prev.map((img) =>
-            img.type === imageType ? { ...img, status: 'failed' as const, error: err.message || 'Regeneration failed' } : img
+            img.type === imageType
+              ? { ...img, status: 'failed' as const, error: creditError.isCreditsError ? 'Insufficient credits' : (err.message || 'Regeneration failed') }
+              : img
           )
         );
       }
@@ -900,9 +950,17 @@ export const HomePage: React.FC = () => {
         }
       } catch (err: any) {
         console.error('Image edit failed:', err);
+        // Check for credit error and show modal
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setImages((prev) =>
           prev.map((img) =>
-            img.type === imageType ? { ...img, status: 'failed' as const, error: err.message || 'Edit failed' } : img
+            img.type === imageType
+              ? { ...img, status: 'failed' as const, error: creditError.isCreditsError ? 'Insufficient credits' : (err.message || 'Edit failed') }
+              : img
           )
         );
       }
@@ -1741,6 +1799,13 @@ export const HomePage: React.FC = () => {
             onStartOver={handleStartOver}
           />
         }
+      />
+
+      {/* Out of Credits Modal */}
+      <OutOfCreditsModal
+        open={outOfCreditsOpen}
+        onClose={() => setOutOfCreditsOpen(false)}
+        requiredCredits={outOfCreditsRequired}
       />
     </div>
   );
