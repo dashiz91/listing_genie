@@ -295,6 +295,80 @@ BACKGROUND RHYTHM — Alternate using ONLY framework palette colors:
 
 Every background MUST be from the framework palette or a tint/shade of one.
 
+═══════════════════════════════════════════════════════════════════════════════
+                    CINEMATIC CRAFT — WHAT SEPARATES PREMIUM FROM GENERIC
+═══════════════════════════════════════════════════════════════════════════════
+
+Premium brands (Apple, Sony, Bose, GoPro) look expensive because of CRAFT —
+lighting, depth, angle variety, and environmental storytelling. Apply ALL of these:
+
+**1. LIGHTING DIRECTION (never flat)**
+Each module MUST specify a lighting setup. NEVER use flat/even lighting.
+- "Rembrandt 45° left, deep shadows right" (dramatic)
+- "Backlit silhouette, rim light separating product from background" (ethereal)
+- "Low raking light from bottom-right, long shadows" (editorial)
+- "Overhead spotlight, pool of light on product, dark surrounds" (theatrical)
+- Vary lighting between modules — never same setup twice.
+
+**2. CAMERA & CROP VARIETY (never same framing twice)**
+Each module MUST use a DIFFERENT camera approach:
+- "HERO WIDE": Product fills 70%+ of frame, dramatic angle (hero pair only)
+- "MACRO EXTREME": 200% zoom on one detail — texture, material, mechanism
+- "ENVIRONMENT WIDE": Product small (15-25% of frame), environment tells the story
+- "DUTCH ANGLE": Tilted 15-20°, dynamic energy
+- "BIRD'S EYE": Flat lay from directly above
+- "LOW ANGLE": Looking up at product, makes it feel monumental
+RULE: At least ONE module must be macro close-up. At least ONE must be environment-wide.
+
+**3. DEPTH & LAYERING (never flat single-plane)**
+Every module MUST have at least 2 depth layers:
+- FOREGROUND: Bokeh blur element (leaf, fabric, water droplet, hand)
+- MIDGROUND: The product (sharp focus)
+- BACKGROUND: Environmental context (blurred room, gradient, texture)
+Premium images feel 3D. Generic images feel flat. The foreground element is KEY.
+
+**4. SHADOW SYSTEM (consistent across all modules)**
+Define ONE shadow style for the entire set and use it everywhere:
+- Direction: always from same side (e.g., "shadows fall bottom-right")
+- Quality: soft diffused OR hard dramatic — pick one, be consistent
+- This creates visual cohesion across all 6 modules
+
+**5. COLOR TEMPERATURE (cinematic grading)**
+Each module gets a temperature direction:
+- "warm" (golden hour, amber tones — inviting, cozy)
+- "cool" (blue-silver — sophisticated, premium)
+- "neutral" (true-to-life — clean, trustworthy)
+Alternate temperatures for rhythm: warm → cool → warm creates visual music.
+
+**6. NEGATIVE SPACE (at least ONE sparse module)**
+Premium brands use emptiness as a design element.
+- At least ONE module must have 50%+ empty/breathing space
+- Empty space is NOT wasted — it's CONFIDENCE. It says "we don't need to fill every pixel"
+- The product speaks for itself against clean, bold background
+- Think: Apple product on white, Bose headphones on solid burgundy
+
+**7. ANGLE VARIETY (never same product viewpoint twice)**
+Each module shows the product from a DIFFERENT angle:
+- Module 0+1 (hero): 3/4 front, slightly above
+- Module 2: Straight-on profile or macro detail
+- Module 3: From behind/unusual angle, or in-use shot
+- Module 4: Bird's eye or environmental context
+- Module 5: 3/4 back or dramatic low angle
+RULE: NEVER show the same angle/viewpoint in two modules.
+
+**8. HUMAN PRESENCE (at least ONE module with a person)**
+Premium A+ includes people — hands, silhouettes, or full figures.
+- At least ONE module (lifestyle_action archetype) MUST include a person
+- Show genuine interaction: hands reaching, person using, carrying, enjoying
+- People create SCALE and EMOTIONAL CONNECTION
+- Even a single hand holding the product adds premium feel
+
+**9. ENVIRONMENTAL STORYTELLING (scene briefs, not generic)**
+Each module's scene needs a SPECIFIC 50-word brief — never "lifestyle shot."
+- BAD: "Product in a room"
+- GOOD: "Dawn light through floor-to-ceiling windows of a Scandinavian loft. White oak floors, a single monstera plant. Product on a floating walnut shelf at eye level, backlit by morning sun creating a warm halo."
+The environment IS the emotion. Be specific. Be cinematic.
+
 MODULE EMOTIONAL ROLES (pair with archetype):
 - "hero_reveal": Pure visual impact — "Wow" (always modules 0+1, archetype: hero_brand)
 - "intrigue": Draw them deeper — "Tell me more"
@@ -420,6 +494,15 @@ Respond with ONLY valid JSON:
       "viewer_thought": "What the viewer unconsciously thinks",
       "mood": "...",
       "scene_description": "OPTIONAL — only for continuity",
+      "lighting": "Specific lighting setup — direction, quality, shadow behavior (e.g., 'Rembrandt 45° from left, deep shadows right, warm fill')",
+      "camera": "Camera approach — crop level + angle (e.g., 'MACRO EXTREME on texture detail' or 'ENVIRONMENT WIDE, product 20% of frame')",
+      "color_temperature": "warm | cool | neutral — cinematic color grading direction",
+      "depth_layers": {{
+        "foreground": "Bokeh element in front (e.g., 'blurred monstera leaf bottom-left')",
+        "midground": "Product placement and focus",
+        "background": "What's behind (e.g., 'soft gradient to deep navy' or 'blurred kitchen shelf')"
+      }},
+      "scene_brief": "50-word SPECIFIC environment description — cinematic, sensory, emotional. NOT 'lifestyle shot' but a movie scene.",
       "render_text": {{
         "headline": "2-5 evocative words OR null",
         "brand_name": "BRAND or null",
@@ -427,7 +510,7 @@ Respond with ONLY valid JSON:
         "component_labels": ["Part Name", "Feature Name"],
         "text_position": "left | right | center | scattered"
       }},
-      "generation_prompt": "COMPLETE 200-350 word prompt — FEELING first, then visuals. MUST specify what text to render in the image and where."
+      "generation_prompt": "COMPLETE 200-350 word prompt — FEELING first, then visuals. MUST include lighting setup, camera angle, depth layers, and what text to render."
     }}
   ]
 }}
@@ -441,6 +524,17 @@ The render_text fields depend on archetype:
 - trust_authority: stat_badges (2-3 bold stats), brand_name
 - product_in_context: headline only (or null for no text)
 - dramatic_mono: brand_name only (or null for no text)
+
+CINEMATIC CRAFT CHECKLIST (each module MUST have ALL of these):
+- lighting: specific direction + quality (NEVER "even lighting" or "well-lit")
+- camera: specific framing (NEVER "product shot" — say MACRO, WIDE, LOW ANGLE, etc.)
+- color_temperature: warm/cool/neutral (alternate for rhythm)
+- depth_layers: foreground bokeh + midground product + background (3 planes minimum)
+- scene_brief: 50-word SPECIFIC cinematic environment (NEVER "lifestyle shot")
+- At least ONE module with a person (lifestyle_action archetype)
+- At least ONE module with 50%+ negative space (dramatic_mono archetype)
+- EVERY module shows product from DIFFERENT angle — never repeat same viewpoint
+- generation_prompt must describe the EXACT lighting, camera, and depth in its 200-350 words
 
 Generate exactly {module_count} modules. Each creates FEELING — no filler, no feature lists.
 """
@@ -477,6 +571,16 @@ Visual elements: {module_elements}
 THE FEELING: {module_mood}
 What the viewer thinks: {module_content_focus}
 
+═══ CINEMATIC CRAFT FOR THIS MODULE ═══
+LIGHTING: {module_lighting}
+CAMERA/FRAMING: {module_camera}
+COLOR TEMPERATURE: {module_color_temperature}
+DEPTH LAYERS:
+  - Foreground (bokeh/blur): {module_fg}
+  - Midground (sharp focus): {module_mg}
+  - Background: {module_bg}
+SCENE: {module_scene_brief}
+
 {render_text_instruction}
 
 EDGE CONTRACTS:
@@ -497,10 +601,12 @@ CRAFT NOTES:
 - Use STYLE_REFERENCE for visual direction. Match mood, lighting, sophistication.
 - If BRAND_LOGO is provided, reproduce it faithfully in the image where appropriate.
 - Brand colors in scene naturally — lighting, surfaces, atmosphere
-- Frame from a premium brand film, not a template
+- The lighting, camera angle, and depth layers above are NON-NEGOTIABLE — follow them exactly
+- The image must feel like a frame from a premium brand film, not a template
 - NEVER include website UI, Amazon navigation, browser chrome
 - Render text SHORT and BOLD — baked into the image like premium brand A+
 - Text must be LARGE enough to read at 50% zoom, HIGH CONTRAST
+- NEVER flat lighting — use the specified lighting direction for drama and dimension
 
 {continuity_instruction}"""
 
@@ -570,6 +676,14 @@ REFERENCE IMAGES:
 - Top half: pure product photography, minimal or no text
 - NEVER include website UI, Amazon navigation, browser chrome
 - Do NOT duplicate the product — show it ONCE, large, crossing center
+
+═══ CINEMATIC CRAFT (NON-NEGOTIABLE) ═══
+- LIGHTING: Dramatic directional lighting — NOT flat. Side light or backlight with rim separation.
+- DEPTH: Foreground bokeh element (fabric, leaf, surface texture) + sharp product + blurred background
+- SHADOW: Consistent shadow direction throughout the image, soft or hard but COMMITTED
+- COLOR GRADING: Apply a cinematic color grade — warm golden, cool silver, or moody tones
+- ANGLE: Dynamic 3/4 view, slightly above — NOT straight-on catalog shot
+- This hero must look like a frame from a luxury brand commercial, not a product photo
 
 {custom_instructions_block}"""
 
@@ -733,6 +847,16 @@ def build_aplus_module_prompt(
     module_archetype = mod.get("archetype", "product_in_context")
     render_text = mod.get("render_text") or {}
 
+    # Extract cinematic craft fields
+    module_lighting = mod.get("lighting", "Dramatic side lighting from 45° left, natural shadows")
+    module_camera = mod.get("camera", "3/4 view, product fills 60% of frame")
+    module_color_temperature = mod.get("color_temperature", "neutral")
+    depth_layers = mod.get("depth_layers") or {}
+    module_fg = depth_layers.get("foreground", "Subtle bokeh element for depth")
+    module_mg = depth_layers.get("midground", "Product in sharp focus")
+    module_bg = depth_layers.get("background", "Clean gradient from palette")
+    module_scene_brief = mod.get("scene_brief", "Premium editorial composition with cinematic lighting and depth")
+
     # Build render_text instruction based on archetype
     render_text_parts = []
     if render_text:
@@ -825,6 +949,13 @@ def build_aplus_module_prompt(
         module_elements=", ".join(mod.get("key_elements", [])),
         module_mood=mod.get("mood", ""),
         module_content_focus=mod.get("content_focus", ""),
+        module_lighting=module_lighting,
+        module_camera=module_camera,
+        module_color_temperature=module_color_temperature,
+        module_fg=module_fg,
+        module_mg=module_mg,
+        module_bg=module_bg,
+        module_scene_brief=module_scene_brief,
         render_text_instruction=render_text_instruction,
         top_edge=mod.get("top_edge", "Clean start"),
         bottom_edge=mod.get("bottom_edge", "Flows downward"),
