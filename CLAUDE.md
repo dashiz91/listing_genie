@@ -34,8 +34,11 @@ Unlike generic AI image wrappers, REDDAI uses a multi-stage Art Director pipelin
 │                                                                 │
 │   FRONTEND (React + Vite + Tailwind + shadcn/ui)                │
 │   └── src/                                                      │
-│       ├── components/split-layout/   # Split-screen experience  │
-│       ├── components/live-preview/   # Real-time preview        │
+│       ├── components/creator/         # Creator flow (new UI)    │
+│       │   ├── CreatorView.tsx        # Clean centered entry      │
+│       │   ├── AdvancedSettingsSheet  # Right-side settings sheet │
+│       │   └── ResultsView.tsx        # Post-generation results   │
+│       ├── components/split-layout/   # Legacy split-screen       │
 │       ├── components/amazon-preview/ # Amazon listing mockup UI │
 │       ├── components/preview-slots/  # A+ module rendering      │
 │       ├── components/landing/        # Landing page sections    │
@@ -44,7 +47,7 @@ Unlike generic AI image wrappers, REDDAI uses a multi-stage Art Director pipelin
 │       ├── contexts/                  # Auth context (Supabase)  │
 │       ├── pages/LandingPage.tsx      # Marketing landing        │
 │       ├── pages/AuthPage.tsx         # Login/Signup             │
-│       ├── pages/HomePage.tsx         # Split-screen generator   │
+│       ├── pages/HomePage.tsx         # View-based generator     │
 │       ├── pages/ProjectsPage.tsx     # Saved projects history   │
 │       ├── pages/AssetsPage.tsx       # Assets library           │
 │       └── pages/SettingsPage.tsx     # Settings & credits       │
@@ -164,14 +167,14 @@ listing_genie/
 │   │   │   ├── client.ts             # API client (includes auth token)
 │   │   │   └── types.ts              # TypeScript types
 │   │   ├── components/
-│   │   │   ├── split-layout/         # Split-screen layout system
-│   │   │   │   ├── SplitScreenLayout.tsx     # Two-panel responsive container
-│   │   │   │   ├── WorkshopPanel.tsx         # Left: form sections (accordion)
-│   │   │   │   ├── ShowroomPanel.tsx         # Right: live preview wrapper
+│   │   │   ├── creator/              # Creator flow (active UI)
+│   │   │   │   ├── CreatorView.tsx           # Clean centered entry point
+│   │   │   │   ├── AdvancedSettingsSheet.tsx  # Right-side settings drawer
+│   │   │   │   ├── ResultsView.tsx           # Full-width post-generation view
 │   │   │   │   └── index.ts                  # Exports
-│   │   │   ├── live-preview/         # Real-time preview component
-│   │   │   │   ├── LivePreview.tsx           # Always-visible preview (5 states)
-│   │   │   │   └── index.ts                  # Exports
+│   │   │   ├── split-layout/         # Legacy split-screen (unused)
+│   │   │   │   ├── WorkshopPanel.tsx         # Form data types still exported
+│   │   │   │   └── ...                       # Other files kept for reference
 │   │   │   ├── landing/              # Landing page components
 │   │   │   │   ├── navbar.tsx
 │   │   │   │   ├── hero.tsx
@@ -230,38 +233,26 @@ listing_genie/
 
 ## Core Features
 
-### Living Preview Experience (Split-Screen UI)
-The generator uses an immersive split-screen layout where the Amazon listing preview is ALWAYS visible:
+### Creator Flow (KREA.ai-inspired UI)
+The generator uses a clean, centered view-based layout:
 
-```
-┌─────────────────────────────┬───────────────────────────────────┐
-│     THE WORKSHOP            │         THE SHOWROOM              │
-│     (Form & Controls)       │         (Live Preview)            │
-│                             │                                   │
-│  📸 Product Photos          │   [Thumbnails] [Main Image]       │
-│  📝 Product Info (title,    │                                   │
-│     features, audience)     │   BRAND NAME                      │
-│  🎨 Brand Identity          │   Product Title (real-time)       │
-│  🖌️ Style & Colors          │   ★★★★☆ 4.5 (1,247)              │
-│  📋 Global Instructions     │   $XX.XX                          │
-│  🖼️ Design Framework        │   • Feature 1 (real-time)         │
-│                             │   • Feature 2 (real-time)         │
-│  [Analyze] [Generate]       │   • Feature 3 (real-time)         │
-└─────────────────────────────┴───────────────────────────────────┘
-```
+**CreatorView** (view === 'create'):
+- Centered `max-w-3xl` layout with upload zone, product title, analyze button
+- ASIN import as collapsible alternative
+- Advanced Settings opens a right-side Sheet drawer (features, brand, style, colors, instructions)
+- Framework cards appear inline after analysis
+- Browse Styles section at bottom
 
-**Preview States:**
-- `empty` - No uploads yet, shows upload prompt
-- `photos_only` - Photos uploaded, prompts for product details
-- `filling` - Real-time updates as user types title/features
-- `framework_selected` - Styled preview with framework colors
-- `generating` - Progress indicator, images appear one-by-one
-- `complete` - Full Amazon mockup with edit/regenerate options
+**ResultsView** (view === 'results'):
+- Full-width Amazon listing preview with all 5+ images
+- A+ Content section below with desktop/mobile toggle
+- Top bar: "Editor" back button, product title, Settings, New Listing
+- Auto-transitions to results when generation starts
 
-**Responsive Layout:**
-- Desktop (>1024px): 40/60 split
-- Tablet (768-1024px): 50/50 split
-- Mobile (<768px): Stacked with collapsible mini-preview
+**View transitions:**
+- `create` → `results`: auto-switches when `isGenerating` becomes true
+- `results` → `create`: "Editor" back button (preserves all state)
+- Project loading from URL: goes directly to `results` if images exist
 
 ### Authentication (Supabase Auth)
 - Email/password signup and login
@@ -667,7 +658,7 @@ When finishing tasks or ending a session, **always clean up the todo_list folder
 │  ├── reddstudio.ai          ├── reddstudio-backend              │
 │  └── www.reddstudio.ai      └── PostgreSQL (Supabase Pooler)    │
 │                                                                 │
-│  Supabase (qkosgwvqczfjnkdmcumb)                                │
+│  Supabase (swdahopauesvigugsuby)                                │
 │  ├── Auth (JWKS verification)                                   │
 │  ├── Storage (uploads, generated buckets)                       │
 │  └── PostgreSQL (via Supavisor pooler)                          │
@@ -825,7 +816,7 @@ vercel env add VITE_API_URL production  # For production
 # Railway (backend)
 DATABASE_URL=postgresql://postgres.PROJECT_ID:PASSWORD@aws-1-us-east-1.pooler.supabase.com:5432/postgres
 GEMINI_API_KEY=xxx
-SUPABASE_URL=https://qkosgwvqczfjnkdmcumb.supabase.co
+SUPABASE_URL=https://swdahopauesvigugsuby.supabase.co
 SUPABASE_ANON_KEY=xxx
 SUPABASE_SERVICE_ROLE_KEY=xxx
 ALLOWED_EMAILS=robertoxma@hotmail.com  # Whitelist (empty = allow all)
@@ -833,7 +824,7 @@ APP_ENV=production
 
 # Vercel (frontend)
 VITE_API_URL=https://reddstudio-backend-production.up.railway.app
-VITE_SUPABASE_URL=https://qkosgwvqczfjnkdmcumb.supabase.co
+VITE_SUPABASE_URL=https://swdahopauesvigugsuby.supabase.co
 VITE_SUPABASE_ANON_KEY=xxx
 ```
 
@@ -939,12 +930,12 @@ Configured in `app/config.py`, enforced in `app/core/auth.py`.
 - `frontend/src/pages/LandingPage.tsx` - Composes all sections
 - `frontend/src/components/landing/*.tsx` - Individual sections
 
-### Generator App (Split-Screen)
-- `frontend/src/pages/HomePage.tsx` - Orchestrates split layout and state
-- `frontend/src/components/split-layout/SplitScreenLayout.tsx` - Two-panel container
-- `frontend/src/components/split-layout/WorkshopPanel.tsx` - Left panel (form sections)
-- `frontend/src/components/split-layout/ShowroomPanel.tsx` - Right panel (preview wrapper)
-- `frontend/src/components/live-preview/LivePreview.tsx` - Real-time preview (5 states)
+### Generator App (Creator Flow)
+- `frontend/src/pages/HomePage.tsx` - View-based state orchestration (create/results)
+- `frontend/src/components/creator/CreatorView.tsx` - Clean centered entry point
+- `frontend/src/components/creator/AdvancedSettingsSheet.tsx` - Right-side settings drawer
+- `frontend/src/components/creator/ResultsView.tsx` - Full-width post-generation results
+- `frontend/src/components/split-layout/WorkshopPanel.tsx` - Legacy (exports WorkshopFormData type)
 
 ### Amazon Preview (Post-Generation)
 - `frontend/src/components/amazon-preview/AmazonListingPreview.tsx` - Full preview with editing

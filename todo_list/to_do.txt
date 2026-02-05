@@ -22,37 +22,18 @@ To me it just looks like a random assortment of 5 AI generated images on the top
 So many tools like this popping up these days, like selluna.ai or listingoptimization.ai - this capability isn’t new. You need to tell me what your tool does better than the big number of other AI wrappers out there already
 ]
 
-having some pre generated styles for usrs to just choose it, that wont require credits, and ppl can just browse for styles they may like. here we could have different categories like seasonal [xmas,vlentine, moms day etc], simplitic,modern,luxury, idk multi more styles, for this one we could generate the images to have em as fixed assets for all, we cna use gemini mcp to generate those styles ok?
-
-fix sending to https://staging.reddstudio.ai/auth wihch is just blank, on sign out that hapens and other stuff i think
-fix edit attachjments not being appeneded to gens or edits
-remove pricing when we select model as thats cost, also we may need a better way to choose that? easier to seee?
-
-Connect it to seller central to push lisitng and +A single image only modulesare
-make default cheapest model (flash)
+Connect it to seller central to push lisitng and +A single image only modules
 ================================================================================
                               CURATED BY CLAUDE
 ================================================================================
 
 PENDING
 -------
-C - Homepage Simplification
-    Make minimal like reference screenshot, advanced button for forms,
-    show preview only after first generation. Use shadcn.
-    (Needs reference screenshot to proceed)
-
-d - Supabase Email Branding
-    MANUAL: Configure in Supabase dashboard:
-    1) Auth > URL Config: Set Site URL to https://reddstudio.ai
-    2) Add redirect URLs for prod+staging
-    3) Customize email templates (Pro plan required)
-
-d - Loading Animation Improvement
-    Research genius loading bars for inspiration.
-    (Creative/design task - needs user direction)
+(No pending items)
 
 COMPLETED
 ---------
+s - Homepage Simplification (story 010) - KREA.ai-inspired clean interface, advanced settings sheet, results view after generation
 a - A+ Preview Integration (story 003)
 b - Profile Dropdown (story 001)
 c - Style Toggle Default ON + no credits when skipping preview
@@ -66,4 +47,6 @@ l - Default model to Flash - cheapest model now default
 m - Model selector shows credits instead of dollar prices
 n - Monetary Tiers Revision - Free = 10 credits lifetime (implemented)
 o - Alt text generation for images - backend API added
-p - Pre-generated style library - 16 styles, 5 sample images generated
+p - Pre-generated style library - 11 styles in 6 categories (Seasonal, Minimalist, Luxury, Vibrant, Natural, Iconic)
+q - Loading Animation Improvement - enhanced visual effects
+r - Supabase Email Branding - Resend SMTP on staging+prod, branded templates, noreply@reddstudio.ai
