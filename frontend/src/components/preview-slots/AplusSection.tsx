@@ -228,9 +228,9 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
   if (modules.length === 0) return null;
 
   return (
-    <div className={cn('bg-white rounded-lg border border-gray-200 overflow-hidden', className)}>
+    <div className={cn('overflow-hidden', className)}>
       {/* Amazon-style header - "From the manufacturer" section */}
-      <div className="bg-gray-100 border-b border-gray-200 px-4 py-2.5 flex items-center justify-between">
+      <div className="bg-gray-100 border-t border-gray-200 px-4 py-2.5 flex items-center justify-between">
         <span className="text-sm font-medium text-gray-700">From the manufacturer</span>
         {/* Secondary viewport toggle for convenience (uses parent's unified handler) */}
         {onViewportChange && (

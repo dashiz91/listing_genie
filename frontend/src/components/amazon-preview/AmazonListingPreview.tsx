@@ -59,6 +59,9 @@ interface AmazonListingPreviewProps {
   // Controlled device mode (unified with A+ viewport)
   deviceMode?: DeviceMode;
   onDeviceModeChange?: (mode: DeviceMode) => void;
+
+  // A+ content to render inside the same card container
+  aplusContent?: React.ReactNode;
 }
 
 // Default image type order
@@ -92,6 +95,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   onVersionChange,
   deviceMode: controlledDeviceMode,
   onDeviceModeChange,
+  aplusContent,
 }) => {
   void _onGenerateAll; // Reserved for future "Generate All" button
   // Get accent color from framework
@@ -725,6 +729,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 />
               </div>
             </div>
+            {/* A+ Content - flows continuously inside the same card */}
+            {aplusContent}
           </div>
         ) : (
           // Mobile Layout - Amazon App Style
@@ -807,6 +813,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 features={features}
               />
             </div>
+            {/* A+ Content - flows continuously inside the same card */}
+            {aplusContent}
           </div>
         )}
       </div>

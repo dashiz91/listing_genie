@@ -195,8 +195,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
           </div>
         )}
 
-        {/* Normal view */}
-        <div className="flex-1 overflow-auto space-y-6">
+        {/* Normal view - single continuous Amazon page mockup */}
+        <div className="flex-1 overflow-auto">
           <AmazonListingPreview
             productTitle={productTitle}
             brandName={brandName}
@@ -216,34 +216,32 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
             onVersionChange={onListingVersionChange}
             deviceMode={unifiedViewportMode}
             onDeviceModeChange={handleViewportModeChange}
+            aplusContent={aplusModules.length > 0 ? (
+              <AplusSection
+                modules={aplusModules}
+                sessionId={sessionId}
+                productTitle={productTitle}
+                accentColor={accentColor}
+                isEnabled={true}
+                visualScript={aplusVisualScript}
+                isGeneratingScript={isGeneratingScript}
+                onGenerateModule={onGenerateAplusModule}
+                onRegenerateModule={onRegenerateAplusModule}
+                onGenerateAll={onGenerateAllAplus}
+                onRegenerateScript={onRegenerateScript}
+                onVersionChange={onAplusVersionChange}
+                onEditModule={onEditAplusModule}
+                viewportMode={unifiedViewportMode}
+                onViewportChange={handleViewportModeChange}
+                onGenerateMobileModule={onGenerateMobileModule}
+                onGenerateAllMobile={onGenerateAllMobile}
+                onRegenerateMobileModule={onRegenerateMobileModule}
+                onEditMobileModule={onEditMobileModule}
+                availableReferenceImages={availableReferenceImages}
+                onCancelModule={onCancelAplusModule}
+              />
+            ) : undefined}
           />
-
-          {/* A+ Content Section - Show when there are modules */}
-          {aplusModules.length > 0 && (
-            <AplusSection
-              modules={aplusModules}
-              sessionId={sessionId}
-              productTitle={productTitle}
-              accentColor={accentColor}
-              isEnabled={true}
-              visualScript={aplusVisualScript}
-              isGeneratingScript={isGeneratingScript}
-              onGenerateModule={onGenerateAplusModule}
-              onRegenerateModule={onRegenerateAplusModule}
-              onGenerateAll={onGenerateAllAplus}
-              onRegenerateScript={onRegenerateScript}
-              onVersionChange={onAplusVersionChange}
-              onEditModule={onEditAplusModule}
-              viewportMode={unifiedViewportMode}
-              onViewportChange={handleViewportModeChange}
-              onGenerateMobileModule={onGenerateMobileModule}
-              onGenerateAllMobile={onGenerateAllMobile}
-              onRegenerateMobileModule={onRegenerateMobileModule}
-              onEditMobileModule={onEditMobileModule}
-              availableReferenceImages={availableReferenceImages}
-              onCancelModule={onCancelAplusModule}
-            />
-          )}
         </div>
       </div>
     );
