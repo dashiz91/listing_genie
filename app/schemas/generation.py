@@ -636,3 +636,20 @@ class AplusMobileResponse(BaseModel):
 class AplusAllMobileRequest(BaseModel):
     """Request to generate mobile versions for all A+ modules"""
     session_id: str = Field(..., description="Session ID")
+
+
+# ============================================================================
+# ALT TEXT GENERATION
+# ============================================================================
+
+class AltTextRequest(BaseModel):
+    """Request body for alt text generation"""
+    session_id: str = Field(..., description="Session ID")
+    image_type: str = Field(..., description="Image type (main, infographic_1, lifestyle, etc.)")
+
+
+class AltTextResponse(BaseModel):
+    """Response with generated alt text"""
+    image_type: str
+    alt_text: str
+    character_count: int

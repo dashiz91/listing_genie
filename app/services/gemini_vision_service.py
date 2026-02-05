@@ -729,6 +729,74 @@ Make each framework's palette distinct but appropriate for the product.
             logger.error(f"Failed to parse prompts JSON: {e}")
             raise ValueError(f"Invalid JSON in prompts response: {e}")
 
+    async def generate_alt_text(
+        self,
+        image_path: str,
+        product_name: str,
+        image_type: str,
+        features: Optional[List[str]] = None,
+    ) -> str:
+        """
+        Generate SEO-friendly alt text for a listing image.
+
+        Args:
+            image_path: Path to the generated listing image
+            product_name: The product name
+            image_type: Type of image (main, infographic_1, lifestyle, etc.)
+            features: Optional product features for context
+
+        Returns:
+            SEO-optimized alt text string (max 125 characters)
+        """
+        if not self.client:
+            raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
+
+        # Load image
+        image_bytes = self._load_image_bytes(image_path)
+        mime_type = self._get_image_mime_type(image_path)
+
+        # Build prompt for alt text generation
+        features_text = ", ".join(features[:3]) if features else ""
+        prompt = f"""Generate SEO-optimized alt text for this Amazon listing image.
+
+Product: {product_name}
+Image Type: {image_type.replace("_", " ").title()}
+{f"Key Features: {features_text}" if features_text else ""}
+
+REQUIREMENTS:
+1. Maximum 125 characters (crucial for accessibility)
+2. Include the product name naturally
+3. Describe what's visually shown in the image
+4. Include 1-2 relevant keywords for SEO
+5. No phrases like "image of" or "picture of"
+6. Be specific and descriptive
+
+Return ONLY the alt text, nothing else."""
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                    prompt
+                ]
+            )
+
+            alt_text = response.text.strip()
+
+            # Ensure it's not too long
+            if len(alt_text) > 125:
+                # Truncate at last word boundary before 125 chars
+                alt_text = alt_text[:122].rsplit(' ', 1)[0] + '...'
+
+            logger.info(f"Generated alt text for {image_type}: {alt_text}")
+            return alt_text
+
+        except Exception as e:
+            logger.error(f"Alt text generation failed: {e}")
+            # Fallback to generic alt text
+            return f"{product_name} - {image_type.replace('_', ' ').title()} Image"
+
     def health_check(self) -> dict:
         """Verify API connection"""
         if not self.api_key:

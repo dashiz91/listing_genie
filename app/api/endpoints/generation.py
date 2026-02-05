@@ -87,6 +87,8 @@ from app.schemas.generation import (
     HeroPairModuleResult,
     HeroPairResponse,
     AplusMobileRequest,
+    AltTextRequest,
+    AltTextResponse,
     AplusMobileResponse,
     AplusAllMobileRequest,
     ImageGenerationPrompt,
@@ -2175,3 +2177,127 @@ async def generate_all_aplus_mobile(
             })
 
     return results
+
+
+# ============================================================================
+# ALT TEXT GENERATION
+# ============================================================================
+
+@router.post("/alt-text", response_model=AltTextResponse)
+async def generate_alt_text(
+    request: AltTextRequest,
+    service: GenerationService = Depends(get_generation_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
+):
+    """
+    Generate SEO-optimized alt text for a listing image.
+
+    Uses Gemini Vision to analyze the image and generate descriptive,
+    keyword-rich alt text suitable for Amazon listings (max 125 characters).
+    """
+    from app.services.gemini_vision_service import get_gemini_vision_service
+
+    session = service.get_session_status(request.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get the image storage path
+    storage_key = request.image_type
+    if request.image_type.startswith("aplus_"):
+        # A+ modules have different naming: aplus_0 -> aplus_full_image_0
+        module_idx = request.image_type.replace("aplus_", "")
+        storage_key = f"aplus_full_image_{module_idx}"
+
+    try:
+        # Verify image exists
+        storage.get_generated_url(request.session_id, storage_key, expires_in=60)
+    except Exception:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Image not found: {request.image_type}"
+        )
+
+    image_path = f"supabase://{storage.generated_bucket}/{request.session_id}/{storage_key}.png"
+
+    # Get product info from session
+    product_name = session.product_name or "Product"
+    features = []
+    if session.design_framework_json:
+        framework = session.design_framework_json
+        if isinstance(framework, dict):
+            features = framework.get("key_features", [])
+
+    # Generate alt text
+    vision_service = get_gemini_vision_service()
+    try:
+        alt_text = await vision_service.generate_alt_text(
+            image_path=image_path,
+            product_name=product_name,
+            image_type=request.image_type,
+            features=features,
+        )
+    except Exception as e:
+        logger.error(f"Alt text generation failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Alt text generation failed: {str(e)}"
+        )
+
+    return AltTextResponse(
+        image_type=request.image_type,
+        alt_text=alt_text,
+        character_count=len(alt_text),
+    )
+
+
+@router.post("/alt-text/batch")
+async def generate_alt_text_batch(
+    session_id: str,
+    service: GenerationService = Depends(get_generation_service),
+    storage: SupabaseStorageService = Depends(get_storage_service),
+):
+    """
+    Generate alt text for all listing images in a session.
+
+    Returns a dictionary of image_type -> alt_text for all complete images.
+    """
+    from app.services.gemini_vision_service import get_gemini_vision_service
+
+    session = service.get_session_status(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get product info
+    product_name = session.product_name or "Product"
+    features = []
+    if session.design_framework_json:
+        framework = session.design_framework_json
+        if isinstance(framework, dict):
+            features = framework.get("key_features", [])
+
+    vision_service = get_gemini_vision_service()
+    results = {}
+
+    # Standard listing image types
+    listing_types = ["main", "infographic_1", "infographic_2", "lifestyle", "transformation"]
+
+    for image_type in listing_types:
+        try:
+            storage.get_generated_url(session_id, image_type, expires_in=60)
+            image_path = f"supabase://{storage.generated_bucket}/{session_id}/{image_type}.png"
+
+            alt_text = await vision_service.generate_alt_text(
+                image_path=image_path,
+                product_name=product_name,
+                image_type=image_type,
+                features=features,
+            )
+            results[image_type] = {
+                "alt_text": alt_text,
+                "character_count": len(alt_text),
+            }
+        except Exception as e:
+            logger.debug(f"No image or alt text generation failed for {image_type}: {e}")
+            continue
+
+    return {"session_id": session_id, "alt_texts": results}
