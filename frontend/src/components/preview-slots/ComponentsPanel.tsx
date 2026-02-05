@@ -1,5 +1,5 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeColors } from '@/lib/utils';
 import type { UploadWithPreview } from '../ImageUploader';
 import type { DesignFramework } from '@/api/types';
 
@@ -29,7 +29,8 @@ export const ComponentsPanel: React.FC<ComponentsPanelProps> = ({
   isGenerating = false,
   className,
 }) => {
-  const primaryColor = framework?.colors?.[0]?.hex || '#C85A35';
+  const frameworkColors = framework ? normalizeColors(framework.colors) : [];
+  const primaryColor = frameworkColors[0]?.hex || '#C85A35';
 
   return (
     <div className={cn('bg-slate-800/50 rounded-xl p-4 border border-slate-700', className)}>
@@ -121,15 +122,15 @@ export const ComponentsPanel: React.FC<ComponentsPanelProps> = ({
         )}
 
         {/* Framework Color Palette */}
-        {framework && framework.colors && framework.colors.length > 0 && (
+        {framework && frameworkColors.length > 0 && (
           <div className={cn('flex flex-col gap-1', isGenerating && 'opacity-60')}>
             <div className="flex gap-0.5">
-              {framework.colors.slice(0, 5).map((color, idx) => (
+              {frameworkColors.slice(0, 5).map((color, idx) => (
                 <div
                   key={idx}
                   className="w-6 h-6 rounded first:rounded-l-lg last:rounded-r-lg border border-white/10"
                   style={{ backgroundColor: color.hex }}
-                  title={`${color.name}: ${color.hex}`}
+                  title={`${color.name || 'Color'}: ${color.hex}`}
                 />
               ))}
             </div>

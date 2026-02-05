@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeColors } from '@/lib/utils';
 import { apiClient } from '@/api/client';
 import type { SessionImage, DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
@@ -126,7 +126,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
   const generationProgress = totalImages > 0 ? (completeCount / totalImages) * 100 : 0;
 
   // Get accent color from framework
-  const accentColor = selectedFramework?.colors?.find((c) => c.role === 'primary')?.hex || '#C85A35';
+  const frameworkColors = selectedFramework ? normalizeColors(selectedFramework.colors) : [];
+  const accentColor = frameworkColors.find((c) => c.role === 'primary')?.hex || '#C85A35';
 
   // Toggle fullscreen
   const handleFullscreenToggle = useCallback(() => {

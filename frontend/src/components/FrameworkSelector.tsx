@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { DesignFramework } from '../api/types';
+import { normalizeColors } from '@/lib/utils';
 
 interface FrameworkSelectorProps {
   frameworks: DesignFramework[];
@@ -154,12 +155,12 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-xs text-slate-400">Colors:</span>
                   <div className="flex gap-1">
-                    {framework.colors.slice(0, 5).map((color, i) => (
+                    {normalizeColors(framework.colors).slice(0, 5).map((color, i) => (
                       <div
                         key={i}
                         className="w-6 h-6 rounded-full shadow-inner border border-slate-600"
                         style={{ backgroundColor: color.hex }}
-                        title={`${color.name} - ${color.role}`}
+                        title={`${color.name || 'Color'} - ${color.role || 'color'}`}
                       />
                     ))}
                   </div>
