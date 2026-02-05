@@ -551,8 +551,8 @@ Return JSON:
 3. Reference to the consistent visual treatment across all images
 
 EXAMPLE OF CORRECT PROMPT:
-"...Typography uses {headline_font} for the headline 'Crafted with Care' in {primary_hex},
-with callouts in {body_font}. Background gradient from {color1_hex} to {color2_hex}..."
+"...Typography uses [headline_font] for the headline 'Crafted with Care' in [primary hex],
+with callouts in [body_font]. Background gradient from [color1 hex] to [color2 hex]..."
 
 EXAMPLE OF WRONG PROMPT:
 "...elegant serif typography in soft blue tones..." ← NO! This breaks cohesion.
