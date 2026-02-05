@@ -1098,10 +1098,10 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             {/* Analyze button */}
             <button
               onClick={onAnalyze}
-              disabled={!canAnalyze || isAnalyzing || (!isAdmin && !canAffordAnalyze)}
+              disabled={!canAnalyze || isAnalyzing}
               className={cn(
                 'w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all',
-                canAnalyze && !isAnalyzing && (isAdmin || canAffordAnalyze)
+                canAnalyze && !isAnalyzing
                   ? 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20'
                   : 'bg-slate-700 cursor-not-allowed'
               )}
@@ -1156,10 +1156,10 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             {/* Generate button */}
             <button
               onClick={onGenerate}
-              disabled={!canGenerate || isGenerating || (!isAdmin && !canAffordGenerate)}
+              disabled={!canGenerate || isGenerating}
               className={cn(
                 'w-full py-4 px-6 rounded-xl font-bold text-white text-lg transition-all',
-                canGenerate && !isGenerating && (isAdmin || canAffordGenerate)
+                canGenerate && !isGenerating
                   ? 'bg-redd-500 hover:bg-redd-600 shadow-lg shadow-redd-500/20'
                   : 'bg-slate-700 cursor-not-allowed'
               )}
