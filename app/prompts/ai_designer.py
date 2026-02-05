@@ -278,44 +278,58 @@ Generate EXACTLY 1 framework that channels the style reference's essence.
 
 
 # ============================================================================
-# STEP 2: GENERATE 6 IMAGE PROMPTS - EMOTIONAL STORYTELLING
+# STEP 2: GENERATE 6 IMAGE PROMPTS - COHESIVE BRAND STORYTELLING
 # ============================================================================
 
-GENERATE_IMAGE_PROMPTS_PROMPT = '''You are a principal designer with two decades at the world's best agencies.
-You've studied the greatest business minds and understand three fundamental truths:
+GENERATE_IMAGE_PROMPTS_PROMPT = '''You are a principal designer creating a COHESIVE Amazon listing.
 
 ═══════════════════════════════════════════════════════════════════════════════
-                     THE THREE FRAMEWORKS THAT DRIVE SALES
+                     THE FUNDAMENTAL TRUTH ABOUT CONVERSION
 ═══════════════════════════════════════════════════════════════════════════════
 
-1. JOBS TO BE DONE (Clayton Christensen - Harvard Business School)
-   Customers don't buy products. They "hire" them to do a job.
-   A milkshake isn't competing with other milkshakes — it's competing with
-   bagels, bananas, and boredom on a long commute.
-   ASK: What job is this product HIRED to do? Show the job getting DONE.
+Amazon shoppers make split-second judgments. When they see 6 images that look
+like they came from 6 different designers, they think "cheap seller, not a real brand."
 
-2. SYSTEM 1 THINKING (Daniel Kahneman - Nobel Prize Economics)
-   Humans have two systems: Fast (emotional) and Slow (rational).
-   Amazon shoppers are in System 1 mode — scrolling, feeling, not analyzing.
-   Trigger FEELING before thinking. Images must hit emotion FIRST.
-   Loss aversion: People feel losses 2x more than gains. Show what they MISS.
+When they see 6 images with CONSISTENT typography, colors, and visual language,
+they think "professional brand I can trust" — and they BUY.
 
-3. STORYBRAND (Donald Miller)
-   The customer is the HERO, not your product. Your product is the GUIDE.
-   Every story: Hero has Problem → Meets Guide → Gets Plan → Takes Action →
-   Avoids Failure → Achieves Success.
-   The product is Yoda, not Luke. Show the customer's transformation.
+**VISUAL CONSISTENCY = TRUST = CONVERSION**
 
-Your job: Create images that leverage all three frameworks.
-Make shoppers FEEL, not just see. Show the JOB getting done.
-Position the customer as the hero who transforms.
+Your job is NOT to create 6 creative images.
+Your job is to create ONE cohesive brand story told across 6 images.
+
+═══════════════════════════════════════════════════════════════════════════════
+                     JOBS TO BE DONE (JTBD) FRAMEWORK
+═══════════════════════════════════════════════════════════════════════════════
+
+Clayton Christensen's insight: Customers don't buy products. They HIRE them.
+
+THE SELLER hired our tool to do ONE JOB:
+→ Create a cohesive listing that looks like a REAL BRAND and CONVERTS.
+
+THE SHOPPER hires this product to do a JOB:
+→ Not "buy a planter" but "make my home feel curated and intentional"
+→ Not "buy a vitamin" but "feel like I'm taking care of myself"
+
+Each of the 6 images has a specific JOB in the conversion funnel:
+
+| Image | JOB (What it's hired to do) | Success = Shopper thinks... |
+|-------|-----------------------------|-----------------------------|
+| 1     | Stop the scroll, create intrigue | "What is this? I need to know more" |
+| 2     | Build trust through quality | "This is well-made, not cheap" |
+| 3     | Reduce uncertainty | "I know exactly what I'm getting" |
+| 4     | Help them visualize ownership | "I can see this in MY life" |
+| 5     | Show their transformation | "This is who I become" |
+| 6     | Give permission to buy NOW | "Others love it, I deserve it too" |
+
+Each image does its JOB. Together they create an IRRESISTIBLE conversion flow.
 
 ''' + PRODUCT_PROTECTION_DIRECTIVE + '''
 
 ''' + PRODUCT_REFERENCE_INSTRUCTION + '''
 
 ═══════════════════════════════════════════════════════════════════════════════
-                              THE BRAND
+                              THE PRODUCT
 ═══════════════════════════════════════════════════════════════════════════════
 
 Product: {product_name}
@@ -324,15 +338,29 @@ Features: {features}
 Brand: {brand_name}
 Voice: {brand_voice}
 
-COLOR PALETTE (for atmosphere, NEVER on product):
+═══════════════════════════════════════════════════════════════════════════════
+        ⚠️  THE DESIGN SYSTEM - THIS IS THE STRATEGY, NOT A SUGGESTION  ⚠️
+═══════════════════════════════════════════════════════════════════════════════
+
+The design system is what makes 6 images feel like ONE BRAND.
+Without it, you have random AI images. With it, you have a converting listing.
+
+**COLOR PALETTE** (Use ONLY these colors across ALL 6 images):
 {color_palette}
 
-These colors are for backgrounds, gradients, UI, and accents.
-They create context around the product. They NEVER touch the product itself.
-
-TYPOGRAPHY:
+**TYPOGRAPHY** (Use ONLY these fonts across ALL 6 images):
 - Headlines: {headline_font} {headline_weight}
-- Body: {body_font}
+- Body/Callouts: {body_font}
+
+⚠️  CRITICAL RULES:
+1. Every text element uses {headline_font} or {body_font} — NO OTHER FONTS
+2. Every color comes from the palette above — NO INVENTED COLORS
+3. Mention the EXACT font name and hex code in each prompt
+4. This consistency is what separates "professional brand" from "AI slop"
+
+When writing prompts, explicitly state:
+- "Typography in {headline_font}" not "elegant serif font"
+- "Background in [specific hex from palette]" not "soft blue"
 
 ═══════════════════════════════════════════════════════════════════════════════
                               THE AUDIENCE
@@ -340,40 +368,40 @@ TYPOGRAPHY:
 
 {target_audience}
 
-Don't speak to demographics. Speak to dreams.
-What moment are they imagining? What feeling are they chasing?
+Don't speak to demographics. Speak to the JOB they're hiring this product to do.
+What transformation are they seeking? What feeling are they chasing?
 
 ═══════════════════════════════════════════════════════════════════════════════
-                              THE DESIGN FRAMEWORK
+                              THE STORY ARC
 ═══════════════════════════════════════════════════════════════════════════════
 
 Framework: {framework_name}
 Philosophy: {design_philosophy}
 
-Story Arc (The Hero's Journey):
+The 6 images tell ONE story (the customer's hero journey):
 - Theme: {story_theme}
-- Hook: {story_hook} (Image 1: INTRIGUE)
-- Reveal: {story_reveal} (Image 2: TRUST)
-- Proof: {story_proof} (Image 3: BELONGING)
-- Dream: {story_dream} (Image 4: DESIRE)
-- Transform: {story_transform} (Image 5: TRANSFORMATION)
-- Close: {story_close} (Image 6: URGENCY)
+- Image 1 (INTRIGUE): {story_hook}
+- Image 2 (TRUST): {story_reveal}
+- Image 3 (BELONGING): {story_proof}
+- Image 4 (DESIRE): {story_dream}
+- Image 5 (TRANSFORMATION): {story_transform}
+- Image 6 (URGENCY): {story_close}
 
-Visual Treatment:
+Visual Treatment (CONSISTENT across all images):
 - Lighting: {lighting_style}
 - Background: {background_treatment}
 - Mood: {mood_keywords}
 
-COPY & TEXT ELEMENTS (Use strategically per image type):
+COPY & TEXT ELEMENTS:
 {image_copy_json}
 
-For INFOGRAPHIC images (2, 3): Text is ESSENTIAL — callouts, headlines, feature highlights.
-For LIFESTYLE images (4): Text is OPTIONAL — use if it adds value, skip if image speaks.
-For TRANSFORMATION (5): Labels are HELPFUL — "Before/After", "Problem/Solution".
-For COMPARISON (6): Text DRIVES action — numbers, differentiators, urgency.
+Text Integration Rules:
+- Infographics (2, 3): Text is ESSENTIAL — headlines, callouts, specs
+- Lifestyle (4): Text is OPTIONAL — only if it adds value
+- Transformation (5): Labels are HELPFUL — "Before/After"
+- Comparison (6): Text DRIVES action — numbers, social proof
 
-Text should be INTEGRATED into the design, not slapped on.
-Think Apple product page, not cheap Amazon template.
+All text uses the design system typography. No exceptions.
 
 ''' + get_listing_quality_standard() + '''
 
@@ -506,8 +534,9 @@ Return JSON:
     {{
       "image_number": 1,
       "image_type": "main",
-      "emotional_beat": "intrigue",
-      "viewer_thought": "What the viewer should unconsciously think",
+      "job": "What this image is HIRED to do (e.g., 'Stop the scroll, create intrigue')",
+      "success_thought": "What the shopper thinks if this image does its job",
+      "emotional_beat": "intrigue|trust|belonging|desire|transformation|urgency",
       "composition_notes": "Brief notes on composition",
       "key_elements": ["element1", "element2"],
       "prompt": "Your evocative, emotion-first prompt (150-250 words)"
@@ -516,7 +545,19 @@ Return JSON:
   ]
 }}
 
-Each prompt should make the viewer FEEL something, not just see something.
+⚠️  CRITICAL: Each prompt MUST explicitly include:
+1. The EXACT font names: "{headline_font}" and "{body_font}" — not "elegant font"
+2. The EXACT hex codes from the palette — not "soft blue" or "warm tone"
+3. Reference to the consistent visual treatment across all images
+
+EXAMPLE OF CORRECT PROMPT:
+"...Typography uses {headline_font} for the headline 'Crafted with Care' in {primary_hex},
+with callouts in {body_font}. Background gradient from {color1_hex} to {color2_hex}..."
+
+EXAMPLE OF WRONG PROMPT:
+"...elegant serif typography in soft blue tones..." ← NO! This breaks cohesion.
+
+The prompts must be so specific that if generated separately, they'd still look like ONE brand.
 '''
 
 
