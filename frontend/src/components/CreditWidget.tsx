@@ -202,7 +202,7 @@ export const CreditWidget: React.FC<CreditWidgetProps> = ({ className, compact =
 
               {/* Reset info */}
               <p className="text-[10px] text-slate-500">
-                {credits?.period === 'day' ? 'Resets daily' : 'Resets monthly'}
+                {credits?.period === 'lifetime' ? 'Never resets' : credits?.period === 'day' ? 'Resets daily' : 'Resets monthly'}
               </p>
             </>
           )}

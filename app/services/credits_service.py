@@ -9,10 +9,10 @@ Credit Costs:
 - Pro model (quality): 3 credits per image
 
 Plans:
-- Free: 50 credits/day (resets daily)
-- Starter ($9/mo): 500 credits/month
-- Pro ($29/mo): 2000 credits/month
-- Business ($79/mo): 10000 credits/month
+- Free: 10 credits lifetime (one-time, never resets)
+- Starter ($15/mo): 300 credits/month
+- Pro ($49/mo): 1000 credits/month
+- Business ($149/mo): 3000 credits/month
 
 Admin:
 - Admin emails (configured in settings) have unlimited credits
@@ -68,13 +68,12 @@ PLANS = {
     "free": {
         "name": "Free",
         "price": 0,
-        "credits_per_period": 30,
-        "period": "day",  # Credits reset daily
+        "credits_per_period": 10,
+        "period": "lifetime",  # One-time credits, never reset
         "features": [
-            "30 credits per day",
-            "~1 full listing with Flash",
+            "10 credits lifetime",
+            "Try before you buy",
             "Access to all models",
-            "Great for testing",
         ],
     },
     "starter": {
@@ -355,13 +354,21 @@ class CreditsService:
         return settings.credits_balance
 
     def _check_daily_reset(self, settings: UserSettings) -> None:
-        """Reset daily credits for free tier if new day."""
+        """
+        Check for daily credit reset (only for plans with period='day').
+        Free tier is now lifetime, so no reset applies.
+        """
+        plan_info = PLANS.get(settings.plan_tier, PLANS["free"])
+        if plan_info.get("period") != "day":
+            # Lifetime or monthly plans don't have daily reset
+            return
+
         now = datetime.now(timezone.utc)
         last_reset = settings.updated_at
 
         if last_reset is None or last_reset.date() < now.date():
             # New day, reset credits
-            settings.credits_balance = PLANS["free"]["credits_per_period"]
+            settings.credits_balance = plan_info["credits_per_period"]
             settings.updated_at = now
             self.db.commit()
             logger.info(f"Daily credit reset for user {settings.user_id}")

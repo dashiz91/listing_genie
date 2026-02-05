@@ -367,7 +367,7 @@ export const SettingsPage: React.FC = () => {
                 </div>
                 <p className="text-sm text-slate-500 mt-1">
                   {settings?.usage.plan_tier === 'free'
-                    ? 'Resets daily at midnight UTC'
+                    ? 'Lifetime credits (never reset)'
                     : 'Resets monthly on billing date'
                   }
                 </p>
