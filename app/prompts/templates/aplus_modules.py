@@ -267,17 +267,20 @@ This creates the visual variety seen in Apple, Sony, Bose, GoPro, Anker A+ pages
   → Text: "WHAT'S INCLUDED" header + item name labels
   → Think: Nintendo Switch unboxing layout, Apple AirPods box contents
 
-"lifestyle_action": Product in dramatic real-world use with a person
+"lifestyle_action": Person ACTIVELY using/enjoying the product. MUST include a real person with face visible, genuine emotion, authentic moment. The person IS the story — show their joy, calm, excitement.
   → Text: One aspirational headline (2-4 words) OR no text
   → Think: Stanley pickleball action, New Balance running, GoPro surfing
+  → generation_prompt MUST describe: who the person is, what they're doing, their expression, the environment
 
 "trust_authority": Social proof, awards, stats — the credibility module
   → Text: 2-3 stat badges ("#1 Brand", "6.5M+ Users", "35 Patents", "Award Winner")
   → Think: Levoit "#1 HUMIDIFIER BRAND", Anker "#1 Mobile Charging Brand"
+  → generation_prompt MUST describe: layout (product right, stats left), badge styling, background color
 
-"product_in_context": Product shown in natural environment (room, desk, kitchen, shelf)
+"product_in_context": Product in natural environment with a person nearby. Show the LIFE around the product — couple on sofa, friend admiring it, someone walking past. The environment + person create FOMO.
   → Text: One evocative headline (2-4 words) OR no text
-  → Think: Sony TV on wall, Bose headphones on nightstand, YETI cooler at campsite
+  → Think: West Elm catalog, Anthropologie home feature, Architectural Digest room shot
+  → generation_prompt MUST describe: the room/space in 50+ words, the person's role, the product's placement
 
 "dramatic_mono": Single product on bold solid color, dramatic studio lighting, minimal
   → Text: Brand name only, or NO text — let the product speak
@@ -356,12 +359,14 @@ Each module shows the product from a DIFFERENT angle:
 - Module 5: 3/4 back or dramatic low angle
 RULE: NEVER show the same angle/viewpoint in two modules.
 
-**8. HUMAN PRESENCE (at least ONE module with a person)**
-Premium A+ includes people — hands, silhouettes, or full figures.
-- At least ONE module (lifestyle_action archetype) MUST include a person
-- Show genuine interaction: hands reaching, person using, carrying, enjoying
-- People create SCALE and EMOTIONAL CONNECTION
-- Even a single hand holding the product adds premium feel
+**8. HUMAN PRESENCE (at least TWO modules with people)**
+Premium A+ includes REAL PEOPLE — faces visible, genuinely interacting, radiating happiness.
+- At least TWO modules MUST include a person (face visible, authentic emotion)
+- lifestyle_action: Person ACTIVELY using/enjoying the product (watering, hanging, admiring)
+- product_in_context: Person in the environment WITH the product (couple on sofa, friend visiting)
+- People create SCALE, EMOTIONAL CONNECTION, and FOMO
+- Show genuine joy, satisfaction, aspiration — NOT stock photo poses
+- Diverse, authentic people in REAL moments — the viewer should think "I want that life"
 
 **9. ENVIRONMENTAL STORYTELLING (scene briefs, not generic)**
 Each module's scene needs a SPECIFIC 50-word brief — never "lifestyle shot."
@@ -502,7 +507,7 @@ Respond with ONLY valid JSON:
         "midground": "Product placement and focus",
         "background": "What's behind (e.g., 'soft gradient to deep navy' or 'blurred kitchen shelf')"
       }},
-      "scene_brief": "50-word SPECIFIC environment description — cinematic, sensory, emotional. NOT 'lifestyle shot' but a movie scene.",
+      "scene_brief": "50-word SPECIFIC environment — paint a movie scene: 'Dawn light through floor-to-ceiling windows of a Scandinavian loft. White oak floors, a single monstera plant. Product on a floating walnut shelf at eye level, backlit by morning sun creating a warm halo.' NEVER generic ('lifestyle shot', 'clean background').",
       "render_text": {{
         "headline": "2-5 evocative words OR null",
         "brand_name": "BRAND or null",
@@ -510,7 +515,7 @@ Respond with ONLY valid JSON:
         "component_labels": ["Part Name", "Feature Name"],
         "text_position": "left | right | center | scattered"
       }},
-      "generation_prompt": "COMPLETE 200-350 word prompt — FEELING first, then visuals. MUST include lighting setup, camera angle, depth layers, and what text to render."
+      "generation_prompt": "COMPLETE 200-350 word SCENE-PAINTING prompt. Write it like a cinematographer's shot brief — NOT a template. Start with 'SCENE:' and paint the specific environment in 50-100 words (e.g., 'Golden hour on a Mediterranean balcony, wrought-iron brackets, trailing bougainvillea...'). Then describe CAMERA angle, LIGHTING setup by name (Rembrandt, backlight, rim light), DEPTH LAYERS with specific objects per layer, COLOR usage from the palette, and what TEXT to render. End with an emotional hook: 'The viewer should feel/think...' and a reference comparison: 'Think [Brand X] meets [Brand Y].' This prompt IS the creative brief — make it vivid, specific, cinematic."
     }}
   ]
 }}
@@ -531,7 +536,7 @@ CINEMATIC CRAFT CHECKLIST (each module MUST have ALL of these):
 - color_temperature: warm/cool/neutral (alternate for rhythm)
 - depth_layers: foreground bokeh + midground product + background (3 planes minimum)
 - scene_brief: 50-word SPECIFIC cinematic environment (NEVER "lifestyle shot")
-- At least ONE module with a person (lifestyle_action archetype)
+- At least TWO modules with people (lifestyle_action + product_in_context archetypes)
 - At least ONE module with 50%+ negative space (dramatic_mono archetype)
 - EVERY module shows product from DIFFERENT angle — never repeat same viewpoint
 - generation_prompt must describe the EXACT lighting, camera, and depth in its 200-350 words
@@ -540,38 +545,19 @@ Generate exactly {module_count} modules. Each creates FEELING — no filler, no 
 """
 
 
-APLUS_MODULE_WITH_SCRIPT = """Sotheby's catalog. Campaign imagery. Cinematic.
+APLUS_MODULE_WITH_SCRIPT = """Ultra-premium Amazon A+ Content banner. Wide cinematic 2.4:1 format.
 
-You're executing a premium A+ banner for {product_title}.
-The Art Director scripted the entire section as one EMOTIONAL JOURNEY.
-Bring THIS frame to life — faithful to the feeling, with craft and instinct.
+PRODUCT: {product_title}
+BRAND: {brand_name}
+PALETTE: {primary_color} | {color_palette}
 
-PRODUCT:
-- Brand: {brand_name}
-- What creates desire: {features}
-- Who dreams of this: {target_audience}
+═══ ART DIRECTOR'S CREATIVE BRIEF — MODULE {module_index} OF {module_count} ═══
+ARCHETYPE: {module_archetype} | ROLE: {module_role}
+The viewer should think: "{module_viewer_thought}"
 
-VISUAL IDENTITY ({framework_name}):
-{design_philosophy}
-Anchor color: {primary_color} | Palette: {color_palette}
-Mood: {framework_mood}
+{generation_prompt}
 
-THE ART DIRECTOR'S EMOTIONAL VISION:
-"{narrative_theme}"
-Color journey: {color_flow}
-Background world: {background_strategy}
-Seam technique: {edge_connection_strategy}
-
-YOUR FRAME — Module {module_index} of {module_count} ({module_role}):
-DESIGN ARCHETYPE: {module_archetype}
-Headline: "{module_headline}"
-Product treatment: {module_product_angle}
-Background: {module_background}
-Visual elements: {module_elements}
-THE FEELING: {module_mood}
-What the viewer thinks: {module_content_focus}
-
-═══ CINEMATIC CRAFT FOR THIS MODULE ═══
+═══ CINEMATIC CRAFT (NON-NEGOTIABLE) ═══
 LIGHTING: {module_lighting}
 CAMERA/FRAMING: {module_camera}
 COLOR TEMPERATURE: {module_color_temperature}
@@ -583,30 +569,19 @@ SCENE: {module_scene_brief}
 
 {render_text_instruction}
 
-EDGE CONTRACTS:
-- Top edge resolves to: {top_edge}
-- Bottom edge sets up: {bottom_edge}
-
 POSITION: {module_position}
 {position_instruction}
 
-FEELING FIRST:
-- Don't just show the product — create a moment they want to live in
-- Every element should deepen desire, not deliver information
-- The viewer should FEEL something, not just understand something
-- Wide format (2.4:1) — cinematic, not catalog
-
-CRAFT NOTES:
-- Use PRODUCT_PHOTO for REAL product. Honor materials and proportions.
-- Use STYLE_REFERENCE for visual direction. Match mood, lighting, sophistication.
-- If BRAND_LOGO is provided, reproduce it faithfully in the image where appropriate.
-- Brand colors in scene naturally — lighting, surfaces, atmosphere
-- The lighting, camera angle, and depth layers above are NON-NEGOTIABLE — follow them exactly
-- The image must feel like a frame from a premium brand film, not a template
-- NEVER include website UI, Amazon navigation, browser chrome
-- Render text SHORT and BOLD — baked into the image like premium brand A+
-- Text must be LARGE enough to read at 50% zoom, HIGH CONTRAST
-- NEVER flat lighting — use the specified lighting direction for drama and dimension
+CRAFT NON-NEGOTIABLES:
+- Use PRODUCT_PHOTO for the REAL product. Honor its materials, proportions, character.
+- Use STYLE_REFERENCE for visual mood and lighting direction.
+- If BRAND_LOGO is provided, reproduce it faithfully where the archetype calls for it.
+- Brand colors live in the SCENE — lighting, surfaces, atmosphere. Never flat overlays.
+- Wide format (2.4:1) — cinematic, not catalog. Breathing room at edges.
+- This must look like a frame from a luxury brand commercial, NOT a product photo.
+- NEVER include website UI, Amazon navigation, browser chrome.
+- Text: SHORT, BOLD, HIGH CONTRAST, baked into image. Readable at 50% zoom.
+- Follow the specified lighting direction EXACTLY — NEVER use flat/even lighting.
 
 {continuity_instruction}"""
 
@@ -830,15 +805,35 @@ def build_aplus_module_prompt(
     module_archetype = mod.get("archetype", "product_in_context")
     render_text = mod.get("render_text") or {}
 
+    # Extract the AI's rich generation_prompt (200-350 words of scene painting)
+    generation_prompt = mod.get("generation_prompt", "")
+    module_viewer_thought = mod.get("viewer_thought", "I need this in my life")
+
+    # If generation_prompt is missing, build a fallback from available fields
+    if not generation_prompt:
+        scene_desc = mod.get("scene_description", "")
+        mood = mod.get("mood", "premium and cinematic")
+        generation_prompt = (
+            f"Create a {module_archetype} composition for {product_title}. "
+            f"{scene_desc} "
+            f"The mood is {mood}. Use the product reference photo — honor its real materials, "
+            f"proportions, and character. Create a scene that makes the viewer think: "
+            f'"{module_viewer_thought}". '
+            f"This must look like a frame from a luxury brand commercial — "
+            f"think Anthropologie catalog meets Architectural Digest. "
+            f"Dramatic lighting, real depth with foreground bokeh elements, "
+            f"and cinematic color grading using the framework palette."
+        )
+
     # Extract cinematic craft fields
-    module_lighting = mod.get("lighting", "Dramatic side lighting from 45° left, natural shadows")
-    module_camera = mod.get("camera", "3/4 view, product fills 60% of frame")
-    module_color_temperature = mod.get("color_temperature", "neutral")
+    module_lighting = mod.get("lighting", "Dramatic Rembrandt setup — key light 45° from upper left, deep shadows opposite side, subtle rim light from behind separating product from background")
+    module_camera = mod.get("camera", "3/4 view, slightly above center, product fills 50-60% of frame, shot at f/2.8 with selective focus")
+    module_color_temperature = mod.get("color_temperature", "warm")
     depth_layers = mod.get("depth_layers") or {}
-    module_fg = depth_layers.get("foreground", "Subtle bokeh element for depth")
-    module_mg = depth_layers.get("midground", "Product in sharp focus")
-    module_bg = depth_layers.get("background", "Clean gradient from palette")
-    module_scene_brief = mod.get("scene_brief", "Premium editorial composition with cinematic lighting and depth")
+    module_fg = depth_layers.get("foreground", "Subtle organic element softly blurred — petals, fabric edge, or botanical detail")
+    module_mg = depth_layers.get("midground", "Product in tack-sharp focus, catching directional light")
+    module_bg = depth_layers.get("background", "Rich gradient from framework palette, smoothly out of focus")
+    module_scene_brief = mod.get("scene_brief", "Cinematic studio environment with dramatic directional lighting, rich depth layers, and the product presented as the hero of a luxury brand campaign")
 
     # Build render_text instruction based on archetype
     render_text_parts = []
@@ -911,27 +906,14 @@ def build_aplus_module_prompt(
     prompt = APLUS_MODULE_WITH_SCRIPT.format(
         product_title=product_title,
         brand_name=brand_name or "Premium Brand",
-        features=", ".join(features) if features else "Quality craftsmanship",
-        target_audience=target_audience or "Discerning customers",
-        framework_name=framework.get("framework_name", "Professional"),
-        design_philosophy=framework.get("design_philosophy", "Clean and modern"),
         primary_color=primary_color,
         color_palette=", ".join(c.get("hex", "") for c in colors) or primary_color,
-        framework_mood=framework.get("brand_voice", "Professional"),
-        narrative_theme=visual_script.get("narrative_theme", ""),
-        color_flow=visual_script.get("color_flow", ""),
-        background_strategy=visual_script.get("background_strategy", ""),
-        edge_connection_strategy=visual_script.get("edge_connection_strategy", ""),
         module_index=module_index,
         module_count=module_count,
         module_role=mod.get("role", f"Module {module_index + 1}"),
         module_archetype=module_archetype,
-        module_headline=mod.get("headline", ""),
-        module_product_angle=mod.get("product_angle", ""),
-        module_background=mod.get("background_description", ""),
-        module_elements=", ".join(mod.get("key_elements", [])),
-        module_mood=mod.get("mood", ""),
-        module_content_focus=mod.get("content_focus", ""),
+        module_viewer_thought=module_viewer_thought,
+        generation_prompt=generation_prompt,
         module_lighting=module_lighting,
         module_camera=module_camera,
         module_color_temperature=module_color_temperature,
@@ -940,8 +922,6 @@ def build_aplus_module_prompt(
         module_bg=module_bg,
         module_scene_brief=module_scene_brief,
         render_text_instruction=render_text_instruction,
-        top_edge=mod.get("top_edge", "Clean start"),
-        bottom_edge=mod.get("bottom_edge", "Flows downward"),
         module_position=module_position,
         position_instruction=position_instruction,
         continuity_instruction=continuity_instruction,
