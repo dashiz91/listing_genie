@@ -1274,8 +1274,8 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                 disabled={isGenerating}
                 className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-xs text-white focus:ring-1 focus:ring-redd-500 focus:border-transparent disabled:opacity-50"
               >
-                <option value="gemini-3-pro-image-preview">Pro — Best quality ($0.13/img)</option>
-                <option value="gemini-2.5-flash-image">Flash — 3x cheaper ($0.04/img)</option>
+                <option value="gemini-2.5-flash-image">⚡ Flash — Fast (1 credit/img)</option>
+                <option value="gemini-3-pro-image-preview">✨ Pro — Best quality (3 credits/img)</option>
               </select>
             </div>
 
