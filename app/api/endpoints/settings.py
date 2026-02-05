@@ -15,6 +15,9 @@ from app.dependencies import get_db, get_storage_service
 from app.core.auth import User, get_current_user
 from app.models.database import UserSettings, GenerationSession, ImageRecord, GenerationStatusEnum
 from app.services.supabase_storage_service import SupabaseStorageService
+from app.services.credits_service import (
+    CreditsService, PLANS, MODEL_COSTS, estimate_generation_cost
+)
 from app.config import settings as app_settings
 
 logger = logging.getLogger(__name__)
@@ -260,3 +263,178 @@ async def get_usage_stats(
         credits_balance=settings.credits_balance,
         plan_tier=settings.plan_tier,
     )
+
+
+# ============================================================================
+# Credits Endpoints
+# ============================================================================
+
+class CreditsResponse(BaseModel):
+    """Current credits info"""
+    balance: int
+    plan_tier: str
+    plan_name: str
+    credits_per_period: int
+    period: str  # "day" or "month"
+
+
+class PlanInfo(BaseModel):
+    """Plan information"""
+    id: str
+    name: str
+    price: int
+    credits_per_period: int
+    period: str
+    features: List[str]
+
+
+class PlansResponse(BaseModel):
+    """All available plans"""
+    plans: List[PlanInfo]
+    current_plan: str
+
+
+class CostEstimateRequest(BaseModel):
+    """Request to estimate generation cost"""
+    operation: str  # "full_listing", "listing_images", "aplus", "single_image"
+    model: str = "gemini-3-pro-image-preview"
+    count: int = 1
+
+
+class CostEstimateResponse(BaseModel):
+    """Estimated cost breakdown"""
+    total: int
+    breakdown: dict
+    can_afford: bool
+    current_balance: int
+
+
+@router.get("/credits", response_model=CreditsResponse)
+async def get_credits(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get current credits balance and plan info.
+    """
+    credits_service = CreditsService(db)
+    settings = credits_service.get_user_settings(user.id)
+    plan_info = credits_service.get_plan_info(settings.plan_tier)
+
+    return CreditsResponse(
+        balance=settings.credits_balance,
+        plan_tier=settings.plan_tier,
+        plan_name=plan_info["name"],
+        credits_per_period=plan_info["credits_per_period"],
+        period=plan_info["period"],
+    )
+
+
+@router.get("/plans", response_model=PlansResponse)
+async def get_plans(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get all available plans with features.
+    """
+    settings = get_or_create_settings(db, user.id)
+
+    plans = [
+        PlanInfo(
+            id=plan_id,
+            name=plan["name"],
+            price=plan["price"],
+            credits_per_period=plan["credits_per_period"],
+            period=plan["period"],
+            features=plan["features"],
+        )
+        for plan_id, plan in PLANS.items()
+    ]
+
+    return PlansResponse(
+        plans=plans,
+        current_plan=settings.plan_tier,
+    )
+
+
+@router.post("/credits/estimate", response_model=CostEstimateResponse)
+async def estimate_cost(
+    request: CostEstimateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Estimate credit cost for a generation operation.
+    """
+    credits_service = CreditsService(db)
+    settings = credits_service.get_user_settings(user.id)
+
+    if request.operation == "full_listing":
+        # Full listing = framework + 6 listing images + 5 A+ desktop + 5 A+ mobile
+        estimate = estimate_generation_cost(
+            num_listing_images=6,
+            num_aplus_modules=5,
+            include_mobile=True,
+            model=request.model,
+        )
+        total = estimate["total"]
+        breakdown = estimate
+    elif request.operation == "listing_images":
+        # Just the 6 listing images
+        cost = credits_service.get_credit_cost("listing_image", request.model, 6)
+        total = cost
+        breakdown = {"listing_images": cost}
+    elif request.operation == "aplus":
+        # A+ section (5 desktop + 5 mobile)
+        model_cost = MODEL_COSTS.get(request.model, 2)
+        desktop = 5 * model_cost
+        mobile = 5 * 1  # Mobile transforms are cheap
+        total = desktop + mobile
+        breakdown = {"aplus_desktop": desktop, "aplus_mobile": mobile}
+    elif request.operation == "single_image":
+        total = credits_service.get_credit_cost("listing_image", request.model, request.count)
+        breakdown = {"images": total}
+    elif request.operation == "framework":
+        # Framework analysis + 4 previews
+        total = 2 + 4  # Analysis + 4 preview images
+        breakdown = {"analysis": 2, "previews": 4}
+    else:
+        total = credits_service.get_credit_cost(request.operation, request.model, request.count)
+        breakdown = {request.operation: total}
+
+    return CostEstimateResponse(
+        total=total,
+        breakdown=breakdown,
+        can_afford=settings.credits_balance >= total,
+        current_balance=settings.credits_balance,
+    )
+
+
+@router.get("/credits/model-costs")
+async def get_model_costs(
+    user: User = Depends(get_current_user),
+):
+    """
+    Get credit costs for each model.
+    """
+    return {
+        "models": {
+            "gemini-2.0-flash": {
+                "name": "Flash (Fast)",
+                "cost": 1,
+                "description": "Fast generation, good for drafts",
+            },
+            "gemini-3-pro-image-preview": {
+                "name": "Pro (Quality)",
+                "cost": 3,
+                "description": "High quality, best for final images",
+            },
+        },
+        "operations": {
+            "framework_analysis": {"cost": 2, "description": "AI product analysis"},
+            "framework_preview": {"cost": 1, "description": "Style preview image"},
+            "edit_image": {"cost": 1, "description": "Edit existing image"},
+            "aplus_mobile": {"cost": 1, "description": "Mobile transform"},
+        },
+    }

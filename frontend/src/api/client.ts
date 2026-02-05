@@ -556,6 +556,46 @@ class ApiClient {
     const response = await this.client.get<UsageStats>('/settings/usage');
     return response.data;
   }
+
+  /**
+   * Get current credits balance and plan info
+   */
+  async getCredits(): Promise<CreditsInfo> {
+    const response = await this.client.get<CreditsInfo>('/settings/credits');
+    return response.data;
+  }
+
+  /**
+   * Get all available plans
+   */
+  async getPlans(): Promise<PlansResponse> {
+    const response = await this.client.get<PlansResponse>('/settings/plans');
+    return response.data;
+  }
+
+  /**
+   * Estimate credit cost for an operation
+   */
+  async estimateCost(
+    operation: string,
+    model: string = 'gemini-3-pro-image-preview',
+    count: number = 1
+  ): Promise<CostEstimate> {
+    const response = await this.client.post<CostEstimate>('/settings/credits/estimate', {
+      operation,
+      model,
+      count,
+    });
+    return response.data;
+  }
+
+  /**
+   * Get model credit costs
+   */
+  async getModelCosts(): Promise<ModelCosts> {
+    const response = await this.client.get<ModelCosts>('/settings/credits/model-costs');
+    return response.data;
+  }
 }
 
 // Asset item type
@@ -592,6 +632,41 @@ export interface UserSettings {
   brand_presets: BrandPresets;
   usage: UsageStats;
   email: string;
+}
+
+// Credits types
+export interface CreditsInfo {
+  balance: number;
+  plan_tier: string;
+  plan_name: string;
+  credits_per_period: number;
+  period: string;
+}
+
+export interface PlanInfo {
+  id: string;
+  name: string;
+  price: number;
+  credits_per_period: number;
+  period: string;
+  features: string[];
+}
+
+export interface PlansResponse {
+  plans: PlanInfo[];
+  current_plan: string;
+}
+
+export interface CostEstimate {
+  total: number;
+  breakdown: Record<string, number>;
+  can_afford: boolean;
+  current_balance: number;
+}
+
+export interface ModelCosts {
+  models: Record<string, { name: string; cost: number; description: string }>;
+  operations: Record<string, { cost: number; description: string }>;
 }
 
 export const apiClient = new ApiClient();

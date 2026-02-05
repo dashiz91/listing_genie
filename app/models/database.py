@@ -238,9 +238,10 @@ class UserSettings(Base):
     images_generated_this_month = Column(Integer, default=0)
     last_generation_at = Column(DateTime, nullable=True)
 
-    # Credits/billing (for future monetization)
-    credits_balance = Column(Integer, default=0)
-    plan_tier = Column(String(50), default="free")  # free, starter, pro, enterprise
+    # Credits/billing
+    credits_balance = Column(Integer, default=50)  # Start with free tier credits
+    plan_tier = Column(String(50), default="free")  # free, starter, pro, business
+    credits_last_reset = Column(DateTime, nullable=True)  # For daily reset tracking
 
     # Timestamps
     created_at = Column(DateTime, default=func.now())

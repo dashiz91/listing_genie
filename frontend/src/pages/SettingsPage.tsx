@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { apiClient, UserSettings, AssetItem } from '../api/client';
+import { apiClient, UserSettings, AssetItem, PlanInfo } from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
 export const SettingsPage: React.FC = () => {
@@ -24,6 +24,10 @@ export const SettingsPage: React.FC = () => {
   const [styleRefs, setStyleRefs] = useState<AssetItem[]>([]);
   const [selectedLogoPath, setSelectedLogoPath] = useState<string | null>(null);
   const [selectedStyleRefPath, setSelectedStyleRefPath] = useState<string | null>(null);
+
+  // Plans state
+  const [plans, setPlans] = useState<PlanInfo[]>([]);
+  const [currentPlan, setCurrentPlan] = useState<string>('free');
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -53,10 +57,21 @@ export const SettingsPage: React.FC = () => {
     }
   }, []);
 
+  const fetchPlans = useCallback(async () => {
+    try {
+      const data = await apiClient.getPlans();
+      setPlans(data.plans);
+      setCurrentPlan(data.current_plan);
+    } catch (err) {
+      console.error('Failed to fetch plans:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSettings();
     fetchAssets();
-  }, [fetchSettings, fetchAssets]);
+    fetchPlans();
+  }, [fetchSettings, fetchAssets, fetchPlans]);
 
   const handleSaveBrandPresets = async () => {
     setIsSaving(true);
@@ -297,47 +312,151 @@ export const SettingsPage: React.FC = () => {
         </div>
       </section>
 
-      {/* Usage & Credits Section */}
+      {/* Credits Balance Section */}
       <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
           <svg className="w-5 h-5 text-redd-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          Usage & Credits
+          Credits
         </h2>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-            <p className="text-2xl font-bold text-white">{settings?.usage.projects_count || 0}</p>
-            <p className="text-sm text-slate-400">Projects</p>
+        <div className="flex items-center gap-6 mb-6">
+          <div className="flex-1 bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-bold text-redd-400">{settings?.usage.credits_balance || 0}</span>
+              <span className="text-slate-400">credits remaining</span>
+            </div>
+            <p className="text-sm text-slate-500 mt-1">
+              {settings?.usage.plan_tier === 'free'
+                ? 'Resets daily at midnight UTC'
+                : 'Resets monthly on billing date'
+              }
+            </p>
           </div>
-          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-            <p className="text-2xl font-bold text-white">{settings?.usage.images_generated_total || 0}</p>
-            <p className="text-sm text-slate-400">Images Total</p>
-          </div>
-          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-            <p className="text-2xl font-bold text-white">{settings?.usage.images_generated_this_month || 0}</p>
-            <p className="text-sm text-slate-400">This Month</p>
-          </div>
-          <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
-            <p className="text-2xl font-bold text-redd-400">{settings?.usage.credits_balance || 0}</p>
-            <p className="text-sm text-slate-400">Credits</p>
+          <div className="text-right">
+            <p className="text-sm text-slate-400">Current Plan</p>
+            <p className="text-xl font-semibold text-white capitalize">{settings?.usage.plan_tier || 'Free'}</p>
           </div>
         </div>
 
-        <div className="bg-slate-900/30 rounded-lg p-4 border border-slate-700/30">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-white">Current Plan</p>
-              <p className="text-lg font-semibold text-redd-400 capitalize">
-                {settings?.usage.plan_tier || 'Free'}
-              </p>
+        {/* Credit costs info */}
+        <div className="bg-slate-900/30 rounded-lg p-4 border border-slate-700/30 mb-4">
+          <h3 className="text-sm font-medium text-white mb-3">Credit Costs</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-400">Flash model (fast)</span>
+              <span className="text-white font-mono">1 credit/image</span>
             </div>
-            <Button variant="outline" className="border-redd-500 text-redd-400 hover:bg-redd-500/10" disabled>
-              Upgrade (Coming Soon)
-            </Button>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Pro model (quality)</span>
+              <span className="text-white font-mono">3 credits/image</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Framework analysis</span>
+              <span className="text-white font-mono">2 credits</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">Edit/Mobile transform</span>
+              <span className="text-white font-mono">1 credit</span>
+            </div>
           </div>
         </div>
+
+        {/* Usage stats */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 text-center">
+            <p className="text-2xl font-bold text-white">{settings?.usage.projects_count || 0}</p>
+            <p className="text-xs text-slate-400">Projects</p>
+          </div>
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 text-center">
+            <p className="text-2xl font-bold text-white">{settings?.usage.images_generated_total || 0}</p>
+            <p className="text-xs text-slate-400">Images Total</p>
+          </div>
+          <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50 text-center">
+            <p className="text-2xl font-bold text-white">{settings?.usage.images_generated_this_month || 0}</p>
+            <p className="text-xs text-slate-400">This Month</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Plans Section */}
+      <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+          <svg className="w-5 h-5 text-redd-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+          </svg>
+          Pricing
+        </h2>
+        <p className="text-sm text-slate-400 mb-6">Choose a plan that fits your needs</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {plans.map((plan) => {
+            const isCurrentPlan = plan.id === currentPlan;
+            const isPopular = plan.id === 'pro';
+
+            return (
+              <div
+                key={plan.id}
+                className={`relative rounded-xl border p-5 transition-all ${
+                  isCurrentPlan
+                    ? 'border-redd-500 bg-redd-500/5'
+                    : isPopular
+                    ? 'border-slate-600 bg-slate-800/50'
+                    : 'border-slate-700/50 bg-slate-900/30'
+                }`}
+              >
+                {isPopular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-redd-500 text-white text-xs font-medium px-3 py-1 rounded-full">
+                    Popular
+                  </div>
+                )}
+
+                <h3 className="text-lg font-semibold text-white">{plan.name}</h3>
+
+                <div className="mt-3 mb-4">
+                  <span className="text-3xl font-bold text-white">${plan.price}</span>
+                  <span className="text-slate-400">/mo</span>
+                </div>
+
+                <div className="flex items-center gap-2 mb-4 text-sm">
+                  <svg className="w-4 h-4 text-redd-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span className="text-white font-medium">
+                    {plan.credits_per_period.toLocaleString()} credits/{plan.period}
+                  </span>
+                </div>
+
+                <ul className="space-y-2 mb-5">
+                  {plan.features.slice(0, 4).map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-slate-300">
+                      <svg className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <Button
+                  className={`w-full ${
+                    isCurrentPlan
+                      ? 'bg-slate-700 text-slate-300 cursor-default'
+                      : 'bg-redd-500 hover:bg-redd-600 text-white'
+                  }`}
+                  disabled={isCurrentPlan || plan.price > 0}
+                >
+                  {isCurrentPlan ? 'Current Plan' : plan.price === 0 ? 'Get Started' : 'Coming Soon'}
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="text-center text-sm text-slate-500 mt-6">
+          Paid plans coming soon with Stripe integration
+        </p>
       </section>
 
       {/* Account Section */}
