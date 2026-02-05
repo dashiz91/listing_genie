@@ -682,6 +682,22 @@ class ApiClient {
     const response = await this.client.get<AdminUserCredits>(`/admin/users/${userId}/credits`);
     return response.data;
   }
+
+  // Alt text generation
+  async generateAltText(sessionId: string, imageType: string): Promise<AltTextResponse> {
+    const response = await this.client.post<AltTextResponse>('/generate/alt-text', {
+      session_id: sessionId,
+      image_type: imageType,
+    });
+    return response.data;
+  }
+
+  async generateAltTextBatch(sessionId: string): Promise<AltTextBatchResponse> {
+    const response = await this.client.post<AltTextBatchResponse>(
+      `/generate/alt-text/batch?session_id=${sessionId}`
+    );
+    return response.data;
+  }
 }
 
 // ASIN Import types
@@ -796,6 +812,18 @@ export interface AdminUserCredits {
   email: string | null;
   credits_balance: number;
   plan_tier: string;
+}
+
+// Alt text types
+export interface AltTextResponse {
+  image_type: string;
+  alt_text: string;
+  character_count: number;
+}
+
+export interface AltTextBatchResponse {
+  session_id: string;
+  alt_texts: Record<string, { alt_text: string; character_count: number }>;
 }
 
 export const apiClient = new ApiClient();
