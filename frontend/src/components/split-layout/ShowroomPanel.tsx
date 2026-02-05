@@ -37,6 +37,8 @@ interface ShowroomPanelProps {
   onRegenerateAplusModule?: (moduleIndex: number, note?: string, referenceImagePaths?: string[]) => void;
   onGenerateAllAplus?: () => void;
   onRegenerateScript?: () => void;
+  onReplanAll?: () => void;
+  isReplanning?: boolean;
   onAplusVersionChange?: (moduleIndex: number, versionIndex: number) => void;
   onEditAplusModule?: (moduleIndex: number, editInstructions: string, referenceImagePaths?: string[]) => void;
   aplusViewportMode?: AplusViewportMode;
@@ -86,6 +88,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
   onRegenerateAplusModule,
   onGenerateAllAplus,
   onRegenerateScript,
+  onReplanAll,
+  isReplanning = false,
   onAplusVersionChange,
   onEditAplusModule,
   aplusViewportMode: _aplusViewportMode, // Now controlled via unified viewport
@@ -216,6 +220,8 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
             onVersionChange={onListingVersionChange}
             deviceMode={unifiedViewportMode}
             onDeviceModeChange={handleViewportModeChange}
+            onReplanAll={onReplanAll}
+            isReplanning={isReplanning}
             aplusContent={aplusModules.length > 0 ? (
               <AplusSection
                 modules={aplusModules}

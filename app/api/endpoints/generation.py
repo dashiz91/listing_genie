@@ -80,6 +80,8 @@ from app.schemas.generation import (
     AplusModuleResponse,
     AplusVisualScriptRequest,
     AplusVisualScriptResponse,
+    ReplanRequest,
+    ReplanResponse,
     HeroPairRequest,
     HeroPairModuleResult,
     HeroPairResponse,
@@ -1771,6 +1773,111 @@ async def get_aplus_visual_script(
 
     # A+ prompts are stored in the same PromptHistory system as listing images.
     # Use GET /generate/{session_id}/prompts/aplus_0 through aplus_4 to retrieve them.
+
+
+# ============== Re-plan All Prompts (Listing + A+) ==============
+
+@router.post("/replan", response_model=ReplanResponse)
+async def replan_all_prompts(
+    request: ReplanRequest,
+    vision: VisionService = Depends(get_unified_vision_service),
+    gemini: GeminiService = Depends(get_gemini_service),
+    user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Regenerate all prompts (listing images + A+ visual script) without regenerating
+    the framework itself. This keeps the same style/colors but creates fresh prompts
+    for variation.
+
+    Use this when you want different creative direction while maintaining visual consistency.
+    """
+    try:
+        session = db.query(GenerationSession).filter(
+            GenerationSession.id == request.session_id
+        ).first()
+
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Get stored framework
+        framework = session.design_framework_json
+        if not framework:
+            raise HTTPException(status_code=400, detail="No design framework found. Generate frameworks first.")
+
+        features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
+
+        # === STEP 1: Regenerate listing prompts ===
+        logger.info(f"Re-planning listing prompts for session {request.session_id}")
+
+        listing_prompts = await vision.generate_image_prompts(
+            framework=framework,
+            product_name=session.product_title,
+            product_description=session.product_title,
+            features=features,
+            target_audience=session.target_audience or "",
+            global_note=session.global_note,
+            has_style_reference=bool(session.style_reference_path),
+            brand_name=session.brand_name or "",
+        )
+
+        logger.info(f"Generated {len(listing_prompts)} listing prompts")
+
+        # Update framework with new prompts
+        framework['generation_prompts'] = listing_prompts
+        session.design_framework_json = framework
+        db.commit()
+
+        # === STEP 2: Regenerate A+ visual script ===
+        logger.info(f"Re-planning A+ visual script for session {request.session_id}")
+
+        visual_script_prompt = get_visual_script_prompt(
+            product_title=session.product_title,
+            brand_name=session.brand_name or "",
+            features=features,
+            target_audience=session.target_audience or "",
+            framework=framework,
+            module_count=request.module_count,
+        )
+
+        # Collect product image paths for visual context
+        image_paths = []
+        if session.upload_path:
+            image_paths.append(session.upload_path)
+        if session.additional_upload_paths:
+            image_paths.extend(session.additional_upload_paths)
+
+        # Call Gemini with images so Art Director can SEE the product
+        raw_text = await gemini.generate_text_with_images(
+            prompt=visual_script_prompt,
+            image_paths=image_paths,
+            max_tokens=5000,
+            temperature=0.7,
+        )
+
+        visual_script = json_module.loads(strip_json_fences(raw_text))
+
+        # Store on session
+        session.aplus_visual_script = visual_script
+        db.commit()
+
+        logger.info(f"Visual script regenerated with {len(visual_script.get('modules', []))} modules")
+
+        return ReplanResponse(
+            session_id=request.session_id,
+            listing_prompts=listing_prompts,
+            visual_script=visual_script,
+            module_count=request.module_count,
+        )
+
+    except HTTPException:
+        raise
+    except json_module.JSONDecodeError as e:
+        logger.error(f"Failed to parse visual script JSON: {e}")
+        raise HTTPException(status_code=500, detail="Art Director returned invalid JSON")
+    except Exception as e:
+        logger.error(f"Replan failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Replan failed: {str(e)}")
 
 
 @router.post("/aplus/generate-mobile", response_model=AplusMobileResponse)

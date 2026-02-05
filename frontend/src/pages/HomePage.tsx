@@ -187,6 +187,7 @@ export const HomePage: React.FC = () => {
   // A+ Art Director visual script state
   const [aplusVisualScript, setAplusVisualScript] = useState<AplusVisualScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [isReplanning, setIsReplanning] = useState(false);
 
   // A+ viewport mode (desktop vs mobile)
   const [aplusViewportMode, setAplusViewportMode] = useState<AplusViewportMode>('desktop');
@@ -1029,6 +1030,56 @@ export const HomePage: React.FC = () => {
     }
   }, [sessionId]);
 
+  // Re-plan ALL prompts (listing images + A+ visual script) without regenerating the framework
+  const replanAll = useCallback(async () => {
+    if (!sessionId) return;
+    setIsReplanning(true);
+    try {
+      const response = await apiClient.replanAll(sessionId, 6);
+
+      // Update visual script
+      setAplusVisualScript(response.visual_script);
+
+      // Update selected framework with new listing prompts
+      if (selectedFramework) {
+        setSelectedFramework({
+          ...selectedFramework,
+          generation_prompts: response.listing_prompts,
+        });
+      }
+
+      // Adjust A+ module count if needed
+      const count = response.visual_script.modules?.length || 6;
+      setAplusModules((prev) => {
+        const updated: typeof prev = [];
+        for (let i = 0; i < count; i++) {
+          if (i < prev.length) {
+            updated.push(prev[i]);
+          } else {
+            updated.push({
+              id: `aplus-${i + 1}`,
+              type: 'full_image' as const,
+              index: i,
+              status: 'ready' as SlotStatus,
+              versions: [],
+              activeVersionIndex: 0,
+              mobileVersions: [],
+              mobileActiveVersionIndex: 0,
+              mobileStatus: 'ready' as SlotStatus,
+            });
+          }
+        }
+        return updated;
+      });
+
+      console.log('Re-planned all prompts successfully');
+    } catch (err: any) {
+      console.error('Replan failed:', err);
+    } finally {
+      setIsReplanning(false);
+    }
+  }, [sessionId, selectedFramework]);
+
   // Handle generate hero pair (modules 0+1 as one image split in half)
   const handleGenerateHeroPair = useCallback(
     async (note?: string, referenceImagePaths?: string[]) => {
@@ -1827,6 +1878,8 @@ export const HomePage: React.FC = () => {
             onRegenerateAplusModule={handleRegenerateAplusModule}
             onGenerateAllAplus={handleGenerateAllAplus}
             onRegenerateScript={regenerateVisualScript}
+            onReplanAll={replanAll}
+            isReplanning={isReplanning}
             onAplusVersionChange={handleAplusViewportVersionChange}
             onEditAplusModule={handleEditAplusModule}
             aplusViewportMode={aplusViewportMode}

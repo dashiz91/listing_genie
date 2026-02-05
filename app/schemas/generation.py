@@ -567,6 +567,24 @@ class AplusVisualScriptResponse(BaseModel):
 
 
 # ============================================================================
+# Re-plan All Prompts (Listing + A+)
+# ============================================================================
+
+class ReplanRequest(BaseModel):
+    """Request to regenerate all prompts (listing + A+) without regenerating framework"""
+    session_id: str = Field(..., description="Session ID from listing generation")
+    module_count: int = Field(default=6, ge=1, le=7, description="Number of A+ modules")
+
+
+class ReplanResponse(BaseModel):
+    """Response with regenerated prompts"""
+    session_id: str
+    listing_prompts: List[dict] = Field(default_factory=list, description="6 listing image prompts")
+    visual_script: dict = Field(default_factory=dict, description="A+ visual script")
+    module_count: int
+
+
+# ============================================================================
 # A+ Hero Pair Generation
 # ============================================================================
 

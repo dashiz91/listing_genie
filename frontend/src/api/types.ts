@@ -107,6 +107,8 @@ export interface DesignFramework {
   // Preview image generated for this framework
   preview_url?: string;
   preview_path?: string;
+  // Detailed generation prompts for listing images
+  generation_prompts?: ImageGenerationPrompt[];
 }
 
 // Color Mode - controls how AI Designer handles colors
@@ -481,6 +483,25 @@ export interface HeroPairResponse {
 
 export interface AplusVisualScriptResponse {
   session_id: string;
+  visual_script: AplusVisualScript;
+  module_count: number;
+}
+
+// ============================================================================
+// Re-plan All (Listing + A+)
+// ============================================================================
+
+export interface ImageGenerationPrompt {
+  image_number: number;
+  image_type: string;
+  prompt: string;
+  composition_notes: string;
+  key_elements: string[];
+}
+
+export interface ReplanResponse {
+  session_id: string;
+  listing_prompts: ImageGenerationPrompt[];
   visual_script: AplusVisualScript;
   module_count: number;
 }

@@ -62,6 +62,10 @@ interface AmazonListingPreviewProps {
 
   // A+ content to render inside the same card container
   aplusContent?: React.ReactNode;
+
+  // Re-plan all prompts (listing + A+)
+  onReplanAll?: () => void;
+  isReplanning?: boolean;
 }
 
 // Default image type order
@@ -96,6 +100,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   deviceMode: controlledDeviceMode,
   onDeviceModeChange,
   aplusContent,
+  onReplanAll,
+  isReplanning = false,
 }) => {
   void _onGenerateAll; // Reserved for future "Generate All" button
   // Get accent color from framework
@@ -729,6 +735,34 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 />
               </div>
             </div>
+
+            {/* Re-plan All Prompts Button - between listings and A+ */}
+            {aplusContent && onReplanAll && (
+              <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
+                <button
+                  onClick={onReplanAll}
+                  disabled={isReplanning}
+                  className="w-full py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isReplanning ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Re-planning all prompts...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Re-plan All Prompts (Listings + A+)
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
             {/* A+ Content - flows continuously inside the same card */}
             {aplusContent}
           </div>
@@ -813,6 +847,34 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 features={features}
               />
             </div>
+
+            {/* Re-plan All Prompts Button - between listings and A+ (Mobile) */}
+            {aplusContent && onReplanAll && (
+              <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
+                <button
+                  onClick={onReplanAll}
+                  disabled={isReplanning}
+                  className="w-full py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isReplanning ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Re-planning...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Re-plan All Prompts
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
             {/* A+ Content - flows continuously inside the same card */}
             {aplusContent}
           </div>

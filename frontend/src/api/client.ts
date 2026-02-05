@@ -19,6 +19,7 @@ import type {
   AplusModuleRequest,
   AplusModuleResponse,
   AplusVisualScriptResponse,
+  ReplanResponse,
   HeroPairResponse,
 } from './types';
 
@@ -428,6 +429,22 @@ class ApiClient {
   async getAplusVisualScript(sessionId: string): Promise<AplusVisualScriptResponse> {
     const response = await this.client.get<AplusVisualScriptResponse>(
       `/generate/aplus/${sessionId}/visual-script`
+    );
+    return response.data;
+  }
+
+  /**
+   * Re-plan all prompts (listing images + A+ visual script) without regenerating
+   * the framework itself. Keeps the same style/colors but creates fresh prompts.
+   */
+  async replanAll(
+    sessionId: string,
+    moduleCount: number = 6
+  ): Promise<ReplanResponse> {
+    const response = await this.client.post<ReplanResponse>(
+      '/generate/replan',
+      { session_id: sessionId, module_count: moduleCount },
+      { timeout: 120000 } // 2 minute timeout for both prompts
     );
     return response.data;
   }
