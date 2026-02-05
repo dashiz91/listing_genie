@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import health, generation, upload, images, projects, assets, settings, asin, admin
+from app.api.endpoints import health, generation, upload, images, projects, assets, settings, asin, admin, styles
 
 api_router = APIRouter(prefix="/api")
 
@@ -60,4 +60,10 @@ api_router.include_router(
     admin.router,
     prefix="/admin",
     tags=["admin"]
+)
+
+# Style library endpoints (free, no auth required)
+api_router.include_router(
+    styles.router,
+    tags=["styles"]
 )
