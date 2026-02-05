@@ -124,17 +124,13 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
     fetchStyles();
   }, [open]);
 
-  // Filter styles by category
-  const filteredStyles = activeCategory === 'all'
-    ? styles
-    : styles.filter(s => s.category === activeCategory);
+  // IDs of styles that have actual preview images generated
+  const STYLES_WITH_IMAGES = ['christmas', 'clean-white', 'gold-luxe', 'neon-pop', 'earth-tones'];
 
-  // Check if style has a preview image available
-  const hasPreviewImage = (style: StylePreset) => {
-    return [
-      'christmas', 'clean-white', 'gold-luxe', 'neon-pop', 'earth-tones'
-    ].includes(style.id);
-  };
+  // Filter styles: only show ones with preview images, then by category
+  const filteredStyles = styles
+    .filter(s => STYLES_WITH_IMAGES.includes(s.id))
+    .filter(s => activeCategory === 'all' || s.category === activeCategory);
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -198,7 +194,6 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
             {filteredStyles.map((style) => {
               const isSelected = selectedStyleId === style.id;
               const isHovered = hoveredStyle === style.id;
-              const hasImage = hasPreviewImage(style);
 
               return (
                 <button
@@ -216,22 +211,13 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
                       : 'border-slate-700 hover:border-slate-500'
                   )}
                 >
-                  {/* Preview image or color gradient */}
-                  <div className="aspect-[4/3] relative overflow-hidden">
-                    {hasImage ? (
-                      <img
-                        src={style.preview_image}
-                        alt={style.name}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div
-                        className="w-full h-full"
-                        style={{
-                          background: `linear-gradient(135deg, ${style.colors[0]} 0%, ${style.colors[1]} 50%, ${style.colors[2] || style.colors[0]} 100%)`,
-                        }}
-                      />
-                    )}
+                  {/* Preview image */}
+                  <div className="aspect-[4/3] relative overflow-hidden bg-slate-800">
+                    <img
+                      src={style.preview_image}
+                      alt={style.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
 
                     {/* Hover overlay */}
                     <div className={cn(
@@ -249,13 +235,6 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
                         <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                      </div>
-                    )}
-
-                    {/* "Coming soon" badge for styles without preview */}
-                    {!hasImage && (
-                      <div className="absolute top-2 left-2 px-2 py-1 bg-slate-800/80 rounded text-xs text-slate-400">
-                        Preview coming soon
                       </div>
                     )}
                   </div>
