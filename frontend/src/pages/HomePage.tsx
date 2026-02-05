@@ -15,7 +15,6 @@ import type {
   ImageVersion,
 } from '../api/types';
 import type { AplusModule, AplusViewportMode } from '../components/preview-slots/AplusSection';
-import { getActiveImagePath } from '../components/preview-slots/AplusSection';
 import type { SlotStatus } from '../components/preview-slots/ImageSlot';
 import { useCredits } from '../contexts/CreditContext';
 import { OutOfCreditsModal } from '../components/OutOfCreditsModal';
