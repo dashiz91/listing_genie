@@ -27,6 +27,8 @@ Unlike generic AI image wrappers, REDDAI uses a multi-stage Art Director pipelin
 │   /auth      → Authentication (login/signup)                    │
 │   /app       → Listing Generator (protected, requires auth)     │
 │   /app/projects → Projects page (saved listings history)        │
+│   /app/assets   → Assets library (logos, style refs, generated) │
+│   /app/settings → Settings (brand presets, credits, account)    │
 │                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
@@ -43,7 +45,9 @@ Unlike generic AI image wrappers, REDDAI uses a multi-stage Art Director pipelin
 │       ├── pages/LandingPage.tsx      # Marketing landing        │
 │       ├── pages/AuthPage.tsx         # Login/Signup             │
 │       ├── pages/HomePage.tsx         # Split-screen generator   │
-│       └── pages/ProjectsPage.tsx     # Saved projects history   │
+│       ├── pages/ProjectsPage.tsx     # Saved projects history   │
+│       ├── pages/AssetsPage.tsx       # Assets library           │
+│       └── pages/SettingsPage.tsx     # Settings & credits       │
 │                                                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
@@ -56,6 +60,7 @@ Unlike generic AI image wrappers, REDDAI uses a multi-stage Art Director pipelin
 │       │   ├── gemini_service.py          # Gemini API (generate/edit)     │
 │       │   ├── gemini_vision_service.py   # Vision analysis + frameworks   │
 │       │   ├── design_architect_service.py # Framework generation          │
+│       │   ├── credits_service.py         # Credits system & pricing       │
 │       │   ├── image_utils.py             # Canvas compositor, resizing    │
 │       │   └── supabase_storage_service.py # Cloud storage                 │
 │       ├── prompts/              # AI prompts & templates        │
@@ -384,6 +389,23 @@ GET    /api/projects/                   List user's projects (paginated)
 GET    /api/projects/{session_id}       Get project details
 PATCH  /api/projects/{session_id}       Rename project
 DELETE /api/projects/{session_id}       Delete project and images
+```
+
+### Assets
+```
+GET /api/assets/                        List user's assets (logos, style-refs, products, generated)
+```
+
+### Settings & Credits
+```
+GET   /api/settings/                    Get all settings (brand presets, usage, credits)
+GET   /api/settings/brand-presets       Get brand presets
+PATCH /api/settings/brand-presets       Update brand presets
+GET   /api/settings/usage               Get usage statistics
+GET   /api/settings/credits             Get credits balance and plan info
+GET   /api/settings/plans               Get available pricing plans
+POST  /api/settings/credits/estimate    Estimate cost for an operation
+GET   /api/settings/credits/model-costs Get credit costs per model/operation
 ```
 
 ### Health
@@ -778,36 +800,76 @@ Create these buckets in Supabase Storage:
 
 ## AI Models & Cost
 
-| Model | Role | Cost |
-|-------|------|------|
-| `gemini-3-flash-preview` | Vision analysis, framework gen | ~$0.50/1M input, $3/1M output |
-| `gemini-2.0-flash` | Text generation (visual scripts, design architect) | ~$0.10/1M input, $0.40/1M output |
-| `gemini-3-pro-image-preview` | Image generation & editing | ~$0.134/image (1K), $0.0011/input image |
+| Model | Role | API Cost | Credits |
+|-------|------|----------|---------|
+| `gemini-2.5-flash` | Fast image generation | ~$0.039/image | 1 credit |
+| `gemini-3-pro-image-preview` | Best quality image generation | ~$0.134/image | 3 credits |
+| `gemini-3-flash-preview` | Vision analysis, framework gen | ~$0.50/1M input | 1 credit |
 
-**Estimated cost per full listing** (5 listing images + 4 framework previews + 6 A+ desktop + 6 A+ mobile):
-- ~21 image generations × $0.134 = ~$2.81
-- + vision/text calls ~$0.20
-- **Total: ~$3.00 per full listing generation** (before regenerations/edits)
+## Credits System
+
+Credits are the internal currency for image generation. Users purchase/earn credits, which are deducted when generating images.
+
+### Credit Costs by Operation
+
+| Operation | Credits | Notes |
+|-----------|---------|-------|
+| Framework Analysis | 1 | Vision/text analysis |
+| Framework Preview | 1 | Always uses Flash |
+| Listing Image (Flash) | 1 | Fast generation |
+| Listing Image (Pro) | 3 | Best quality |
+| A+ Module (Flash) | 1 | Fast generation |
+| A+ Module (Pro) | 3 | Best quality |
+| A+ Mobile Transform | 1 | Edit API |
+| Edit Image | 1 | Edit API |
+
+### Full Listing Cost
+
+| Model | Total Credits | Breakdown |
+|-------|---------------|-----------|
+| **Pro (best)** | **47 credits** | 1 analysis + 4 previews + 18 listing (6×3) + 18 A+ (6×3) + 6 mobile |
+| **Flash (fast)** | **23 credits** | 1 analysis + 4 previews + 6 listing + 6 A+ + 6 mobile |
+
+### Pricing Plans
+
+| Plan | Price | Credits | Full Listings (Pro) |
+|------|-------|---------|---------------------|
+| Free | $0 | 30/day | ~0.6/day |
+| Starter | $15/mo | 300/mo | ~6/mo |
+| Pro | $49/mo | 1000/mo | ~21/mo |
+| Business | $149/mo | 3000/mo | ~64/mo |
+
+### Admin Access
+
+Admin users (configured in `ADMIN_EMAILS` env var) have unlimited credits and bypass all credit checks.
+
+Default admin: `robertoxma@hotmail.com`
+
+### Key Files
+
+- `app/services/credits_service.py` - Credit costs, plans, check/deduct logic
+- `app/api/endpoints/settings.py` - `/credits`, `/plans`, `/credits/estimate` endpoints
+- `app/config.py` - `admin_emails` configuration
 
 ## Generation Flow Summary
 
 ```
 User uploads photos + fills product info
-  → /frameworks/analyze (vision + 4 preview images)     ~4 calls
+  → /frameworks/analyze (vision + 4 preview images)     ~5 credits
   → User picks framework
-  → /frameworks/generate (5 listing images)              ~5 calls
-  → /aplus/script (visual script via text gen)           ~1 call
-  → /aplus/hero (hero pair, split into modules 0+1)      ~1 call
-  → /aplus/module × 4 (canvas continuity for 2-5)        ~4 calls
-  → /aplus/mobile × 6 (desktop→mobile transforms)        ~6 calls
-                                                    Total: ~21 image calls
+  → /frameworks/generate (6 listing images)              ~18 credits (Pro)
+  → /aplus/script (visual script via text gen)           ~0 credits (text only)
+  → /aplus/hero (hero pair, split into modules 0+1)      ~3 credits (Pro)
+  → /aplus/module × 4 (canvas continuity for 2-5)        ~12 credits (Pro)
+  → /aplus/mobile × 6 (desktop→mobile transforms)        ~6 credits
+                                                    Total: ~47 credits (Pro)
 ```
 
 ## Future Scope / Roadmap
 - ASIN import (scrape Amazon listing to pre-fill product info)
 - Alt text generation per image (SEO)
 - Seller Central export (ZIP with correct filenames/sizes)
-- Credit-based pricing system (Stripe integration)
+- Stripe integration for paid plans
 - More A+ section types (comparison tables, text+image)
 - Batch generation for multiple products
 - Social login (Google, GitHub)
