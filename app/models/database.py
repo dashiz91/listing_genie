@@ -58,9 +58,9 @@ class GenerationSession(Base):
 
     # Product information
     product_title = Column(String(200), nullable=False)
-    feature_1 = Column(String(100), nullable=True)  # Now optional
-    feature_2 = Column(String(100), nullable=True)  # Now optional
-    feature_3 = Column(String(100), nullable=True)  # Now optional
+    feature_1 = Column(String(500), nullable=True)  # Now optional
+    feature_2 = Column(String(500), nullable=True)  # Now optional
+    feature_3 = Column(String(500), nullable=True)  # Now optional
     target_audience = Column(String(150), nullable=True)  # Now optional
 
     # Brand & Style

@@ -86,6 +86,18 @@ def init_db():
         except Exception as e:
             logger.warning(f"Could not add columns to prompt_history: {e}")
 
+    # Widen feature columns from VARCHAR(100) to VARCHAR(500) for ASIN-imported long features
+    if "generation_sessions" in table_names and "postgresql" in SQLALCHEMY_DATABASE_URL:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE generation_sessions ALTER COLUMN feature_1 TYPE VARCHAR(500)"))
+                conn.execute(text("ALTER TABLE generation_sessions ALTER COLUMN feature_2 TYPE VARCHAR(500)"))
+                conn.execute(text("ALTER TABLE generation_sessions ALTER COLUMN feature_3 TYPE VARCHAR(500)"))
+                conn.commit()
+                logger.info("Widened feature_1/2/3 columns to VARCHAR(500)")
+        except Exception as e:
+            logger.warning(f"Could not widen feature columns (may already be correct): {e}")
+
     # Add email column to user_settings (for admin lookup by email)
     if "user_settings" in table_names:
         try:
