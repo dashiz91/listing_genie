@@ -4,6 +4,7 @@ import type { AplusModuleType, ImageVersion } from '@/api/types';
 import { APLUS_DIMENSIONS, APLUS_MOBILE_DIMENSIONS } from '@/api/types';
 import { apiClient } from '@/api/client';
 import { PromptModal } from '@/components/PromptModal';
+import { GenerationLoader } from '@/components/generation-loader';
 import { ImageActionOverlay } from '@/components/shared/ImageActionOverlay';
 import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -451,27 +452,33 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                 );
               })()}
 
-              {/* Generating: spinner */}
+              {/* Generating: compact loader */}
               {mStatus === 'generating' && (
                 <div
-                  className={cn("relative w-full border-2 border-gray-200 bg-gray-50 overflow-hidden", imageRounding)}
+                  className={cn("relative w-full overflow-hidden", imageRounding)}
                   style={{ paddingBottom: `${Math.min(aspectPercent, isMobile ? 75 : 60)}%` }}
                 >
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                    <div className="w-8 h-8 border-2 border-gray-300 rounded-full animate-spin" style={{ borderTopColor: accentColor }} />
-                    <p className="text-sm text-gray-500">
-                      {isMobile ? 'Generating mobile version...' : `Generating ${moduleLabel}...`}
-                    </p>
+                  <div className="absolute inset-0">
+                    <GenerationLoader
+                      imageType={isMobile ? `aplus_${idx}_mobile` : `aplus_${idx}`}
+                      accentColor={accentColor}
+                      estimatedSeconds={15}
+                      compact={true}
+                      className="w-full h-full"
+                    />
+                    {/* Cancel button overlay (appears after 5s) */}
                     {stuckModules.has(idx) && onCancelModule && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onCancelModule(idx, isMobile ? 'mobile' : 'desktop');
-                        }}
-                        className="text-xs font-medium text-slate-700 bg-white border border-slate-300 px-3 py-1.5 rounded-md transition-colors shadow-sm hover:bg-slate-50"
-                      >
-                        Cancel
-                      </button>
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onCancelModule(idx, isMobile ? 'mobile' : 'desktop');
+                          }}
+                          className="text-xs font-medium text-slate-300 bg-slate-700/80 border border-slate-600 px-3 py-1.5 rounded-md transition-colors shadow-sm hover:bg-slate-600/80"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

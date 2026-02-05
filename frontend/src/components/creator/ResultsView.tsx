@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { normalizeColors } from '@/lib/utils';
 import type { SessionImage, DesignFramework, ReferenceImage, AplusVisualScript } from '@/api/types';
 import { AmazonListingPreview } from '../amazon-preview';
+import { GenerationProgressBar } from '../amazon-preview/GenerationProgressBar';
+import { CelebrationOverlay } from '../amazon-preview/CelebrationOverlay';
 import { AplusSection, type AplusModule, type AplusViewportMode } from '../preview-slots/AplusSection';
 import type { ListingVersionState } from '@/pages/HomePage';
 
@@ -52,6 +54,11 @@ interface ResultsViewProps {
   availableReferenceImages: ReferenceImage[];
   onRetry: () => void;
 
+  // Generation state
+  isGenerating?: boolean;
+  showGenerationCelebration?: boolean;
+  onCelebrationComplete?: () => void;
+
   // Navigation
   onBackToEditor: () => void;
   onOpenAdvancedSettings: () => void;
@@ -93,6 +100,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   onCancelGeneration,
   availableReferenceImages,
   onRetry,
+  isGenerating = false,
+  showGenerationCelebration = false,
+  onCelebrationComplete,
   onBackToEditor,
   onOpenAdvancedSettings,
   onStartOver,
@@ -144,6 +154,17 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Generation progress bar */}
+      <GenerationProgressBar images={images} isGenerating={isGenerating} />
+
+      {/* Celebration overlay */}
+      <CelebrationOverlay
+        isVisible={showGenerationCelebration}
+        onComplete={onCelebrationComplete}
+        message="Images Ready!"
+        subMessage="Your listing images have been generated"
+      />
 
       {/* Full-width Amazon preview */}
       <div className="max-w-7xl mx-auto">

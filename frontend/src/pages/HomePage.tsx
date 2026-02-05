@@ -131,13 +131,20 @@ export const HomePage: React.FC = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const sessionCreatingRef = useRef<Promise<string> | null>(null);
-  const [generationStatus, setGenerationStatus] = useState<GenerationStatus>('pending');
+  const [, setGenerationStatus] = useState<GenerationStatus>('pending');
+  const generationStatusRef = useRef<GenerationStatus>('pending');
   const [images, setImages] = useState<SessionImage[]>([]);
 
   // Keep ref in sync with state
   const updateSessionId = useCallback((id: string | null) => {
     sessionIdRef.current = id;
     setSessionId(id);
+  }, []);
+
+  // Update both state and ref to avoid stale closures in polling
+  const updateGenerationStatus = useCallback((status: GenerationStatus) => {
+    generationStatusRef.current = status;
+    setGenerationStatus(status);
   }, []);
 
   // UI state
@@ -149,6 +156,23 @@ export const HomePage: React.FC = () => {
   // View state: 'create' for the clean editor, 'results' for full-width Amazon preview
   const [view, setView] = useState<'create' | 'results'>(hasProjectToLoad ? 'results' : 'create');
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
+
+  // Generation celebration state
+  const [showGenerationCelebration, setShowGenerationCelebration] = useState(false);
+  const prevIsGeneratingRef = useRef(false);
+
+  // Detect generation completion and trigger celebration
+  useEffect(() => {
+    const wasGenerating = prevIsGeneratingRef.current;
+    prevIsGeneratingRef.current = isGenerating;
+
+    if (wasGenerating && !isGenerating) {
+      const completedCount = images.filter(img => img.status === 'complete').length;
+      if (completedCount >= 3) {
+        setShowGenerationCelebration(true);
+      }
+    }
+  }, [isGenerating, images]);
 
   // Out of credits modal state
   const [outOfCreditsOpen, setOutOfCreditsOpen] = useState(false);
@@ -298,7 +322,7 @@ export const HomePage: React.FC = () => {
 
         // 6. Restore session and images
         updateSessionId(project.session_id);
-        setGenerationStatus(project.status as GenerationStatus);
+        updateGenerationStatus(project.status as GenerationStatus);
 
         const sessionImages: SessionImage[] = project.images.map((img) => ({
           type: img.image_type,
@@ -403,20 +427,22 @@ export const HomePage: React.FC = () => {
   }, []);
 
   // Poll for generation status
+  // NOTE: generationStatus is intentionally excluded from deps to prevent
+  // the interval from being torn down and recreated on every image completion.
+  // We use generationStatusRef instead to check current status inside the callback.
   useEffect(() => {
-    if (!sessionId || generationStatus === 'complete' || generationStatus === 'failed') {
-      return;
-    }
-
-    if (!isGenerating) {
+    if (!sessionId || !isGenerating) {
       return;
     }
 
     const pollStatus = async () => {
+      // Check ref (not state) to avoid stale closure
+      if (generationStatusRef.current === 'complete' || generationStatusRef.current === 'failed') return;
+
       try {
         const response = await apiClient.getSessionImages(sessionId);
         setImages(response.images);
-        setGenerationStatus(response.status);
+        updateGenerationStatus(response.status);
 
         // Capture version snapshots for newly completed images
         response.images.forEach((img: SessionImage) => {
@@ -441,7 +467,7 @@ export const HomePage: React.FC = () => {
 
     const interval = setInterval(pollStatus, 2000);
     return () => clearInterval(interval);
-  }, [sessionId, generationStatus, isGenerating]);
+  }, [sessionId, isGenerating, updateGenerationStatus]);
 
   // Features array for results view
   const features = useMemo(
@@ -657,7 +683,7 @@ export const HomePage: React.FC = () => {
       );
 
       updateSessionId(response.session_id);
-      setGenerationStatus(response.status);
+      updateGenerationStatus(response.status);
       // Persist session to URL for refresh resilience
       setSearchParams({ session: response.session_id }, { replace: true });
 
@@ -757,7 +783,7 @@ export const HomePage: React.FC = () => {
 
     setError(null);
     setIsGenerating(true);
-    setGenerationStatus('processing');
+    updateGenerationStatus('processing');
 
     // Initialize all 6 images as pending (will be set to processing by handleGenerateSingle)
     setImages([
@@ -783,9 +809,9 @@ export const HomePage: React.FC = () => {
     const successCount = results.filter((r) => r.status === 'fulfilled').length;
 
     if (anyFailed) {
-      setGenerationStatus('partial');
+      updateGenerationStatus('partial');
     } else {
-      setGenerationStatus('complete');
+      updateGenerationStatus('complete');
     }
     setIsGenerating(false);
 
@@ -813,9 +839,9 @@ export const HomePage: React.FC = () => {
     if (!sessionId) return;
 
     try {
-      setGenerationStatus('processing');
+      updateGenerationStatus('processing');
       const response = await apiClient.retryFailedImages(sessionId);
-      setGenerationStatus(response.status);
+      updateGenerationStatus(response.status);
 
       const sessionImages: SessionImage[] = response.images.map((img) => ({
         type: img.image_type,
@@ -1718,7 +1744,7 @@ export const HomePage: React.FC = () => {
     setProductAnalysis('');
     setProductAnalysisRaw(null);
     updateSessionId(null);
-    setGenerationStatus('pending');
+    updateGenerationStatus('pending');
     setImages([]);
     setIsAnalyzing(false);
     setIsGenerating(false);
@@ -1877,6 +1903,9 @@ export const HomePage: React.FC = () => {
           onCancelGeneration={handleCancelGeneration}
           availableReferenceImages={availableReferenceImages}
           onRetry={handleRetry}
+          isGenerating={isGenerating}
+          showGenerationCelebration={showGenerationCelebration}
+          onCelebrationComplete={() => setShowGenerationCelebration(false)}
           onBackToEditor={() => setView('create')}
           onOpenAdvancedSettings={() => setAdvancedSettingsOpen(true)}
           onStartOver={handleStartOver}
