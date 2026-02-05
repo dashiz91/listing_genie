@@ -563,6 +563,14 @@ todo_list/
 - **RAW IDEAS section (top)** — User dumps messy ideas here quickly
 - **CURATED BY CLAUDE section (bottom)** — Agent organizes pending/completed items
 
+**How we interact with to_do.txt:**
+1. **User** dumps raw ideas in the RAW IDEAS section anytime (messy is fine)
+2. **Agent** periodically curates: moves items from RAW to CURATED section with clean summaries
+3. **Agent** updates COMPLETED when stories are done
+4. **Agent** syncs curated items to `backlog.md` for detailed tracking
+5. **User** can correct agent if items are marked wrong (e.g., "c is not done")
+6. **Never delete** user's raw notes without permission
+
 ### How It Works
 
 1. **User** adds raw ideas to `backlog.md`
