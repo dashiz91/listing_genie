@@ -12,6 +12,7 @@ class ImageTypeEnum(str, Enum):
     INFOGRAPHIC_1 = "infographic_1"
     INFOGRAPHIC_2 = "infographic_2"
     LIFESTYLE = "lifestyle"
+    TRANSFORMATION = "transformation"  # Image 5: Before/After life state
     COMPARISON = "comparison"
     STYLE_PREVIEW = "style_preview"
     APLUS_0 = "aplus_0"

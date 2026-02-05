@@ -505,6 +505,13 @@ export const HomePage: React.FC = () => {
         colorMode = 'ai_decides';
       }
 
+      // Determine style reference path:
+      // 1. If we just uploaded a new style ref, use that
+      // 2. If "use exact style" toggle is on, use the original style ref path
+      // 3. Otherwise, no style reference
+      const effectiveStyleRefPath = uploadedStyleRefPath ||
+        (useOriginalStyleRef && originalStyleRefPath ? originalStyleRefPath : undefined);
+
       // Call API
       const response = await apiClient.analyzeFrameworks({
         product_title: formData.productTitle,
@@ -516,9 +523,9 @@ export const HomePage: React.FC = () => {
         primary_color: primaryColor,
         color_mode: colorMode,
         locked_colors: lockedColors,
-        style_reference_path: uploadedStyleRefPath,
+        style_reference_path: effectiveStyleRefPath,
         framework_count: formData.styleCount, // Number of styles to generate (1-4)
-        skip_preview_generation: useOriginalStyleRef,
+        skip_preview_generation: useOriginalStyleRef && !!effectiveStyleRefPath, // Only skip if we have a style ref
       });
 
       setProductAnalysis(response.product_analysis);
