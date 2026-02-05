@@ -615,11 +615,11 @@ User value / problem being solved
 When finishing tasks or ending a session, **always clean up the todo_list folder**:
 
 1. **Move completed stories** from `ready/` to `done/`
-2. **Update `backlog.md`** - move completed items to the "Completed" section at the bottom
-3. **Remove stale files** - delete any orphaned `.txt` files or duplicates in the todo_list folder
+2. **Sync `to_do.txt` → `backlog.md`** - migrate new items from user's quick-dump file to proper backlog sections, mark completed items
+3. **Update `backlog.md`** - move completed items to the "Completed" section at the bottom
 4. **Verify `ready/` is clean** - only stories actively being worked should be here
 
-This prevents confusion about what's done vs pending and keeps the workflow organized.
+**IMPORTANT:** Do NOT delete `to_do.txt` - this is the user's quick-dump file for raw ideas. Just sync its contents to `backlog.md`.
 
 ---
 
