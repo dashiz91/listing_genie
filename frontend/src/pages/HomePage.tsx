@@ -1078,13 +1078,18 @@ export const HomePage: React.FC = () => {
         );
       } catch (err: any) {
         console.error('Hero pair generation failed:', err);
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setAplusModules((prev) =>
           prev.map((m, idx) =>
             idx === 0 || idx === 1
               ? {
                   ...m,
                   status: 'error' as SlotStatus,
-                  errorMessage: extractErrorMessage(err, 'Hero pair generation failed'),
+                  errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'Hero pair generation failed'),
                 }
               : m
           )
@@ -1166,13 +1171,18 @@ export const HomePage: React.FC = () => {
         );
       } catch (err: any) {
         console.error('A+ module generation failed:', err);
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setAplusModules((prev) =>
           prev.map((m, idx) =>
             idx === moduleIndex
               ? {
                   ...m,
                   status: 'error' as SlotStatus,
-                  errorMessage: extractErrorMessage(err, 'A+ generation failed'),
+                  errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'A+ generation failed'),
                 }
               : m
           )
@@ -1227,10 +1237,15 @@ export const HomePage: React.FC = () => {
         );
       } catch (err: any) {
         console.error('Hero pair generation failed:', err);
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setAplusModules((prev) =>
           prev.map((m, idx) =>
             idx === 0 || idx === 1
-              ? { ...m, status: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Hero pair generation failed') }
+              ? { ...m, status: 'error' as SlotStatus, errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'Hero pair generation failed') }
               : m
           )
         );
@@ -1282,10 +1297,15 @@ export const HomePage: React.FC = () => {
           );
         } catch (err: any) {
           console.error(`A+ module ${i} generation failed:`, err);
+          const creditError = parseCreditsError(err);
+          if (creditError.isCreditsError) {
+            setOutOfCreditsRequired(creditError.required);
+            setOutOfCreditsOpen(true);
+          }
           setAplusModules((prev) =>
             prev.map((m, idx) =>
               idx === i
-                ? { ...m, status: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'A+ generation failed') }
+                ? { ...m, status: 'error' as SlotStatus, errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'A+ generation failed') }
                 : m
             )
           );
@@ -1388,10 +1408,15 @@ export const HomePage: React.FC = () => {
         );
       } catch (err: any) {
         console.error('A+ module edit failed:', err);
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setAplusModules((prev) =>
           prev.map((m, i) =>
             i === moduleIndex
-              ? { ...m, status: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Edit failed') }
+              ? { ...m, status: 'error' as SlotStatus, errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'Edit failed') }
               : m
           )
         );
@@ -1433,10 +1458,15 @@ export const HomePage: React.FC = () => {
         );
       } catch (err: any) {
         console.error('Mobile A+ generation failed:', err);
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setAplusModules((prev) =>
           prev.map((m, i) =>
             i === moduleIndex
-              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Mobile generation failed') }
+              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'Mobile generation failed') }
               : m
           )
         );
@@ -1484,10 +1514,15 @@ export const HomePage: React.FC = () => {
         );
       } catch (err: any) {
         console.error(`Mobile A+ module ${i} generation failed:`, err);
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setAplusModules((prev) =>
           prev.map((mod, idx) =>
             idx === i
-              ? { ...mod, mobileStatus: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Mobile generation failed') }
+              ? { ...mod, mobileStatus: 'error' as SlotStatus, errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'Mobile generation failed') }
               : mod
           )
         );
@@ -1529,10 +1564,15 @@ export const HomePage: React.FC = () => {
         );
       } catch (err: any) {
         console.error('Mobile A+ regen failed:', err);
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setAplusModules((prev) =>
           prev.map((m, i) =>
             i === moduleIndex
-              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Mobile regen failed') }
+              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'Mobile regen failed') }
               : m
           )
         );
@@ -1573,10 +1613,15 @@ export const HomePage: React.FC = () => {
         );
       } catch (err: any) {
         console.error('Mobile A+ edit failed:', err);
+        const creditError = parseCreditsError(err);
+        if (creditError.isCreditsError) {
+          setOutOfCreditsRequired(creditError.required);
+          setOutOfCreditsOpen(true);
+        }
         setAplusModules((prev) =>
           prev.map((m, i) =>
             i === moduleIndex
-              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: extractErrorMessage(err, 'Mobile edit failed') }
+              ? { ...m, mobileStatus: 'error' as SlotStatus, errorMessage: creditError.isCreditsError ? 'Insufficient credits' : extractErrorMessage(err, 'Mobile edit failed') }
               : m
           )
         );
