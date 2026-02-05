@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeColors } from '@/lib/utils';
 import { apiClient } from '@/api/client';
 import type { DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
@@ -941,7 +941,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                       <p className="text-xs font-medium text-white truncate">{framework.framework_name}</p>
                       {/* Color palette preview */}
                       <div className="flex gap-1 mt-1">
-                        {framework.colors.slice(0, 4).map((color, i) => (
+                        {normalizeColors(framework.colors).slice(0, 4).map((color, i) => (
                           <div
                             key={i}
                             className="w-4 h-4 rounded-full border border-slate-600"
@@ -983,12 +983,12 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                       <div>
                         <h4 className="text-xs font-semibold text-slate-400 uppercase mb-2">Color Palette</h4>
                         <div className="flex flex-wrap gap-2">
-                          {fw.colors.map((color, i) => (
+                          {normalizeColors(fw.colors).map((color, i) => (
                             <div key={i} className="flex items-center gap-2 bg-slate-700/50 rounded-lg px-2 py-1">
                               <div className="w-5 h-5 rounded-full border border-slate-500" style={{ backgroundColor: color.hex }} />
                               <div>
-                                <p className="text-xs text-white font-medium">{color.name}</p>
-                                <p className="text-[10px] text-slate-400">{color.hex} — {color.role}</p>
+                                <p className="text-xs text-white font-medium">{color.name || 'Color'}</p>
+                                <p className="text-[10px] text-slate-400">{color.hex} — {color.role || 'color'}</p>
                               </div>
                             </div>
                           ))}

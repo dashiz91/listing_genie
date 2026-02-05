@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/utils';
+import { cn, normalizeColors } from '@/lib/utils';
 import { apiClient } from '@/api/client';
 import type { SessionImage, DesignFramework } from '@/api/types';
 import { PromptModal } from '@/components/PromptModal';
@@ -89,7 +89,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
 }) => {
   void _onGenerateAll; // Reserved for future "Generate All" button
   // Get accent color from framework
-  const accentColor = framework?.colors?.find((c) => c.role === 'primary')?.hex || '#C85A35';
+  const frameworkColors = framework ? normalizeColors(framework.colors) : [];
+  const accentColor = frameworkColors.find((c) => c.role === 'primary')?.hex || '#C85A35';
   // Local state
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
   const [selectedImageType, setSelectedImageType] = useState<string>('main');

@@ -9,7 +9,7 @@ AI-powered Amazon listing image generator that creates complete, visually cohesi
 ## What It Does
 
 Upload your product photos and REDDSTUDIO generates:
-- **5 Listing Images** — Hero, infographics, lifestyle, comparison shots
+- **6 Listing Images** — Hero, infographics, lifestyle, comparison, transformation shots
 - **6 A+ Content Modules** — Desktop + mobile versions with seamless transitions
 - **Cohesive Design** — All images follow a unified visual framework
 
@@ -26,6 +26,40 @@ Unlike generic AI image tools, REDDSTUDIO uses a multi-stage Art Director pipeli
 | Storage | Supabase Storage |
 | Database | PostgreSQL (prod/staging), SQLite (local) |
 | Hosting | Vercel (frontend), Railway (backend) |
+
+## Credits System
+
+REDDSTUDIO uses a credit-based system for image generation:
+
+| Operation | Credits | Notes |
+|-----------|---------|-------|
+| Framework Analysis | 1 | Vision analysis |
+| Framework Previews | 4 | 4 style previews |
+| Listing Image (Pro) | 3 | Best quality |
+| Listing Image (Flash) | 1 | Faster |
+| A+ Module (Pro) | 3 | Best quality |
+| A+ Mobile Transform | 1 | Desktop → Mobile |
+| Edit Image | 1 | Modifications |
+
+**Full Listing Cost:** ~47 credits (Pro) or ~23 credits (Flash)
+
+### Pricing Plans
+
+| Plan | Credits | Price |
+|------|---------|-------|
+| Free | 30/day | $0 |
+| Starter | 300/mo | $15/mo |
+| Pro | 1000/mo | $49/mo |
+| Business | 3000/mo | $149/mo |
+
+### Credit UI
+
+The app displays credits in three places:
+- **Sidebar Widget** — Shows current balance with color-coded status
+- **Generate Buttons** — Shows cost preview before actions
+- **Usage Toasts** — Confirms credits used after generation
+
+Admin users (configured via `ADMIN_EMAILS` env var) have unlimited credits.
 
 ## Quick Start
 

@@ -845,11 +845,49 @@ Admin users (configured in `ADMIN_EMAILS` env var) have unlimited credits and by
 
 Default admin: `robertoxma@hotmail.com`
 
+### Credit UI Components
+
+The credits system includes a complete frontend experience:
+
+**Credit Widget (Sidebar)**
+- Always visible in sidebar showing current balance
+- Admin users see "👑 ∞ UNLIMITED" with gold gradient styling
+- Regular users see numeric balance with color-coded status:
+  - Green (normal): >25% of plan credits remaining
+  - Orange (warning): 10-25% remaining
+  - Red (critical): <10% remaining
+- Expandable panel shows progress bar and "View Plans" link
+- Animated balance changes when credits are deducted
+
+**Cost Preview (Generate Buttons)**
+- Shows estimated credit cost below generate buttons
+- Format: "5 credits" or "18 credits" depending on operation
+- Updates based on selected AI model (Pro vs Flash)
+- Helps users understand cost before committing
+
+**Usage Toast (Post-Generation)**
+- Appears after successful generation showing credits used
+- Admin users see: "Admin mode - no credits deducted"
+- Regular users see: "-5 credits • 25 remaining"
+- Auto-dismisses after 4 seconds
+
+**Credit Context**
+- React context (`CreditContext`) provides credit state app-wide
+- Exposes: `balance`, `isAdmin`, `planName`, `planTier`, `refetch()`
+- `useCreditCost()` hook for estimating operation costs
+- `recordUsage()` updates local state immediately for responsiveness
+
 ### Key Files
 
+**Backend:**
 - `app/services/credits_service.py` - Credit costs, plans, check/deduct logic
 - `app/api/endpoints/settings.py` - `/credits`, `/plans`, `/credits/estimate` endpoints
 - `app/config.py` - `admin_emails` configuration
+
+**Frontend:**
+- `frontend/src/contexts/CreditContext.tsx` - Credit state provider & hooks
+- `frontend/src/components/CreditWidget.tsx` - Sidebar credit display
+- `frontend/src/components/Layout.tsx` - Integrates CreditWidget in sidebar
 
 ## Generation Flow Summary
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { PromptHistory } from '@/api/types';
 import { apiClient } from '@/api/client';
+import { normalizeColors } from '@/lib/utils';
 
 interface PromptModalProps {
   /** Session ID for fetching prompt data */
@@ -152,12 +153,12 @@ export const PromptModal: React.FC<PromptModalProps> = ({
                           </p>
                           {/* Colors */}
                           <div className="flex gap-1 mt-2">
-                            {prompt.designer_context.framework_summary.colors?.map((c: any, i: number) => (
+                            {normalizeColors(prompt.designer_context.framework_summary.colors).map((c, i) => (
                               <div
                                 key={i}
                                 className="w-6 h-6 rounded border border-slate-500"
                                 style={{ backgroundColor: c.hex }}
-                                title={`${c.name} (${c.role}): ${c.hex}`}
+                                title={`${c.name || 'Color'} (${c.role || 'color'}): ${c.hex}`}
                               />
                             ))}
                           </div>

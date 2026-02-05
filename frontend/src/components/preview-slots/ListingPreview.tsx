@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, normalizeColors } from '@/lib/utils';
 import { ComponentsPanel } from './ComponentsPanel';
 import { ImageSlot, SlotStatus } from './ImageSlot';
 import { AplusSection, AplusModule } from './AplusSection';
@@ -77,7 +77,8 @@ export const ListingPreview: React.FC<ListingPreviewProps> = ({
   isGenerating = false,
   className,
 }) => {
-  const accentColor = framework?.colors?.[0]?.hex || '#C85A35';
+  const frameworkColors = framework ? normalizeColors(framework.colors) : [];
+  const accentColor = frameworkColors[0]?.hex || '#C85A35';
 
   // Map session images to slot statuses
   const slotStatuses = useMemo(() => {
