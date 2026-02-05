@@ -293,13 +293,21 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   );
 
   // Submit regenerate with optional note
-  const handleRegenSubmit = useCallback(() => {
+  const handleRegenSubmit = useCallback(async () => {
     if (regenImageType) {
       const refPaths = regenFocusImages.getSelectedPaths();
-      console.log('[REGEN DEBUG] selectedPaths Set:', regenFocusImages.selectedPaths);
-      console.log('[REGEN DEBUG] getSelectedPaths():', refPaths);
+
+      // Upload extra file if present and get its path
+      if (regenFocusImages.extraFile) {
+        try {
+          const uploadResult = await apiClient.uploadImage(regenFocusImages.extraFile.file);
+          refPaths.push(uploadResult.file_path);
+        } catch (err) {
+          console.error('Failed to upload extra reference image:', err);
+        }
+      }
+
       const refs = refPaths.length > 0 ? refPaths : undefined;
-      console.log('[REGEN DEBUG] Sending refs:', refs);
       onRegenerateSingle?.(regenImageType, regenNote.trim() || undefined, refs);
       setImageCacheKey((prev) => ({ ...prev, [regenImageType]: Date.now() }));
       setRegenPanelOpen(false);
@@ -309,9 +317,20 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   }, [regenImageType, regenNote, onRegenerateSingle, regenFocusImages]);
 
   // Submit edit — version management is now in HomePage
-  const handleEditSubmit = useCallback(() => {
+  const handleEditSubmit = useCallback(async () => {
     if (editingImageType && editInstructions.trim().length >= 5) {
       const refPaths = focusImages.getSelectedPaths();
+
+      // Upload extra file if present and get its path
+      if (focusImages.extraFile) {
+        try {
+          const uploadResult = await apiClient.uploadImage(focusImages.extraFile.file);
+          refPaths.push(uploadResult.file_path);
+        } catch (err) {
+          console.error('Failed to upload extra reference image:', err);
+        }
+      }
+
       const refs = refPaths.length > 0 ? refPaths : undefined;
       onEditSingle?.(editingImageType, editInstructions.trim(), refs);
       setImageCacheKey((prev) => ({ ...prev, [editingImageType]: Date.now() }));

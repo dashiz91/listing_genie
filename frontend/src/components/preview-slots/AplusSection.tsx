@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { cn } from '@/lib/utils';
 import type { AplusModuleType, ImageVersion } from '@/api/types';
 import { APLUS_DIMENSIONS, APLUS_MOBILE_DIMENSIONS } from '@/api/types';
+import { apiClient } from '@/api/client';
 import { PromptModal } from '@/components/PromptModal';
 import { ImageActionOverlay } from '@/components/shared/ImageActionOverlay';
 import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker';
@@ -616,9 +617,20 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
             {/* Action buttons */}
             <div className="flex gap-3 pt-4">
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (regenModuleIndex !== null) {
                     const refPaths = regenFocusImages.getSelectedPaths();
+
+                    // Upload extra file if present and get its path
+                    if (regenFocusImages.extraFile) {
+                      try {
+                        const uploadResult = await apiClient.uploadImage(regenFocusImages.extraFile.file);
+                        refPaths.push(uploadResult.file_path);
+                      } catch (err) {
+                        console.error('Failed to upload extra reference image:', err);
+                      }
+                    }
+
                     const refs = refPaths.length > 0 ? refPaths : undefined;
                     if (isMobile) {
                       onRegenerateMobileModule?.(regenModuleIndex, regenNote.trim() || undefined, refs);
@@ -701,9 +713,20 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
             {/* Action buttons */}
             <div className="flex gap-3 pt-4">
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (editInstructions.trim().length >= 5 && editingModuleIndex !== null) {
                     const refPaths = focusImages.getSelectedPaths();
+
+                    // Upload extra file if present and get its path
+                    if (focusImages.extraFile) {
+                      try {
+                        const uploadResult = await apiClient.uploadImage(focusImages.extraFile.file);
+                        refPaths.push(uploadResult.file_path);
+                      } catch (err) {
+                        console.error('Failed to upload extra reference image:', err);
+                      }
+                    }
+
                     const refs = refPaths.length > 0 ? refPaths : undefined;
                     if (isMobile) {
                       onEditMobileModule?.(editingModuleIndex, editInstructions.trim(), refs);
