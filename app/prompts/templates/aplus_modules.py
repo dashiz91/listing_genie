@@ -55,8 +55,11 @@ Breathing room at edges — the design extends beyond the frame.
 
 ABSOLUTE RULES:
 - NEVER include website UI, Amazon navigation, browser chrome
-- Do NOT render text, headlines, logos in the image
-- Pure photographic/visual composition only
+- Render SHORT bold text baked into the image (headlines 2-5 words max)
+- Render brand name / product name prominently
+- If BRAND_LOGO reference image is provided, reproduce the logo
+- Use EXACT framework font names and hex colors for all text
+- HIGH CONTRAST text — light on dark, dark on light. Readable at 50% zoom.
 """
 
 APLUS_CONTINUITY_ADDITION = """
@@ -238,20 +241,50 @@ STRUCTURE — THE {module_count}-MODULE ARC:
 Modules 0+1 = HERO PAIR. ONE continuous image split in half.
 Product DRAMATICALLY LARGE, filling full height of both modules combined.
 Module 0: Top portion (50-60% of product visible, cropped at bottom).
-Module 1: Reveals the rest + brand/product name as text.
-Together: "wow" moment — not information, pure visual impact.
+Module 1: Reveals the rest + brand name + product name as bold text.
+Together: "wow" moment — brand statement + visual impact.
 
-Modules 2-5 = INDEPENDENT editorial compositions. Each one:
-- SHORT EVOCATIVE HEADLINE (2-5 words) — feeling, not feature
-- Supporting body copy that creates DESIRE, not description
-- Optional spec callouts (only if they feel impressive, not just informative)
-- Product from a DIFFERENT angle each time
-- Clean background (solid or subtle gradient — NOT busy scenes)
+Modules 2-5 = INDEPENDENT editorial compositions. Each one MUST use a
+DIFFERENT archetype (see below). Variety is what makes premium A+ stand out.
 
-HEADLINE EXAMPLES:
-- WRONG: "Water-Tight Interior" → RIGHT: "Every Morning, Fresh"
-- WRONG: "Premium Ceramic Material" → RIGHT: "Made to Last"
-- WRONG: "8 inches tall" → RIGHT: "A Quiet Presence"
+═══════════════════════════════════════════════════════════════════════════════
+                    MODULE DESIGN ARCHETYPES
+═══════════════════════════════════════════════════════════════════════════════
+
+Assign ONE archetype per module — EVERY module MUST use a DIFFERENT archetype.
+This creates the visual variety seen in Apple, Sony, Bose, GoPro, Anker A+ pages.
+
+"hero_brand": Large product + bold brand name + product name + tagline
+  → Text: Product name LARGE, brand name, short tagline (2-4 words)
+  → Always modules 0+1 (hero pair)
+  → Think: Bose burgundy monochrome, Sony Bravia hero
+
+"exploded_detail": Product broken into components, extreme close-ups of internals
+  → Text: Component labels (1-2 words each: "ND Filter", "Macro Lens", "USB-C Port")
+  → Think: GoPro lens exploded view, Dyson cutaway, Anker charger internals
+
+"in_the_box": All included items laid out cleanly on solid background with labels
+  → Text: "WHAT'S INCLUDED" header + item name labels
+  → Think: Nintendo Switch unboxing layout, Apple AirPods box contents
+
+"lifestyle_action": Product in dramatic real-world use with a person
+  → Text: One aspirational headline (2-4 words) OR no text
+  → Think: Stanley pickleball action, New Balance running, GoPro surfing
+
+"trust_authority": Social proof, awards, stats — the credibility module
+  → Text: 2-3 stat badges ("#1 Brand", "6.5M+ Users", "35 Patents", "Award Winner")
+  → Think: Levoit "#1 HUMIDIFIER BRAND", Anker "#1 Mobile Charging Brand"
+
+"product_in_context": Product shown in natural environment (room, desk, kitchen, shelf)
+  → Text: One evocative headline (2-4 words) OR no text
+  → Think: Sony TV on wall, Bose headphones on nightstand, YETI cooler at campsite
+
+"dramatic_mono": Single product on bold solid color, dramatic studio lighting, minimal
+  → Text: Brand name only, or NO text — let the product speak
+  → Think: Bose burgundy/ice blue monochrome shots, Apple product-on-white
+
+DIVERSITY RULE: Each module MUST use a DIFFERENT archetype. If 6 modules,
+use 6 different archetypes. NEVER repeat the same archetype twice.
 
 BACKGROUND RHYTHM — Alternate using ONLY framework palette colors:
 - Modules 0+1 (hero): Framework primary color
@@ -261,23 +294,9 @@ BACKGROUND RHYTHM — Alternate using ONLY framework palette colors:
 - Module 5: Return to primary/secondary (bookend)
 
 Every background MUST be from the framework palette or a tint/shade of one.
-The palette IS the brand identity.
 
-LAYOUT ALTERNATION — Ping-pong composition:
-- Module 2: Product LEFT, text RIGHT
-- Module 3: Text LEFT, product RIGHT
-- Module 4: Product LEFT, text RIGHT
-- Module 5: Text LEFT, product RIGHT
-
-PRODUCT ANGLE PROGRESSION:
-- Modules 0+1: Dramatic tilt, close-up, HUGE
-- Module 2: 3/4 angle, inviting exploration
-- Module 3: Detail close-up, reveals craft
-- Module 4: In context, shows belonging
-- Module 5: Final beauty shot, confident
-
-MODULE EMOTIONAL ROLES (pick best for THIS audience):
-- "hero_reveal": Pure visual impact — "Wow" (always modules 0+1)
+MODULE EMOTIONAL ROLES (pair with archetype):
+- "hero_reveal": Pure visual impact — "Wow" (always modules 0+1, archetype: hero_brand)
 - "intrigue": Draw them deeper — "Tell me more"
 - "trust": Prove quality through craft — "This is well-made"
 - "belonging": Show their life with it — "This fits me"
@@ -288,32 +307,36 @@ MODULE EMOTIONAL ROLES (pick best for THIS audience):
                          TYPOGRAPHY — WORDS THAT FEEL
 ═══════════════════════════════════════════════════════════════════════════════
 
-HERO PAIR (modules 0+1):
-- Module 0: NO text. Pure visual impact. Let the product speak.
-- Module 1: Brand name (smaller) + Product name (large, bold). Nothing else.
+TEXT IN IMAGE — PREMIUM BRAND STANDARD:
+Premium Amazon A+ always renders text BAKED INTO the image. This is non-negotiable.
 
-FEATURE MODULES (2-5):
-- HEADLINE: 2-5 words that create FEELING, not describe features
-- BODY COPY: 1-2 sentences that paint a moment, not list specs
-- SPEC CALLOUTS: Only if impressive — "4,900 mAh" with "All-day confidence"
+HERO PAIR (modules 0+1):
+- Module 0: Product dominates. Brand name can appear small at top.
+- Module 1: Brand name + Product name (large, bold). Short tagline optional.
+
+FEATURE MODULES (2-5) — text depends on archetype:
+- hero_brand: Brand name LARGE, product name, tagline
+- exploded_detail: Component labels (1-2 words each), arranged near parts
+- in_the_box: "WHAT'S INCLUDED" header + item labels
+- lifestyle_action: One aspirational headline (2-4 words) OR no text
+- trust_authority: 2-3 stat badges rendered as bold text/graphics
+- product_in_context: One evocative headline (2-4 words) OR no text
+- dramatic_mono: Brand name only OR no text
+
+TEXT RENDERING RULES:
+- ALL text SHORT — 2-5 words max per headline. Fewer words = cleaner.
+- Use EXACT framework font names and EXACT hex colors for text
+- HIGH CONTRAST: light text on dark, dark text on light. Always readable.
+- Text must be LARGE enough to read at 50% zoom
+- Keep text to ONE SIDE — never scatter across image
+- NO paragraphs, NO long sentences, NO fine print
+- Stat badges: bold number + short label ("6.5M+ Users", "#1 Brand")
 
 COPYWRITING RULES:
-- Headlines should feel like a whisper, not a shout
-- Body copy should create a scene, not explain a feature
-- Every word should make them want the product MORE
-
-WRONG COPY:
-- "Water-Tight Interior"
-- "Premium ceramic material ensures durability"
-- "Perfect for fresh flowers"
-
-RIGHT COPY:
-- "Every Morning, Fresh"
-- "The quiet ritual of arranging flowers in something beautiful"
-- (No feature explanation needed — the image shows it)
-
-Typography uses the EXACT framework fonts from the design system above.
-Headlines bold, body regular. Keep text to ONE SIDE — never scatter across image.
+- Headlines create FEELING, not describe features
+- WRONG: "Water-Tight Interior" → RIGHT: "Every Morning, Fresh"
+- WRONG: "Premium Ceramic Material" → RIGHT: "Made to Last"
+- Body copy paints a moment, not lists specs
 
 ⚠️  FONT/COLOR CONSISTENCY (NON-NEGOTIABLE):
 - Use the EXACT font names from the typography section — not "elegant serif"
@@ -350,9 +373,11 @@ hero_pair_prompt must include:
 Each banner receives:
 - `PRODUCT_PHOTO` — the actual product (always)
 - `STYLE_REFERENCE` — visual style direction (if available)
+- `BRAND_LOGO` — the brand's logo image (if available)
 - `PREVIOUS_MODULE` — banner above (modules 1+ only)
 
-Your prompts MUST reference PRODUCT_PHOTO and STYLE_REFERENCE by name.
+Your prompts MUST reference PRODUCT_PHOTO, STYLE_REFERENCE, and BRAND_LOGO by name.
+If BRAND_LOGO is provided, hero pair and trust/brand modules should reproduce it.
 
 ═══════════════════════════════════════════════════════════════════════════════
                          OUTPUT FORMAT
@@ -363,10 +388,11 @@ Respond with ONLY valid JSON:
   "narrative_theme": "Single sentence capturing the EMOTIONAL journey",
   "color_flow": "How palette evolves — which module gets which color",
   "background_strategy": "Rhythm pattern",
-  "hero_pair_prompt": "COMPLETE 200-350 word prompt for tall 4:3 hero image — FEELING first",
+  "hero_pair_prompt": "COMPLETE 200-350 word prompt for tall 4:3 hero image — MUST include brand name + product name as bold text in bottom half. Reference PRODUCT_PHOTO, STYLE_REFERENCE, and BRAND_LOGO by name.",
   "modules": [
     {{
       "index": 0,
+      "archetype": "hero_brand",
       "role": "hero_reveal",
       "emotional_beat": "awe",
       "viewer_thought": "Wow, this is beautiful",
@@ -377,26 +403,44 @@ Respond with ONLY valid JSON:
     }},
     {{
       "index": 1,
+      "archetype": "hero_brand",
       "role": "hero_reveal",
       "emotional_beat": "awe",
       "viewer_thought": "I want to know more",
       "headline": "Brand + Product Name",
       "mood": "Feeling",
-      "scene_description": "50-100 words: bottom half",
-      "render_text": {{"headline": null, "body_copy": null, "spec_callouts": null, "text_position": "left or right"}}
+      "scene_description": "50-100 words: bottom half — brand name + product name as text",
+      "render_text": {{"headline": "Product Name", "brand_name": "BRAND", "tagline": "Short tagline 2-4 words", "text_position": "center"}}
     }},
     {{
       "index": 2,
+      "archetype": "exploded_detail | in_the_box | lifestyle_action | trust_authority | product_in_context | dramatic_mono",
       "role": "intrigue | trust | belonging | desire | certainty",
       "emotional_beat": "intrigue",
       "viewer_thought": "What the viewer unconsciously thinks",
       "mood": "...",
       "scene_description": "OPTIONAL — only for continuity",
-      "render_text": {{"headline": "2-5 evocative words", "body_copy": "1-2 sentences that create a scene", "spec_callouts": [], "text_position": "left or right"}},
-      "generation_prompt": "COMPLETE 200-350 word prompt — FEELING first, then visuals..."
+      "render_text": {{
+        "headline": "2-5 evocative words OR null",
+        "brand_name": "BRAND or null",
+        "stat_badges": ["#1 Brand", "6.5M+ Users"],
+        "component_labels": ["Part Name", "Feature Name"],
+        "text_position": "left | right | center | scattered"
+      }},
+      "generation_prompt": "COMPLETE 200-350 word prompt — FEELING first, then visuals. MUST specify what text to render in the image and where."
     }}
   ]
 }}
+
+IMPORTANT: Each module index 2-5 MUST have a DIFFERENT archetype value.
+The render_text fields depend on archetype:
+- hero_brand: headline, brand_name, tagline
+- exploded_detail: component_labels, headline optional
+- in_the_box: headline ("WHAT'S INCLUDED"), component_labels for items
+- lifestyle_action: headline only (or null for no text)
+- trust_authority: stat_badges (2-3 bold stats), brand_name
+- product_in_context: headline only (or null for no text)
+- dramatic_mono: brand_name only (or null for no text)
 
 Generate exactly {module_count} modules. Each creates FEELING — no filler, no feature lists.
 """
@@ -425,12 +469,15 @@ Background world: {background_strategy}
 Seam technique: {edge_connection_strategy}
 
 YOUR FRAME — Module {module_index} of {module_count} ({module_role}):
+DESIGN ARCHETYPE: {module_archetype}
 Headline: "{module_headline}"
 Product treatment: {module_product_angle}
 Background: {module_background}
 Visual elements: {module_elements}
 THE FEELING: {module_mood}
 What the viewer thinks: {module_content_focus}
+
+{render_text_instruction}
 
 EDGE CONTRACTS:
 - Top edge resolves to: {top_edge}
@@ -446,12 +493,14 @@ FEELING FIRST:
 - Wide format (2.4:1) — cinematic, not catalog
 
 CRAFT NOTES:
-- Use product reference for REAL product. Honor materials and proportions.
-- Style reference = visual direction. Match mood, lighting, sophistication.
+- Use PRODUCT_PHOTO for REAL product. Honor materials and proportions.
+- Use STYLE_REFERENCE for visual direction. Match mood, lighting, sophistication.
+- If BRAND_LOGO is provided, reproduce it faithfully in the image where appropriate.
 - Brand colors in scene naturally — lighting, surfaces, atmosphere
 - Frame from a premium brand film, not a template
 - NEVER include website UI, Amazon navigation, browser chrome
-- Do NOT render text, headlines, logos in the image
+- Render text SHORT and BOLD — baked into the image like premium brand A+
+- Text must be LARGE enough to read at 50% zoom, HIGH CONTRAST
 
 {continuity_instruction}"""
 
@@ -500,6 +549,7 @@ The viewer should NOT be able to tell where the crop line is.
 REFERENCE IMAGES:
 - PRODUCT_PHOTO: The actual product — honor materials, proportions, character
 - STYLE_REFERENCE: Match this visual style, mood, and color treatment
+- BRAND_LOGO: If provided, reproduce this logo in the bottom half near brand name
 
 ═══ ART DIRECTOR'S CREATIVE BRIEF ═══
 
@@ -515,7 +565,9 @@ REFERENCE IMAGES:
 - ONE continuous photograph, NOT two stacked panels
 - Product naturally spans vertical center of image
 - Background: one continuous color/gradient top to bottom — no dividing lines
-- Text in lower third only, integrated naturally
+- Bottom half: brand name + product name as BOLD text, integrated naturally
+- If BRAND_LOGO provided, place logo in bottom half near brand name
+- Top half: pure product photography, minimal or no text
 - NEVER include website UI, Amazon navigation, browser chrome
 - Do NOT duplicate the product — show it ONCE, large, crossing center
 
@@ -677,6 +729,37 @@ def build_aplus_module_prompt(
 
     mod = modules[module_index]
 
+    # Extract archetype and render_text from visual script
+    module_archetype = mod.get("archetype", "product_in_context")
+    render_text = mod.get("render_text") or {}
+
+    # Build render_text instruction based on archetype
+    render_text_parts = []
+    if render_text:
+        headline = render_text.get("headline")
+        brand_name = render_text.get("brand_name")
+        tagline = render_text.get("tagline")
+        stat_badges = render_text.get("stat_badges", [])
+        component_labels = render_text.get("component_labels", [])
+        text_position = render_text.get("text_position", "left")
+
+        render_text_parts.append(f"TEXT RENDERING (bake into image, {text_position} side):")
+        if brand_name:
+            render_text_parts.append(f"- Brand name: \"{brand_name}\" — render prominently")
+        if headline:
+            render_text_parts.append(f"- Headline: \"{headline}\" — bold, large, readable at 50% zoom")
+        if tagline:
+            render_text_parts.append(f"- Tagline: \"{tagline}\" — smaller, below headline")
+        if stat_badges:
+            badges_str = ", ".join(f'"{b}"' for b in stat_badges)
+            render_text_parts.append(f"- Stat badges: {badges_str} — bold numbers, short labels")
+        if component_labels:
+            labels_str = ", ".join(f'"{l}"' for l in component_labels)
+            render_text_parts.append(f"- Component labels: {labels_str} — near their respective parts")
+        render_text_parts.append("- Use EXACT framework font names and hex colors for all text")
+        render_text_parts.append("- HIGH CONTRAST: light text on dark bg, dark text on light bg")
+    render_text_instruction = "\n".join(render_text_parts) if render_text_parts else "TEXT: Follow archetype guidelines for text rendering."
+
     # Position instructions with emotional context
     if module_index == 0:
         position_instruction = (
@@ -735,12 +818,14 @@ def build_aplus_module_prompt(
         module_index=module_index,
         module_count=module_count,
         module_role=mod.get("role", f"Module {module_index + 1}"),
+        module_archetype=module_archetype,
         module_headline=mod.get("headline", ""),
         module_product_angle=mod.get("product_angle", ""),
         module_background=mod.get("background_description", ""),
         module_elements=", ".join(mod.get("key_elements", [])),
         module_mood=mod.get("mood", ""),
         module_content_focus=mod.get("content_focus", ""),
+        render_text_instruction=render_text_instruction,
         top_edge=mod.get("top_edge", "Clean start"),
         bottom_edge=mod.get("bottom_edge", "Flows downward"),
         module_position=module_position,

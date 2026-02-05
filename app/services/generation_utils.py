@@ -182,8 +182,8 @@ def assemble_reference_images(
     Encodes all rules about which images to include for each type:
     - Listing (non-main): upload + additional + style_ref + logo
     - Listing (main): upload + additional + style_ref (no logo)
-    - A+ hero: upload + style_ref
-    - A+ module: upload + style_ref + previous (if chained)
+    - A+ hero: upload + style_ref + logo (as BRAND_LOGO)
+    - A+ module: upload + style_ref + logo (as BRAND_LOGO) + previous (if chained)
     - A+ canvas: canvas + upload + style_ref
     - Any with focus_overrides: only those images
     - Mobile transform: source desktop only (handled externally)
@@ -230,8 +230,10 @@ def assemble_reference_images(
             result.unnamed_paths.append(session.style_reference_path)
             result.history_meta.append({"type": "style_reference", "path": session.style_reference_path})
 
-    # Logo (listing non-main only, skip when focus overrides active)
-    if not use_focus and not is_aplus and image_type != "main" and session.logo_path:
+    # Logo (listing non-main + all A+ modules, skip when focus overrides active)
+    if not use_focus and image_type != "main" and session.logo_path:
+        if is_aplus and use_named:
+            result.named_images.append(("BRAND_LOGO", session.logo_path))
         result.unnamed_paths.append(session.logo_path)
         result.history_meta.append({"type": "logo", "path": session.logo_path})
 
