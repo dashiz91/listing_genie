@@ -1357,10 +1357,8 @@ export const HomePage: React.FC = () => {
         )
       );
 
-      let module1Path: string | undefined;
       try {
         const heroPairResult = await apiClient.generateAplusHeroPair(sessionId, undefined, undefined, formData.imageModel);
-        module1Path = heroPairResult.module_1.image_path;
 
         setAplusModules((prev) =>
           prev.map((m, idx) => {
@@ -1400,8 +1398,9 @@ export const HomePage: React.FC = () => {
         return; // Stop on hero pair failure
       }
 
-      // Step 3: Generate modules 2+ sequentially, using module 1's path as starting chain
-      let prevPath = module1Path;
+      // Step 3: Generate modules 2+ sequentially with canvas continuity.
+      // Skip chaining for module 2 — module 1 is a cut hero image that trips up generation.
+      let prevPath: string | undefined = undefined;
       for (let i = 2; i < aplusModules.length; i++) {
         setAplusModules((prev) =>
           prev.map((m, idx) =>
