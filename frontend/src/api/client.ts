@@ -21,6 +21,11 @@ import type {
   AplusVisualScriptResponse,
   ReplanResponse,
   HeroPairResponse,
+  AmazonAuthStatus,
+  AmazonAuthUrlResponse,
+  AmazonDisconnectResponse,
+  AmazonPushResponse,
+  AmazonPushStatusResponse,
 } from './types';
 
 // In production, use VITE_API_URL; in development, use relative /api (proxied by Vite)
@@ -680,6 +685,60 @@ class ApiClient {
    */
   async getUserCredits(userId: string): Promise<AdminUserCredits> {
     const response = await this.client.get<AdminUserCredits>(`/admin/users/${userId}/credits`);
+    return response.data;
+  }
+
+  // ============================================================================
+  // Amazon Seller Central Push
+  // ============================================================================
+
+  /**
+   * Check if the current user has connected their Amazon Seller Central account.
+   */
+  async getAmazonAuthStatus(): Promise<AmazonAuthStatus> {
+    const response = await this.client.get<AmazonAuthStatus>('/amazon/auth/status');
+    return response.data;
+  }
+
+  /**
+   * Get the Amazon OAuth authorization URL to redirect the seller to.
+   */
+  async getAmazonAuthUrl(): Promise<AmazonAuthUrlResponse> {
+    const response = await this.client.post<AmazonAuthUrlResponse>('/amazon/auth/url');
+    return response.data;
+  }
+
+  /**
+   * Disconnect the user's Amazon Seller Central account.
+   */
+  async disconnectAmazon(): Promise<AmazonDisconnectResponse> {
+    const response = await this.client.delete<AmazonDisconnectResponse>('/amazon/auth/disconnect');
+    return response.data;
+  }
+
+  /**
+   * Push listing images to Amazon Seller Central for a given ASIN/SKU.
+   */
+  async pushListingImages(
+    sessionId: string,
+    asin: string,
+    sku: string
+  ): Promise<AmazonPushResponse> {
+    const response = await this.client.post<AmazonPushResponse>('/amazon/push/listing-images', {
+      session_id: sessionId,
+      asin,
+      sku,
+    });
+    return response.data;
+  }
+
+  /**
+   * Get the status of an Amazon push job.
+   */
+  async getAmazonPushStatus(jobId: string): Promise<AmazonPushStatusResponse> {
+    const response = await this.client.get<AmazonPushStatusResponse>(
+      `/amazon/push/status/${jobId}`
+    );
     return response.data;
   }
 

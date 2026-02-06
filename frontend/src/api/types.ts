@@ -524,6 +524,39 @@ export interface ImageVersion {
 // A+ prompts use the same PromptHistory system as listing images.
 // Use getImagePrompt(sessionId, 'aplus_0') through 'aplus_4' to retrieve them.
 
+// ============================================================================
+// Amazon Seller Central Push
+// ============================================================================
+
+export interface AmazonAuthStatus {
+  connected: boolean;
+  seller_id?: string;
+  marketplace?: string;
+}
+
+export interface AmazonAuthUrlResponse {
+  auth_url: string;
+}
+
+export interface AmazonDisconnectResponse {
+  success: boolean;
+}
+
+export type AmazonPushJobStatus = 'queued' | 'uploading' | 'processing' | 'completed' | 'failed';
+
+export interface AmazonPushResponse {
+  job_id: string;
+  status: AmazonPushJobStatus;
+}
+
+export interface AmazonPushStatusResponse {
+  job_id: string;
+  status: AmazonPushJobStatus;
+  progress?: number;
+  message?: string;
+  error?: string;
+}
+
 // A+ Module dimensions (for UI reference)
 export const APLUS_DIMENSIONS: Record<AplusModuleType, { width: number; height: number }> = {
   full_image: { width: 1464, height: 600 },

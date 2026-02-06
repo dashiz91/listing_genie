@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { apiClient, UserSettings, AssetItem, PlanInfo, CreditsInfo, CreditAdjustmentResponse } from '../api/client';
+import type { AmazonAuthStatus } from '../api/types';
 import { useAuth } from '../contexts/AuthContext';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -40,6 +41,13 @@ export const SettingsPage: React.FC = () => {
   const [adminAdjusting, setAdminAdjusting] = useState(false);
   const [adminResult, setAdminResult] = useState<CreditAdjustmentResponse | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
+
+  // Amazon Seller Central state
+  const [amazonAuth, setAmazonAuth] = useState<AmazonAuthStatus | null>(null);
+  const [amazonLoading, setAmazonLoading] = useState(false);
+  const [amazonConnecting, setAmazonConnecting] = useState(false);
+  const [amazonDisconnecting, setAmazonDisconnecting] = useState(false);
+  const [amazonMessage, setAmazonMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -88,12 +96,47 @@ export const SettingsPage: React.FC = () => {
     }
   }, []);
 
+  const fetchAmazonAuth = useCallback(async () => {
+    setAmazonLoading(true);
+    try {
+      const data = await apiClient.getAmazonAuthStatus();
+      setAmazonAuth(data);
+    } catch (err) {
+      console.error('Failed to fetch Amazon auth status:', err);
+      setAmazonAuth({ connected: false });
+    } finally {
+      setAmazonLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSettings();
     fetchAssets();
     fetchPlans();
     fetchCredits();
-  }, [fetchSettings, fetchAssets, fetchPlans, fetchCredits]);
+    fetchAmazonAuth();
+  }, [fetchSettings, fetchAssets, fetchPlans, fetchCredits, fetchAmazonAuth]);
+
+  // Parse Amazon OAuth callback query params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const amazonConnect = params.get('amazon_connect');
+    if (amazonConnect === 'success') {
+      setAmazonMessage({ type: 'success', text: 'Amazon Seller Central connected successfully!' });
+      fetchAmazonAuth();
+      // Clean URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('amazon_connect');
+      window.history.replaceState({}, '', url.toString());
+    } else if (amazonConnect === 'error') {
+      const errorMsg = params.get('error_message') || 'Failed to connect Amazon account. Please try again.';
+      setAmazonMessage({ type: 'error', text: errorMsg });
+      const url = new URL(window.location.href);
+      url.searchParams.delete('amazon_connect');
+      url.searchParams.delete('error_message');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [fetchAmazonAuth]);
 
   const handleSaveBrandPresets = async () => {
     setIsSaving(true);
@@ -431,6 +474,129 @@ export const SettingsPage: React.FC = () => {
             <p className="text-xs text-slate-400">This Month</p>
           </div>
         </div>
+      </section>
+
+      {/* Amazon Seller Central Section */}
+      <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <svg className="w-5 h-5 text-[#FF9900]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14.1 13.3c-1.3 1-3.2 1.5-4.8 1.5-2.3 0-4.3-.8-5.9-2.2-.1-.1 0-.3.1-.2 1.7 1 3.7 1.5 5.8 1.5 1.4 0 3-.3 4.4-.9.2-.1.4.1.4.3zm1.2-1.4c-.2-.2-1.1-.1-1.5-.1-.1 0-.2-.1-.1-.2.7-.5 2-.4 2.1-.2.2.2 0 1.5-.7 2.1-.1.1-.2 0-.2-.1.2-.4.4-1.3.4-1.5z" />
+            <path d="M13.1 2.9C7.4 2.9 3.4 6.3 3.4 11c0 3 1.5 5.6 3.9 7.5.2.1.1.4-.1.4C5.2 19.3 2 17.3 2 12.7 2 7 6.8 2 13.1 2c3.7 0 7 1.8 8.9 4.5.1.2 0 .4-.2.3-1.4-.8-5.5-2.6-8.7-3.9z" />
+          </svg>
+          Amazon Seller Central
+        </h2>
+        <p className="text-sm text-slate-400 mb-6">
+          Connect your Amazon Seller Central account to push listing images directly to your live listings.
+        </p>
+
+        {amazonMessage && (
+          <div className={`rounded-lg p-3 text-sm mb-4 ${
+            amazonMessage.type === 'success'
+              ? 'bg-green-500/10 border border-green-500/50 text-green-400'
+              : 'bg-red-500/10 border border-red-500/50 text-red-400'
+          }`}>
+            {amazonMessage.text}
+          </div>
+        )}
+
+        {amazonLoading ? (
+          <div className="flex items-center gap-3 py-4">
+            <Spinner size="md" className="text-slate-400" />
+            <span className="text-sm text-slate-400">Checking connection...</span>
+          </div>
+        ) : amazonAuth?.connected ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+              <div className="w-8 h-8 bg-green-500/20 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-green-400">Connected</p>
+                <p className="text-xs text-slate-400">
+                  Seller ID: {amazonAuth.seller_id || 'N/A'}
+                  {amazonAuth.marketplace && ` | Marketplace: ${amazonAuth.marketplace}`}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+              disabled={amazonDisconnecting}
+              onClick={async () => {
+                if (!window.confirm('Disconnect your Amazon Seller Central account? You can reconnect anytime.')) return;
+                setAmazonDisconnecting(true);
+                setAmazonMessage(null);
+                try {
+                  await apiClient.disconnectAmazon();
+                  setAmazonAuth({ connected: false });
+                  setAmazonMessage({ type: 'success', text: 'Amazon account disconnected.' });
+                } catch (err) {
+                  console.error('Failed to disconnect:', err);
+                  setAmazonMessage({ type: 'error', text: 'Failed to disconnect. Please try again.' });
+                } finally {
+                  setAmazonDisconnecting(false);
+                }
+              }}
+            >
+              {amazonDisconnecting ? (
+                <>
+                  <Spinner size="sm" className="text-current mr-2" />
+                  Disconnecting...
+                </>
+              ) : (
+                'Disconnect Amazon Account'
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-slate-900/50 border border-slate-700/50 rounded-lg p-4">
+              <div className="w-8 h-8 bg-slate-700 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-300">Not Connected</p>
+                <p className="text-xs text-slate-500">Connect to push images directly to your Amazon listings</p>
+              </div>
+            </div>
+            <Button
+              className="bg-[#FF9900] hover:bg-[#e68a00] text-slate-900 font-medium"
+              disabled={amazonConnecting}
+              onClick={async () => {
+                setAmazonConnecting(true);
+                setAmazonMessage(null);
+                try {
+                  const { auth_url } = await apiClient.getAmazonAuthUrl();
+                  window.location.href = auth_url;
+                } catch (err) {
+                  console.error('Failed to get auth URL:', err);
+                  setAmazonMessage({ type: 'error', text: 'Failed to start Amazon connection. Please try again.' });
+                  setAmazonConnecting(false);
+                }
+              }}
+            >
+              {amazonConnecting ? (
+                <>
+                  <Spinner size="sm" className="text-current mr-2" />
+                  Connecting...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" />
+                  </svg>
+                  Connect Amazon Account
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </section>
 
       {/* Admin Credit Management Section - Only visible to admins */}

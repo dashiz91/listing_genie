@@ -6,6 +6,7 @@ import { GenerationProgressBar } from '../amazon-preview/GenerationProgressBar';
 import { CelebrationOverlay } from '../amazon-preview/CelebrationOverlay';
 import { AplusSection, type AplusModule, type AplusViewportMode } from '../preview-slots/AplusSection';
 import { WorkflowStepper, type WorkflowStep } from '../ui/workflow-stepper';
+import PushToAmazonButton from '../PushToAmazonButton';
 import type { ListingVersionState } from '@/pages/HomePage';
 
 interface ResultsViewProps {
@@ -181,6 +182,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 );
               })}
             </div>
+            {/* Push to Amazon (visible when session has generated images) */}
+            {sessionId && images.some(i => i.status === 'complete') && (
+              <PushToAmazonButton sessionId={sessionId} />
+            )}
             <button
               onClick={onOpenAdvancedSettings}
               className="px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 border border-slate-600 rounded-lg transition-colors"
