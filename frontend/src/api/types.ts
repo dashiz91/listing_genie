@@ -445,12 +445,15 @@ export interface AplusRenderText {
 export interface AplusVisualScriptModule {
   index: number;
   role: string;
-  headline: string;
-  mood: string;
-  scene_description?: string;    // For canvas continuity (required for hero pair 0+1)
-  render_text?: AplusRenderText; // Typography to render in the image
-  generation_prompt?: string;    // Full pre-written prompt (new format)
-  // Legacy fields (optional for backward compat with old visual scripts)
+  // New format fields
+  scene_prompt?: string;         // Complete scene description (new clean format)
+  text_elements?: string[];      // Short text strings to render in the image
+  // Legacy fields (backward compat with old visual scripts)
+  headline?: string;
+  mood?: string;
+  scene_description?: string;
+  render_text?: AplusRenderText;
+  generation_prompt?: string;    // Old format scene prompt
   product_angle?: string;
   background_description?: string;
   top_edge?: string;
@@ -460,10 +463,11 @@ export interface AplusVisualScriptModule {
 }
 
 export interface AplusVisualScript {
-  narrative_theme: string;
-  color_flow: string;
-  background_strategy: string;
-  edge_connection_strategy?: string;  // Legacy field, not in new format
+  hero_pair_prompt?: string;          // New format: complete hero pair prompt
+  narrative_theme?: string;           // Legacy (not in new format)
+  color_flow?: string;                // Legacy (not in new format)
+  background_strategy?: string;       // Legacy (not in new format)
+  edge_connection_strategy?: string;  // Legacy (not in new format)
   modules: AplusVisualScriptModule[];
 }
 

@@ -1,19 +1,11 @@
 """
-A+ Content Module Prompt Templates - Emotional Storytelling
+A+ Content Module Prompt Templates — Clean Scene Description System
 
-These templates power the Art Director visual script system for generating
-Premium A+ Content images. Uses the same emotional storytelling approach
-as listing images — making viewers FEEL, not just understand.
-
-Philosophy: Great A+ content is a visual journey that deepens the emotional
-connection established by the listing images. Each banner pulls the customer
-deeper into desire until buying feels inevitable.
+Philosophy: The Visual Script does the thinking (scene descriptions).
+Per-module delivery just wraps them lightly — same architecture as listing images.
 """
 import json
 from typing import Optional
-
-from ..vocabulary import get_aplus_quality_standard, get_storytelling_standard, EMOTIONAL_ARC
-from ..product_protection import PRODUCT_PROTECTION_DIRECTIVE
 
 
 # ============================================================================
@@ -136,25 +128,11 @@ def get_aplus_prompt(
 # ART DIRECTOR VISUAL SCRIPT SYSTEM
 # ============================================================================
 
-VISUAL_SCRIPT_PROMPT = """You are an Art Director creating COHESIVE A+ Content that extends the listing's brand story.
+VISUAL_SCRIPT_PROMPT = """You are an Art Director writing generation prompts for {module_count} Amazon A+ Content banners.
 
-═══════════════════════════════════════════════════════════════════════════════
-                     THE FUNDAMENTAL TRUTH ABOUT A+ CONTENT
-═══════════════════════════════════════════════════════════════════════════════
-
-The listing images created a brand impression. If your A+ modules use DIFFERENT
-fonts, colors, or visual language, you DESTROY that trust instantly.
-
-The shopper thinks: "Wait, this looks different... is this even the same product?"
-
-**A+ Content must be VISUALLY CONTINUOUS with the listing images.**
-
-Same fonts. Same colors. Same visual language. ONE cohesive brand story.
-
-═══════════════════════════════════════════════════════════════════════════════
-
-Today: Amazon Premium A+ Content — {module_count} full-width banners (1464×600).
-These stack below the listing images as ONE emotional journey.
+These banners stack below the listing images as one emotional buyer journey.
+By the time shoppers reach A+ content, they've already seen the listing images and are interested.
+A+ deepens desire into certainty. Each module has a specific JOB in the conversion funnel.
 
 THE PRODUCT:
 - {product_title}
@@ -162,433 +140,148 @@ THE PRODUCT:
 - What makes it special: {features}
 - Who it's for: {target_audience}
 
-═══════════════════════════════════════════════════════════════════════════════
-        ⚠️  THE DESIGN SYSTEM - MUST MATCH LISTING IMAGES EXACTLY  ⚠️
-═══════════════════════════════════════════════════════════════════════════════
+DESIGN SYSTEM (must match listing images exactly):
+- Framework: {framework_name} — {design_philosophy}
+- Colors (3 ONLY): {color_palette}
+  Use ONLY these 3 hex colors + black/white for contrast. No invented hues.
+- Typography: {typography}
+  Use these EXACT font names in every text description — no substitutes.
+- Visual treatment: {visual_treatment}
 
-Framework: {framework_name}
-Philosophy: {design_philosophy}
-
-**COLOR PALETTE** (3 COLORS MAX — same as listing images):
-{color_palette}
-⚠️  STRICT 3-COLOR RULE: Use ONLY these 3 hex colors + black/white for text contrast.
-NO additional colors, NO invented hues, NO rainbow compositions.
-Premium brands use FEWER colors, not more. Think Apple (white + silver + black).
-
-**TYPOGRAPHY** (Use ONLY these fonts — same as listing images):
-{typography}
-
-⚠️  CRITICAL RULES:
-1. Every text element uses the framework fonts — NO OTHER FONTS
-2. Every background/accent color comes from the 3-color palette — NO INVENTED COLORS
-3. When writing prompts, specify EXACT font names and hex codes
-4. This consistency is what makes 6 listings + 6 A+ modules feel like ONE brand
-
-Story arc: {story_arc}
-Visual treatment: {visual_treatment}
+{listing_context}
 
 Study the attached product photos. Notice materials, finish, scale, color.
-Your script must reflect the REAL product, not an imagined one.
+Your prompts must reflect the REAL product, not an imagined one.
 
-═══════════════════════════════════════════════════════════════════════════════
-                    🎯 A+ IS THE CLOSE, NOT ANOTHER HOOK
-═══════════════════════════════════════════════════════════════════════════════
+YOUR JOB: Write {module_count} scene descriptions that form an emotional buyer journey.
+Each description should be 150-250 words — a complete prompt for Gemini image generation.
+Write like listing image prompts — one vivid, specific scene per module. No boilerplate.
 
-CRITICAL: Listings and A+ have DIFFERENT JOBS in the conversion funnel.
+MODULE JOBS (each serves a different purpose in the funnel):
 
-**LISTINGS (Images 1-6) = THE HOOK**
-Job: Get them interested enough to KEEP SCROLLING
-- Already showed: Product beauty, features, lifestyle, transformation, social proof
-- Already answered: "What is it?", "Is it quality?", "What do I get?", "Will it fit my life?"
+Modules 0+1 (HERO PAIR): Brand desire — "This is a REAL brand."
+  Immediate visual impact. Product hero + brand identity.
+  The viewer thinks: "Wow, this looks premium."
 
-**A+ CONTENT (Modules 0-5) = THE CLOSE**
-Job: Remove final objections and get them to BUY NOW
-- Must NOT repeat listing content (they already saw it!)
-- Must go DEEPER: details they couldn't see, objections they still have, more contexts
+Module 2: Quality depth — prove craftsmanship.
+  Extreme close-ups, material details, construction quality.
+  The viewer thinks: "Look at that detail."
 
-⚠️  REPETITION = WASTED REAL ESTATE
-If listings showed a before/after transformation, A+ should NOT show another before/after.
-If listings showed lifestyle context, A+ should show DIFFERENT lifestyle contexts.
+Module 3: Authority — social proof and trust signals.
+  Stats, awards, trust badges, credibility.
+  The viewer thinks: "Others trust this."
 
-WHAT A+ SHOULD DO DIFFERENTLY:
-- Extreme close-ups (craftsmanship details not visible in listings)
-- Address the #1 remaining objection explicitly
-- Show MORE lifestyle contexts (different rooms, different uses)
-- Final certainty push (the "why not?" becomes "why wait?")
+Module 4: Lifestyle — show the life with a real person.
+  Product in authentic real-world use, genuine emotion.
+  The viewer thinks: "I can see myself using this."
 
-═══════════════════════════════════════════════════════════════════════════════
-                    THE EMOTIONAL JOURNEY — DEEPEN INTO DESIRE
-═══════════════════════════════════════════════════════════════════════════════
+Module 5: Confidence — close the deal.
+  Final dramatic product shot. Quiet certainty.
+  The viewer thinks: "I'm ready to buy."
 
-By the time they reach A+ Content, they've seen the listing images.
-They're already INTERESTED. Now deepen that into IRRESISTIBLE DESIRE.
+WRITING YOUR SCENE DESCRIPTIONS:
+- Write one vivid, specific scene per module — paint a cinematographer's shot brief
+- Include EXACT hex colors and font names from the design system INLINE in the description
+- Include any text to render (headlines, brand name, labels) naturally in the description
+- Reference PRODUCT_PHOTO, STYLE_REFERENCE, BRAND_LOGO by name where relevant
+- Keep rendered text SHORT (2-5 words per element) — Gemini renders short text well
+- At least 2 modules must include a real person with face visible, genuine emotion
+- Each module should look visually DIFFERENT (variety of compositions, angles, environments)
+- Format: wide 2.4:1 cinematic banners (think editorial magazine, not catalog)
+- Specify lighting direction (never flat), camera angle, and background for each
+- SAFE ZONE: remind to keep text/content 10% from edges (will be cropped)
 
-Each module should make them FEEL something NEW:
-- Not "4,900 mAh battery" → "A full day without worrying about power"
-- Not "Premium ceramic" → "The kind of object you reach for every morning"
-- Not "Modern design" → "Understated confidence on your shelf"
+DON'T REPEAT LISTING CONTENT:
+- Listings already showed product beauty, features, lifestyle, transformation
+- A+ goes DEEPER: details they couldn't see, objections they still have, new contexts
+- If listings showed a lifestyle context, A+ shows DIFFERENT lifestyle contexts
 
-THE A+ EMOTIONAL ARC (builds on listings, doesn't repeat):
-- Modules 0+1 (Hero): AWE — "Wow, this is even more beautiful up close"
-- Module 2: DEPTH — "There's more here than I realized" (details not in listings)
-- Module 3: REASSURANCE — "My concern is addressed" (objection handling)
-- Module 4: IMAGINATION — "I can see this in multiple parts of my life"
-- Module 5: CERTAINTY — "I have no more questions. I'm ready."
+HERO PAIR SPECIAL:
+Write one 200-300 word prompt for a SINGLE tall 4:3 photograph (~1464x1098) that will be split at the midpoint into two A+ banners.
+Compose as ONE seamless photo — the viewer should NOT see the crop line.
+Top half: product photography with dramatic lighting. Bottom half: brand name + product name as bold text.
+Do NOT compose as two separate sections. No website UI or browser chrome.
+Reference PRODUCT_PHOTO, STYLE_REFERENCE, and BRAND_LOGO by name.
 
-═══════════════════════════════════════════════════════════════════════════════
-                         THE EDITORIAL DESIGN SYSTEM
-═══════════════════════════════════════════════════════════════════════════════
-
-STRUCTURE — THE {module_count}-MODULE ARC:
-
-Modules 0+1 = HERO PAIR. ONE continuous image split in half.
-Product DRAMATICALLY LARGE, filling full height of both modules combined.
-Module 0: Top portion (50-60% of product visible, cropped at bottom).
-Module 1: Reveals the rest + brand name + product name as bold text.
-Together: "wow" moment — brand statement + visual impact.
-
-Modules 2-5 = INDEPENDENT editorial compositions. Each one MUST use a
-DIFFERENT archetype (see below). Variety is what makes premium A+ stand out.
-
-═══════════════════════════════════════════════════════════════════════════════
-                    MODULE DESIGN ARCHETYPES
-═══════════════════════════════════════════════════════════════════════════════
-
-Assign ONE archetype per module — EVERY module MUST use a DIFFERENT archetype.
-This creates the visual variety seen in Apple, Sony, Bose, GoPro, Anker A+ pages.
-
-"hero_brand": Large product + bold brand name + product name + tagline
-  → Text: Product name LARGE, brand name, short tagline (2-4 words)
-  → Always modules 0+1 (hero pair)
-  → Think: Bose burgundy monochrome, Sony Bravia hero
-
-"exploded_detail": Product broken into components, extreme close-ups of internals
-  → Text: Component labels (1-2 words each: "ND Filter", "Macro Lens", "USB-C Port")
-  → Think: GoPro lens exploded view, Dyson cutaway, Anker charger internals
-
-"in_the_box": All included items laid out cleanly on solid background with labels
-  → Text: "WHAT'S INCLUDED" header + item name labels
-  → Think: Nintendo Switch unboxing layout, Apple AirPods box contents
-
-"lifestyle_action": Person ACTIVELY using/enjoying the product. MUST include a real person with face visible, genuine emotion, authentic moment. The person IS the story — show their joy, calm, excitement.
-  → Text: One aspirational headline (2-4 words) OR no text
-  → Think: Stanley pickleball action, New Balance running, GoPro surfing
-  → generation_prompt MUST describe: who the person is, what they're doing, their expression, the environment
-
-"trust_authority": Social proof, awards, stats — the credibility module
-  → Text: 2-3 stat badges ("#1 Brand", "6.5M+ Users", "35 Patents", "Award Winner")
-  → Think: Levoit "#1 HUMIDIFIER BRAND", Anker "#1 Mobile Charging Brand"
-  → generation_prompt MUST describe: layout (product right, stats left), badge styling, background color
-
-"product_in_context": Product in natural environment with a person nearby. Show the LIFE around the product — couple on sofa, friend admiring it, someone walking past. The environment + person create FOMO.
-  → Text: One evocative headline (2-4 words) OR no text
-  → Think: West Elm catalog, Anthropologie home feature, Architectural Digest room shot
-  → generation_prompt MUST describe: the room/space in 50+ words, the person's role, the product's placement
-
-"dramatic_mono": Single product on bold solid color, dramatic studio lighting, minimal
-  → Text: Brand name only, or NO text — let the product speak
-  → Think: Bose burgundy/ice blue monochrome shots, Apple product-on-white
-
-DIVERSITY RULE: Each module MUST use a DIFFERENT archetype. If 6 modules,
-use 6 different archetypes. NEVER repeat the same archetype twice.
-
-BACKGROUND RHYTHM — Alternate using ONLY framework palette colors:
-- Modules 0+1 (hero): Framework primary color
-- Module 2: Lightest palette color
-- Module 3: Darkest palette color (drama beat)
-- Module 4: Light again
-- Module 5: Return to primary/secondary (bookend)
-
-Every background MUST be from the framework palette or a tint/shade of one.
-
-═══════════════════════════════════════════════════════════════════════════════
-                    CINEMATIC CRAFT — WHAT SEPARATES PREMIUM FROM GENERIC
-═══════════════════════════════════════════════════════════════════════════════
-
-Premium brands (Apple, Sony, Bose, GoPro) look expensive because of CRAFT —
-lighting, depth, angle variety, and environmental storytelling. Apply ALL of these:
-
-**1. LIGHTING DIRECTION (never flat)**
-Each module MUST specify a lighting setup. NEVER use flat/even lighting.
-- "Rembrandt 45° left, deep shadows right" (dramatic)
-- "Backlit silhouette, rim light separating product from background" (ethereal)
-- "Low raking light from bottom-right, long shadows" (editorial)
-- "Overhead spotlight, pool of light on product, dark surrounds" (theatrical)
-- Vary lighting between modules — never same setup twice.
-
-**2. CAMERA & CROP VARIETY (never same framing twice)**
-Each module MUST use a DIFFERENT camera approach:
-- "HERO WIDE": Product fills 70%+ of frame, dramatic angle (hero pair only)
-- "MACRO EXTREME": 200% zoom on one detail — texture, material, mechanism
-- "ENVIRONMENT WIDE": Product small (15-25% of frame), environment tells the story
-- "DUTCH ANGLE": Tilted 15-20°, dynamic energy
-- "BIRD'S EYE": Flat lay from directly above
-- "LOW ANGLE": Looking up at product, makes it feel monumental
-RULE: At least ONE module must be macro close-up. At least ONE must be environment-wide.
-
-**3. DEPTH & LAYERING (never flat single-plane)**
-Every module MUST have at least 2 depth layers:
-- FOREGROUND: Bokeh blur element (leaf, fabric, water droplet, hand)
-- MIDGROUND: The product (sharp focus)
-- BACKGROUND: Environmental context (blurred room, gradient, texture)
-Premium images feel 3D. Generic images feel flat. The foreground element is KEY.
-
-**4. SHADOW SYSTEM (consistent across all modules)**
-Define ONE shadow style for the entire set and use it everywhere:
-- Direction: always from same side (e.g., "shadows fall bottom-right")
-- Quality: soft diffused OR hard dramatic — pick one, be consistent
-- This creates visual cohesion across all 6 modules
-
-**5. COLOR TEMPERATURE (cinematic grading)**
-Each module gets a temperature direction:
-- "warm" (golden hour, amber tones — inviting, cozy)
-- "cool" (blue-silver — sophisticated, premium)
-- "neutral" (true-to-life — clean, trustworthy)
-Alternate temperatures for rhythm: warm → cool → warm creates visual music.
-
-**6. NEGATIVE SPACE (at least ONE sparse module)**
-Premium brands use emptiness as a design element.
-- At least ONE module must have 50%+ empty/breathing space
-- Empty space is NOT wasted — it's CONFIDENCE. It says "we don't need to fill every pixel"
-- The product speaks for itself against clean, bold background
-- Think: Apple product on white, Bose headphones on solid burgundy
-
-**7. ANGLE VARIETY (never same product viewpoint twice)**
-Each module shows the product from a DIFFERENT angle:
-- Module 0+1 (hero): 3/4 front, slightly above
-- Module 2: Straight-on profile or macro detail
-- Module 3: From behind/unusual angle, or in-use shot
-- Module 4: Bird's eye or environmental context
-- Module 5: 3/4 back or dramatic low angle
-RULE: NEVER show the same angle/viewpoint in two modules.
-
-**8. HUMAN PRESENCE (at least TWO modules with people)**
-Premium A+ includes REAL PEOPLE — faces visible, genuinely interacting, radiating happiness.
-- At least TWO modules MUST include a person (face visible, authentic emotion)
-- lifestyle_action: Person ACTIVELY using/enjoying the product (watering, hanging, admiring)
-- product_in_context: Person in the environment WITH the product (couple on sofa, friend visiting)
-- People create SCALE, EMOTIONAL CONNECTION, and FOMO
-- Show genuine joy, satisfaction, aspiration — NOT stock photo poses
-- Diverse, authentic people in REAL moments — the viewer should think "I want that life"
-
-**9. ENVIRONMENTAL STORYTELLING (scene briefs, not generic)**
-Each module's scene needs a SPECIFIC 50-word brief — never "lifestyle shot."
-- BAD: "Product in a room"
-- GOOD: "Dawn light through floor-to-ceiling windows of a Scandinavian loft. White oak floors, a single monstera plant. Product on a floating walnut shelf at eye level, backlit by morning sun creating a warm halo."
-The environment IS the emotion. Be specific. Be cinematic.
-
-MODULE EMOTIONAL ROLES (pair with archetype):
-- "hero_reveal": Pure visual impact — "Wow" (always modules 0+1, archetype: hero_brand)
-- "intrigue": Draw them deeper — "Tell me more"
-- "trust": Prove quality through craft — "This is well-made"
-- "belonging": Show their life with it — "This fits me"
-- "desire": Create longing — "I want this feeling"
-- "certainty": Remove doubt — "I'm ready to buy"
-
-═══════════════════════════════════════════════════════════════════════════════
-                         TYPOGRAPHY — WORDS THAT FEEL
-═══════════════════════════════════════════════════════════════════════════════
-
-TEXT IN IMAGE — PREMIUM BRAND STANDARD:
-Premium Amazon A+ always renders text BAKED INTO the image. This is non-negotiable.
-
-HERO PAIR (modules 0+1):
-- Module 0: Product dominates. Brand name can appear small at top.
-- Module 1: Brand name + Product name (large, bold). Short tagline optional.
-
-FEATURE MODULES (2-5) — text depends on archetype:
-- hero_brand: Brand name LARGE, product name, tagline
-- exploded_detail: Component labels (1-2 words each), arranged near parts
-- in_the_box: "WHAT'S INCLUDED" header + item labels
-- lifestyle_action: One aspirational headline (2-4 words) OR no text
-- trust_authority: 2-3 stat badges rendered as bold text/graphics
-- product_in_context: One evocative headline (2-4 words) OR no text
-- dramatic_mono: Brand name only OR no text
-
-TEXT RENDERING RULES:
-- ALL text SHORT — 2-5 words max per headline. Fewer words = cleaner.
-- Use EXACT framework font names and EXACT hex colors for text
-- HIGH CONTRAST: light text on dark, dark text on light. Always readable.
-- Text must be LARGE enough to read at 50% zoom
-- Keep text to ONE SIDE — never scatter across image
-- NO paragraphs, NO long sentences, NO fine print
-- Stat badges: bold number + short label ("6.5M+ Users", "#1 Brand")
-
-COPYWRITING RULES:
-- Headlines create FEELING, not describe features
-- WRONG: "Water-Tight Interior" → RIGHT: "Every Morning, Fresh"
-- WRONG: "Premium Ceramic Material" → RIGHT: "Made to Last"
-- Body copy paints a moment, not lists specs
-
-⚠️  FONT/COLOR CONSISTENCY (NON-NEGOTIABLE):
-- Use the EXACT font names from the typography section — not "elegant serif"
-- Use the EXACT hex codes from the palette — not "soft blue" or "warm tone"
-- This ensures A+ modules match the listing images perfectly
-
-CRITICAL: Describe fonts and colors SEPARATELY from text strings.
-  BAD:  "BRAND NAME" in Quicksand Bold #544381
-  GOOD: The text "BRAND NAME" appears large and bold, colored #544381.
-
-═══════════════════════════════════════════════════════════════════════════════
-                         CONTINUITY SYSTEM
-═══════════════════════════════════════════════════════════════════════════════
-
-Modules 0+1 = HERO PAIR technique: ONE tall 4:3 image split at midpoint.
-Both halves from same pixel output — guaranteed perfect alignment.
-
-Write a single `hero_pair_prompt` (200-350 words) at top level of JSON.
-Do NOT write `generation_prompt` for modules 0 or 1.
-
-hero_pair_prompt must include:
-1. Format: "Single tall 4:3 image (~1464×1098). Split at midpoint."
-2. Product: ONE product crossing midline — large, dynamic angle
-3. Background: CINEMATIC environment with depth — NOT a flat solid color. Use palette colors as DOMINANT TONES in a textured setting (fabric, marble, concrete, wood, atmospheric haze). Premium brands NEVER use plain flat backgrounds.
-4. Lighting: DRAMATIC directional light (side or rim), NOT flat/even. Specify exact direction.
-5. Typography: bottom half only — brand name + product name
-6. Top half: NO text, pure product photography
-7. Reference images: "Use PRODUCT_PHOTO. Match STYLE_REFERENCE mood."
-8. Rules: no website UI, no Amazon navigation, no product packaging
-
-═══════════════════════════════════════════════════════════════════════════════
-                         REFERENCE IMAGES
-═══════════════════════════════════════════════════════════════════════════════
-
-Each banner receives:
-- `PRODUCT_PHOTO` — the actual product (always)
-- `STYLE_REFERENCE` — visual style direction (if available)
-- `BRAND_LOGO` — the brand's logo image (if available)
-- `PREVIOUS_MODULE` — banner above (modules 1+ only)
-
-Your prompts MUST reference PRODUCT_PHOTO, STYLE_REFERENCE, and BRAND_LOGO by name.
-If BRAND_LOGO is provided, hero pair and trust/brand modules should reproduce it.
-
-═══════════════════════════════════════════════════════════════════════════════
-                         OUTPUT FORMAT
-═══════════════════════════════════════════════════════════════════════════════
-
-Respond with ONLY valid JSON:
+OUTPUT — respond with ONLY valid JSON:
 {{
-  "narrative_theme": "Single sentence capturing the EMOTIONAL journey",
-  "color_flow": "How palette evolves — which module gets which color",
-  "background_strategy": "Rhythm pattern",
-  "hero_pair_prompt": "COMPLETE 200-350 word prompt for tall 4:3 hero image — MUST include brand name + product name as bold text in bottom half. Reference PRODUCT_PHOTO, STYLE_REFERENCE, and BRAND_LOGO by name.",
+  "hero_pair_prompt": "200-300 word complete prompt for tall 4:3 hero image...",
   "modules": [
     {{
       "index": 0,
-      "archetype": "hero_brand",
       "role": "hero_reveal",
-      "emotional_beat": "awe",
-      "viewer_thought": "Wow, this is beautiful",
-      "headline": "NO TEXT",
-      "mood": "Feeling this evokes",
-      "scene_description": "50-100 words: top half — describe the FEELING, not just visuals",
-      "render_text": null
+      "scene_prompt": null,
+      "text_elements": []
     }},
     {{
       "index": 1,
-      "archetype": "hero_brand",
       "role": "hero_reveal",
-      "emotional_beat": "awe",
-      "viewer_thought": "I want to know more",
-      "headline": "Brand + Product Name",
-      "mood": "Feeling",
-      "scene_description": "50-100 words: bottom half — brand name + product name as text",
-      "render_text": {{"headline": "Product Name", "brand_name": "BRAND", "tagline": "Short tagline 2-4 words", "text_position": "center"}}
+      "scene_prompt": null,
+      "text_elements": ["Brand Name", "Product Name"]
     }},
     {{
       "index": 2,
-      "archetype": "exploded_detail | in_the_box | lifestyle_action | trust_authority | product_in_context | dramatic_mono",
-      "role": "intrigue | trust | belonging | desire | certainty",
-      "emotional_beat": "intrigue",
-      "viewer_thought": "What the viewer unconsciously thinks",
-      "mood": "...",
-      "scene_description": "OPTIONAL — only for continuity",
-      "lighting": "Specific lighting setup — direction, quality, shadow behavior (e.g., 'Rembrandt 45° from left, deep shadows right, warm fill')",
-      "camera": "Camera approach — crop level + angle (e.g., 'MACRO EXTREME on texture detail' or 'ENVIRONMENT WIDE, product 20% of frame')",
-      "color_temperature": "warm | cool | neutral — cinematic color grading direction",
-      "depth_layers": {{
-        "foreground": "Bokeh element in front (e.g., 'blurred monstera leaf bottom-left')",
-        "midground": "Product placement and focus",
-        "background": "What's behind (e.g., 'soft gradient to deep navy' or 'blurred kitchen shelf')"
-      }},
-      "scene_brief": "50-word SPECIFIC environment — paint a movie scene: 'Dawn light through floor-to-ceiling windows of a Scandinavian loft. White oak floors, a single monstera plant. Product on a floating walnut shelf at eye level, backlit by morning sun creating a warm halo.' NEVER generic ('lifestyle shot', 'clean background').",
-      "render_text": {{
-        "headline": "2-5 evocative words OR null",
-        "brand_name": "BRAND or null",
-        "stat_badges": ["#1 Brand", "6.5M+ Users"],
-        "component_labels": ["Part Name", "Feature Name"],
-        "text_position": "left | right | center | scattered"
-      }},
-      "generation_prompt": "COMPLETE 200-350 word SCENE-PAINTING prompt. Write it like a cinematographer's shot brief — NOT a template. Start with 'SCENE:' and paint the specific environment in 50-100 words (e.g., 'Golden hour on a Mediterranean balcony, wrought-iron brackets, trailing bougainvillea...'). Then describe CAMERA angle, LIGHTING setup by name (Rembrandt, backlight, rim light), DEPTH LAYERS with specific objects per layer, COLOR usage from the palette, and what TEXT to render. End with an emotional hook: 'The viewer should feel/think...' and a reference comparison: 'Think [Brand X] meets [Brand Y].' This prompt IS the creative brief — make it vivid, specific, cinematic."
+      "role": "quality_depth",
+      "scene_prompt": "150-250 word vivid scene description with hex colors, font names, lighting, camera angle, text elements inline...",
+      "text_elements": ["Detail Label", "Feature Name"]
+    }},
+    {{
+      "index": 3,
+      "role": "authority",
+      "scene_prompt": "150-250 word scene description...",
+      "text_elements": ["#1 Brand", "6.5M+ Users"]
+    }},
+    {{
+      "index": 4,
+      "role": "lifestyle",
+      "scene_prompt": "150-250 word scene description with a real person...",
+      "text_elements": ["Aspirational Headline"]
+    }},
+    {{
+      "index": 5,
+      "role": "confidence",
+      "scene_prompt": "150-250 word scene description...",
+      "text_elements": ["Brand Name"]
     }}
   ]
 }}
 
-IMPORTANT: Each module index 2-5 MUST have a DIFFERENT archetype value.
-The render_text fields depend on archetype:
-- hero_brand: headline, brand_name, tagline
-- exploded_detail: component_labels, headline optional
-- in_the_box: headline ("WHAT'S INCLUDED"), component_labels for items
-- lifestyle_action: headline only (or null for no text)
-- trust_authority: stat_badges (2-3 bold stats), brand_name
-- product_in_context: headline only (or null for no text)
-- dramatic_mono: brand_name only (or null for no text)
-
-CINEMATIC CRAFT CHECKLIST (each module MUST have ALL of these):
-- lighting: specific direction + quality (NEVER "even lighting" or "well-lit")
-- camera: specific framing (NEVER "product shot" — say MACRO, WIDE, LOW ANGLE, etc.)
-- color_temperature: warm/cool/neutral (alternate for rhythm)
-- depth_layers: foreground bokeh + midground product + background (3 planes minimum)
-- scene_brief: 50-word SPECIFIC cinematic environment (NEVER "lifestyle shot")
-- At least TWO modules with people (lifestyle_action + product_in_context archetypes)
-- At least ONE module with 50%+ negative space (dramatic_mono archetype)
-- EVERY module shows product from DIFFERENT angle — never repeat same viewpoint
-- generation_prompt must describe the EXACT lighting, camera, and depth in its 200-350 words
-
-Generate exactly {module_count} modules. Each creates FEELING — no filler, no feature lists.
+IMPORTANT:
+- Modules 0 and 1 have scene_prompt: null — the hero_pair_prompt covers both.
+- Modules 2-5 each have a complete scene_prompt (the full generation prompt).
+- text_elements lists the short text strings that should appear in the image.
+- Generate exactly {module_count} modules.
 """
 
 
-APLUS_MODULE_WITH_SCRIPT = """Ultra-premium Amazon A+ Content banner. Wide cinematic 2.4:1 format.
+# ============================================================================
+# PER-MODULE PROMPT DELIVERY (clean header + scene description)
+# ============================================================================
 
-PRODUCT: {product_title}
-BRAND: {brand_name}
-PALETTE (3 colors ONLY): {primary_color} | {color_palette} — NO other colors. Premium = restrained.
+APLUS_MODULE_HEADER = """=== REFERENCE IMAGES ===
+{reference_images_desc}
+Channel the style reference's mood, lighting, and atmosphere.
 
-═══ ART DIRECTOR'S CREATIVE BRIEF — MODULE {module_index} OF {module_count} ═══
-ARCHETYPE: {module_archetype} | ROLE: {module_role}
-The viewer should think: "{module_viewer_thought}"
+Amazon A+ Content banner. Wide 2.4:1 format.
+SAFE ZONE: Keep all text and important content at least 10% from edges (will be cropped).
+NEVER include website UI, Amazon navigation, or browser chrome.
 
-{generation_prompt}
+"""
 
-═══ CINEMATIC CRAFT (NON-NEGOTIABLE) ═══
-LIGHTING: {module_lighting}
-CAMERA/FRAMING: {module_camera}
-COLOR TEMPERATURE: {module_color_temperature}
-DEPTH LAYERS:
-  - Foreground (bokeh/blur): {module_fg}
-  - Midground (sharp focus): {module_mg}
-  - Background: {module_bg}
-SCENE: {module_scene_brief}
+APLUS_CONTINUITY_NOTE = """
 
-{render_text_instruction}
+VISUAL CONTINUITY: This banner sits directly below the previous one. Your top edge should naturally flow from the previous banner's bottom edge — match colors and gradient direction at the seam."""
 
-POSITION: {module_position}
-{position_instruction}
+APLUS_HERO_HEADER = """=== REFERENCE IMAGES ===
+{reference_images_desc}
+Channel the style reference's mood, lighting, and atmosphere.
 
-CRAFT NON-NEGOTIABLES:
-- Use PRODUCT_PHOTO for the REAL product. Honor its materials, proportions, character.
-- Use STYLE_REFERENCE for visual mood and lighting direction.
-- If BRAND_LOGO is provided, reproduce it faithfully where the archetype calls for it.
-- ONLY 3 brand colors in the SCENE — lighting, surfaces, atmosphere. Never flat overlays. NO extra colors.
-- Wide format (2.4:1) — cinematic, not catalog.
-- SAFE ZONE: Keep ALL text and important content at least 10% away from ALL edges. Content near edges WILL be cropped.
-- This must look like a frame from a luxury brand commercial, NOT a product photo.
-- NEVER include website UI, Amazon navigation, browser chrome.
-- Text: SHORT, BOLD, HIGH CONTRAST, baked into image. Readable at 50% zoom.
-- Follow the specified lighting direction EXACTLY — NEVER use flat/even lighting.
+Single tall 4:3 photograph (~1464x1098), later split at midpoint into two A+ banners.
+Compose as ONE seamless photo — the viewer should not see the crop line.
+Top half: product photography. Bottom half: brand name + product name as bold text.
+Do NOT compose as two separate sections. Never include website UI or browser chrome.
 
-{continuity_instruction}"""
+"""
 
 
 # ============================================================================
@@ -622,62 +315,53 @@ RULES:
 """
 
 
-HERO_PAIR_PROMPT = """Generate ONE single tall portrait photograph — NOT two separate panels.
-This image will later be cropped into two halves. Must look like one seamless photo top to bottom.
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
 
-THE GOAL: Create immediate AWE. The viewer's first thought should be "Wow."
-Not "What is this?" or "What are the features?" Just: "Wow, this is beautiful."
+def _ref_desc(has_style_ref: bool, has_logo: bool, is_chained: bool) -> str:
+    """Build reference images description matching listing prompt style."""
+    lines = ["- PRODUCT_PHOTO: The actual product — honor its materials, proportions, character"]
+    if has_style_ref:
+        lines.append("- STYLE_REFERENCE: Match this visual style, mood, and color treatment")
+    if has_logo:
+        lines.append("- BRAND_LOGO: Reproduce this logo where appropriate")
+    if is_chained:
+        lines.append("- PREVIOUS_MODULE: The banner directly above — match its bottom edge for seamless flow")
+    return "\n".join(lines)
 
-CRITICAL: Do NOT compose as "top section" and "bottom section."
-Think: ONE tall editorial magazine photograph that happens to be cropped later.
-The viewer should NOT be able to tell where the crop line is.
 
-REFERENCE IMAGES:
-- PRODUCT_PHOTO: The actual product — honor materials, proportions, character
-- STYLE_REFERENCE: Match this visual style, mood, and color treatment
-- BRAND_LOGO: If provided, reproduce this logo in the bottom half near brand name
+def _default_hero_brief(product_title: str, brand_name: str) -> str:
+    """Fallback hero brief when visual script has no hero_pair_prompt."""
+    return (
+        f"Dramatic product hero for {product_title} by {brand_name}. "
+        f"Single tall 4:3 image (~1464x1098). Product crosses midline, dramatically large. "
+        f"CINEMATIC textured background (marble, fabric, atmospheric haze) — not a flat solid color. "
+        f"Dramatic directional lighting — side light with rim separation. "
+        f"Typography in bottom half only — brand name smaller, product name large and bold. "
+        f"Top half is pure product photography, no text. "
+        f"Use PRODUCT_PHOTO for the real product. Match STYLE_REFERENCE mood. "
+        f"If BRAND_LOGO provided, place logo in bottom half near brand name."
+    )
 
-═══ ART DIRECTOR'S CREATIVE BRIEF ═══
 
-{hero_pair_brief}
-
-═══ EMOTIONAL IMPACT (NON-NEGOTIABLE) ═══
-- This is the FIRST thing they see in A+ content
-- After listing images, they're interested — now make them DESIRE
-- Pure visual impact. No information needed.
-- Create the "wow" moment that pulls them deeper into the story
-
-═══ COMPOSITION RULES (NON-NEGOTIABLE) ═══
-- ONE continuous photograph, NOT two stacked panels
-- Product naturally spans vertical center of image
-- Background: CINEMATIC textured environment (fabric, marble, concrete, atmospheric haze) — NOT a flat solid color. Use palette colors as dominant tones with depth and texture. No dividing lines.
-- Bottom half: brand name + product name as BOLD text, integrated naturally
-- If BRAND_LOGO provided, place logo in bottom half near brand name
-- Top half: pure product photography, minimal or no text
-- NEVER include website UI, Amazon navigation, browser chrome
-- Do NOT duplicate the product — show it ONCE, large, crossing center
-
-═══ CINEMATIC CRAFT (NON-NEGOTIABLE) ═══
-- LIGHTING: Dramatic directional lighting — NOT flat. Side light or backlight with rim separation.
-- DEPTH: Foreground bokeh element (fabric, leaf, surface texture) + sharp product + blurred background
-- SHADOW: Consistent shadow direction throughout the image, soft or hard but COMMITTED
-- COLOR GRADING: Apply a cinematic color grade — warm golden, cool silver, or moody tones
-- ANGLE: Dynamic 3/4 view, slightly above — NOT straight-on catalog shot
-- This hero must look like a frame from a luxury brand commercial, not a product photo
-
-{custom_instructions_block}"""
-
+# ============================================================================
+# BUILD FUNCTIONS
+# ============================================================================
 
 def build_hero_pair_prompt(
     visual_script: dict,
     product_title: str,
     brand_name: str,
     custom_instructions: str = "",
+    *,
+    has_style_ref: bool = True,
+    has_logo: bool = False,
 ) -> str:
-    """Build unified prompt for hero pair (modules 0+1)."""
+    """Build clean prompt for hero pair (modules 0+1)."""
     hero_brief = visual_script.get("hero_pair_prompt")
 
-    # Fallback for old visual scripts
+    # Fallback for old visual scripts that have per-module generation_prompts
     if not hero_brief:
         modules = visual_script.get("modules", [])
         parts = []
@@ -685,19 +369,89 @@ def build_hero_pair_prompt(
             parts.append(f"TOP HALF:\n{modules[0]['generation_prompt']}")
         if len(modules) > 1 and modules[1].get("generation_prompt"):
             parts.append(f"BOTTOM HALF:\n{modules[1]['generation_prompt']}")
-        hero_brief = "\n\n".join(parts) if parts else (
-            f"Dramatic product hero for {product_title} by {brand_name}. "
-            f"Single tall 4:3 image (~1464×1098). Product crosses midline, dramatically large. "
-            f"Typography in bottom half only — brand name smaller, product name large and bold. "
-            f"Top half is pure product photography, no text."
+        hero_brief = "\n\n".join(parts) if parts else _default_hero_brief(product_title, brand_name)
+
+    header = APLUS_HERO_HEADER.format(
+        reference_images_desc=_ref_desc(has_style_ref, has_logo, False),
+    )
+    prompt = header + hero_brief
+
+    if custom_instructions:
+        prompt += f"\n\nCLIENT NOTE:\n{custom_instructions}"
+
+    return prompt
+
+
+def build_aplus_module_prompt(
+    product_title: str,
+    brand_name: str,
+    features: list[str],
+    target_audience: str,
+    framework: dict,
+    visual_script: dict,
+    module_index: int,
+    module_count: int = 5,
+    custom_instructions: str = "",
+    is_chained: bool = False,
+    *,
+    has_style_ref: bool = True,
+    has_logo: bool = False,
+) -> str:
+    """Build clean per-module prompt using scene description from visual script."""
+    modules = visual_script.get("modules", [])
+
+    # Out-of-range: fall back to legacy prompt
+    if module_index >= len(modules):
+        position = "first" if module_index == 0 else "middle"
+        colors = framework.get("colors", [])
+        return get_aplus_prompt(
+            module_type="full_image",
+            position=position,
+            product_title=product_title,
+            brand_name=brand_name,
+            features=features,
+            target_audience=target_audience,
+            framework_name=framework.get("framework_name", "Professional"),
+            framework_style=framework.get("design_philosophy", "Clean and modern"),
+            primary_color=colors[0].get("hex", "#C85A35") if colors else "#C85A35",
+            color_palette=[c.get("hex", "") for c in colors],
+            framework_mood=framework.get("brand_voice", "Professional"),
+            custom_instructions=custom_instructions,
         )
 
-    custom_block = f"\nCLIENT NOTE:\n{custom_instructions}" if custom_instructions else ""
+    mod = modules[module_index]
 
-    return HERO_PAIR_PROMPT.format(
-        hero_pair_brief=hero_brief,
-        custom_instructions_block=custom_block,
+    # New format: scene_prompt. Old format: generation_prompt.
+    scene_prompt = mod.get("scene_prompt") or mod.get("generation_prompt")
+
+    # If neither exists, build a minimal fallback from available fields
+    if not scene_prompt:
+        scene_desc = mod.get("scene_description", "")
+        mood = mod.get("mood", "premium and cinematic")
+        role = mod.get("role", "editorial")
+        scene_prompt = (
+            f"Create a {role} composition for {product_title} by {brand_name or 'Premium Brand'}. "
+            f"{scene_desc} "
+            f"The mood is {mood}. Use PRODUCT_PHOTO for the real product — honor its materials, "
+            f"proportions, and character. Match STYLE_REFERENCE visual style. "
+            f"Dramatic directional lighting. Cinematic color grading. "
+            f"Wide 2.4:1 format. Keep text 10% from edges."
+        )
+
+    # Build the clean prompt: header + scene description
+    header = APLUS_MODULE_HEADER.format(
+        reference_images_desc=_ref_desc(has_style_ref, has_logo, is_chained),
     )
+    prompt = header + scene_prompt
+
+    # Add continuity note for chained modules
+    if is_chained and module_index > 0:
+        prompt += APLUS_CONTINUITY_NOTE
+
+    if custom_instructions:
+        prompt += f"\n\nCLIENT NOTE:\n{custom_instructions}"
+
+    return prompt
 
 
 def build_canvas_inpainting_prompt(
@@ -731,20 +485,11 @@ def get_visual_script_prompt(
             job = p.get("job", p.get("emotional_beat", ""))
             listing_summary.append(f"- Image {p.get('image_number', '?')} ({img_type}): {job}")
 
-        listing_context = f"""
-═══════════════════════════════════════════════════════════════════════════════
-                    📋 WHAT LISTINGS ALREADY COVERED (DO NOT REPEAT)
-═══════════════════════════════════════════════════════════════════════════════
-
-The listing images already showed:
-{chr(10).join(listing_summary)}
-
-⚠️  A+ Content must NOT duplicate these concepts. Go DEEPER, not WIDER.
-- If listings showed transformation → A+ shows DIFFERENT transformation or skips it
-- If listings showed lifestyle → A+ shows DIFFERENT lifestyle contexts
-- If listings showed features → A+ shows DETAILS (close-ups, craftsmanship)
-
-"""
+        listing_context = (
+            "WHAT LISTINGS ALREADY COVERED (do not repeat):\n"
+            + "\n".join(listing_summary)
+            + "\n\nA+ must NOT duplicate these concepts. Go deeper, not wider.\n"
+        )
 
     prompt = VISUAL_SCRIPT_PROMPT.format(
         module_count=module_count,
@@ -758,185 +503,8 @@ The listing images already showed:
             c.get("hex", "") for c in framework.get("colors", [])[:3]
         ) or "#C85A35",
         typography=json.dumps(framework.get("typography", {})),
-        story_arc=json.dumps(framework.get("story_arc", {})),
         visual_treatment=json.dumps(framework.get("visual_treatment", {})),
+        listing_context=listing_context,
     )
-
-    # Insert listing context after the design system section
-    if listing_context:
-        # Find a good insertion point
-        insertion_marker = "Study the attached product photos."
-        if insertion_marker in prompt:
-            prompt = prompt.replace(insertion_marker, listing_context + insertion_marker)
-
-    return prompt
-
-
-def build_aplus_module_prompt(
-    product_title: str,
-    brand_name: str,
-    features: list[str],
-    target_audience: str,
-    framework: dict,
-    visual_script: dict,
-    module_index: int,
-    module_count: int = 5,
-    custom_instructions: str = "",
-    is_chained: bool = False,
-) -> str:
-    """Build rich per-module prompt using Art Director's visual script."""
-    modules = visual_script.get("modules", [])
-    if module_index >= len(modules):
-        position = "first" if module_index == 0 else "middle"
-        colors = framework.get("colors", [])
-        return get_aplus_prompt(
-            module_type="full_image",
-            position=position,
-            product_title=product_title,
-            brand_name=brand_name,
-            features=features,
-            target_audience=target_audience,
-            framework_name=framework.get("framework_name", "Professional"),
-            framework_style=framework.get("design_philosophy", "Clean and modern"),
-            primary_color=colors[0].get("hex", "#C85A35") if colors else "#C85A35",
-            color_palette=[c.get("hex", "") for c in colors],
-            framework_mood=framework.get("brand_voice", "Professional"),
-            custom_instructions=custom_instructions,
-        )
-
-    mod = modules[module_index]
-
-    # Extract archetype and render_text from visual script
-    module_archetype = mod.get("archetype", "product_in_context")
-    render_text = mod.get("render_text") or {}
-
-    # Extract the AI's rich generation_prompt (200-350 words of scene painting)
-    generation_prompt = mod.get("generation_prompt", "")
-    module_viewer_thought = mod.get("viewer_thought", "I need this in my life")
-
-    # If generation_prompt is missing, build a fallback from available fields
-    if not generation_prompt:
-        scene_desc = mod.get("scene_description", "")
-        mood = mod.get("mood", "premium and cinematic")
-        generation_prompt = (
-            f"Create a {module_archetype} composition for {product_title}. "
-            f"{scene_desc} "
-            f"The mood is {mood}. Use the product reference photo — honor its real materials, "
-            f"proportions, and character. Create a scene that makes the viewer think: "
-            f'"{module_viewer_thought}". '
-            f"This must look like a frame from a luxury brand commercial — "
-            f"think Anthropologie catalog meets Architectural Digest. "
-            f"Dramatic lighting, real depth with foreground bokeh elements, "
-            f"and cinematic color grading using the framework palette."
-        )
-
-    # Extract cinematic craft fields
-    module_lighting = mod.get("lighting", "Dramatic Rembrandt setup — key light 45° from upper left, deep shadows opposite side, subtle rim light from behind separating product from background")
-    module_camera = mod.get("camera", "3/4 view, slightly above center, product fills 50-60% of frame, shot at f/2.8 with selective focus")
-    module_color_temperature = mod.get("color_temperature", "warm")
-    depth_layers = mod.get("depth_layers") or {}
-    module_fg = depth_layers.get("foreground", "Subtle organic element softly blurred — petals, fabric edge, or botanical detail")
-    module_mg = depth_layers.get("midground", "Product in tack-sharp focus, catching directional light")
-    module_bg = depth_layers.get("background", "Rich gradient from framework palette, smoothly out of focus")
-    module_scene_brief = mod.get("scene_brief", "Cinematic studio environment with dramatic directional lighting, rich depth layers, and the product presented as the hero of a luxury brand campaign")
-
-    # Build render_text instruction based on archetype
-    render_text_parts = []
-    if render_text:
-        headline = render_text.get("headline")
-        brand_name = render_text.get("brand_name")
-        tagline = render_text.get("tagline")
-        stat_badges = render_text.get("stat_badges", [])
-        component_labels = render_text.get("component_labels", [])
-        text_position = render_text.get("text_position", "left")
-
-        render_text_parts.append(f"TEXT RENDERING (bake into image, {text_position} side):")
-        if brand_name:
-            render_text_parts.append(f"- Brand name: \"{brand_name}\" — render prominently")
-        if headline:
-            render_text_parts.append(f"- Headline: \"{headline}\" — bold, large, readable at 50% zoom")
-        if tagline:
-            render_text_parts.append(f"- Tagline: \"{tagline}\" — smaller, below headline")
-        if stat_badges:
-            badges_str = ", ".join(f'"{b}"' for b in stat_badges)
-            render_text_parts.append(f"- Stat badges: {badges_str} — bold numbers, short labels")
-        if component_labels:
-            labels_str = ", ".join(f'"{l}"' for l in component_labels)
-            render_text_parts.append(f"- Component labels: {labels_str} — near their respective parts")
-        render_text_parts.append("- Use EXACT framework font names and hex colors for all text")
-        render_text_parts.append("- HIGH CONTRAST: light text on dark bg, dark text on light bg")
-    render_text_instruction = "\n".join(render_text_parts) if render_text_parts else "TEXT: Follow archetype guidelines for text rendering."
-
-    # Position instructions with emotional context
-    if module_index == 0:
-        position_instruction = (
-            "Opening frame — AWE. Create immediate visual impact. "
-            "The viewer should think: 'Wow, this is beautiful.' "
-            "Plant the emotional seed that grows through all modules."
-        )
-        module_position = "FIRST (the opening)"
-    elif module_index == module_count - 1:
-        position_instruction = (
-            "Closing frame — CERTAINTY. The emotional journey resolves. "
-            "Customer feels confident and ready to buy. No more questions. "
-            "Just quiet certainty: 'I want this. I'm ready.'"
-        )
-        module_position = "LAST (the close)"
-    else:
-        position_instruction = (
-            "Middle frame. Deepen the desire they already feel. "
-            "Don't inform — intensify. Each module should make them want it MORE."
-        )
-        module_position = f"{module_index + 1} of {module_count} (middle)"
-
-    # Continuity instruction with emotional context
-    if is_chained and module_index > 0:
-        continuity_instruction = (
-            "CONTINUITY NON-NEGOTIABLE:\n"
-            "Reference image = banner above. Look at its BOTTOM EDGE — exact colors, gradient, lighting. "
-            "Your TOP EDGE starts with those same colors, then transitions into your background. "
-            "Top 20% of your image = natural extension of previous banner.\n\n"
-            "EMOTIONAL CONTINUITY: The previous module created a feeling. "
-            "Continue that feeling while deepening it. Don't jar them out of the desire."
-        )
-    else:
-        continuity_instruction = ""
-
-    colors = framework.get("colors", [])
-    primary_color = next(
-        (c.get("hex") for c in colors if c.get("role") == "primary"),
-        colors[0].get("hex", "#C85A35") if colors else "#C85A35",
-    )
-
-    # Limit palette to 3 colors max (primary + secondary + accent) — too many colors
-    # overwhelm Gemini and produce rainbow chaos instead of cohesive brand imagery
-    palette_colors = [c.get("hex", "") for c in colors[:3]] if colors else [primary_color]
-
-    prompt = APLUS_MODULE_WITH_SCRIPT.format(
-        product_title=product_title,
-        brand_name=brand_name or "Premium Brand",
-        primary_color=primary_color,
-        color_palette=", ".join(palette_colors),
-        module_index=module_index,
-        module_count=module_count,
-        module_role=mod.get("role", f"Module {module_index + 1}"),
-        module_archetype=module_archetype,
-        module_viewer_thought=module_viewer_thought,
-        generation_prompt=generation_prompt,
-        module_lighting=module_lighting,
-        module_camera=module_camera,
-        module_color_temperature=module_color_temperature,
-        module_fg=module_fg,
-        module_mg=module_mg,
-        module_bg=module_bg,
-        module_scene_brief=module_scene_brief,
-        render_text_instruction=render_text_instruction,
-        module_position=module_position,
-        position_instruction=position_instruction,
-        continuity_instruction=continuity_instruction,
-    )
-
-    if custom_instructions:
-        prompt += f"\n\nCLIENT NOTE:\n{custom_instructions}"
 
     return prompt

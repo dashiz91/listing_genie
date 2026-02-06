@@ -1313,6 +1313,8 @@ async def generate_aplus_hero_pair(
             product_title=session.product_title,
             brand_name=session.brand_name or "",
             custom_instructions="",  # handled by AI enhancement below
+            has_style_ref=bool(session.style_reference_path),
+            has_logo=bool(session.logo_path),
         )
 
         # AI-enhanced prompt rewriting when user provides feedback
@@ -1448,11 +1450,7 @@ async def generate_aplus_module(
         prompt = None
         use_named_images = False
 
-        # Primary: Rich template with cinematic craft fields from visual script
-        # Always use build_aplus_module_prompt — it injects lighting, depth, camera,
-        # scene briefs, archetype, and all craft directions into a structured template.
-        # Always use the rich template — it injects lighting, depth, camera,
-        # scene briefs, archetype, and all craft directions from the visual script.
+        # Build prompt from visual script scene description (clean header + scene)
         if visual_script:
             prompt = build_aplus_module_prompt(
                 product_title=session.product_title,
@@ -1465,10 +1463,12 @@ async def generate_aplus_module(
                 module_count=len(visual_script.get("modules", [])),
                 custom_instructions="",  # handled by AI enhancement below
                 is_chained=is_chained,
+                has_style_ref=bool(session.style_reference_path),
+                has_logo=bool(session.logo_path),
             )
             if prompt:
                 use_named_images = True
-                logger.info(f"Using rich template prompt for module {request.module_index}")
+                logger.info(f"Using visual script prompt for module {request.module_index}, {len(prompt)} chars")
 
         # Tier 3: No visual script fallback
         if not prompt:
