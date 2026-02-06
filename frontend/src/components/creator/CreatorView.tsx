@@ -403,16 +403,41 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
 
           {/* Model + Style Count selectors */}
           <div className="flex items-center gap-3">
-            {/* Model selector */}
-            <select
-              value={formData.imageModel}
-              onChange={(e) => onFormChange({ imageModel: e.target.value })}
-              disabled={isGenerating}
-              className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-xs text-white focus:ring-1 focus:ring-redd-500 focus:border-transparent disabled:opacity-50"
-            >
-              <option value="gemini-2.5-flash-image">Flash</option>
-              <option value="gemini-3-pro-image-preview">Pro</option>
-            </select>
+            {/* Model toggle */}
+            <div className={cn(
+              "flex items-center bg-slate-800 border border-slate-600 rounded-lg p-1 gap-0.5",
+              isGenerating && "opacity-50 pointer-events-none"
+            )}>
+              {([
+                { value: 'gemini-2.5-flash-image', label: 'Flash', icon: '\u26A1', cost: '1' },
+                { value: 'gemini-3-pro-image-preview', label: 'Pro', icon: '\u2728', cost: '3' },
+              ] as const).map((opt) => {
+                const isActive = formData.imageModel === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => onFormChange({ imageModel: opt.value })}
+                    disabled={isGenerating}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                      isActive
+                        ? opt.value.includes('pro')
+                          ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm'
+                          : 'bg-slate-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                    )}
+                    title={`${opt.label} — ${opt.cost} credit${opt.cost !== '1' ? 's' : ''}/image`}
+                  >
+                    <span className="text-[11px]">{opt.icon}</span>
+                    {opt.label}
+                    <span className={cn(
+                      'text-[10px] tabular-nums',
+                      isActive ? 'text-white/70' : 'text-slate-500'
+                    )}>{opt.cost}cr</span>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Style count */}
             {frameworks.length === 0 && (

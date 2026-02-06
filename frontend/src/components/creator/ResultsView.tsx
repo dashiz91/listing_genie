@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { normalizeColors } from '@/lib/utils';
+import { cn, normalizeColors } from '@/lib/utils';
 import type { SessionImage, DesignFramework, ReferenceImage, AplusVisualScript } from '@/api/types';
 import { AmazonListingPreview } from '../amazon-preview';
 import { GenerationProgressBar } from '../amazon-preview/GenerationProgressBar';
@@ -59,6 +59,10 @@ interface ResultsViewProps {
   showGenerationCelebration?: boolean;
   onCelebrationComplete?: () => void;
 
+  // Model
+  imageModel: string;
+  onModelChange: (model: string) => void;
+
   // Navigation
   onBackToEditor: () => void;
   onOpenAdvancedSettings: () => void;
@@ -103,6 +107,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   isGenerating = false,
   showGenerationCelebration = false,
   onCelebrationComplete,
+  imageModel,
+  onModelChange,
   onBackToEditor,
   onOpenAdvancedSettings,
   onStartOver,
@@ -139,6 +145,37 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Model toggle */}
+            <div className="flex items-center bg-slate-800 border border-slate-600 rounded-lg p-0.5 gap-0.5">
+              {([
+                { value: 'gemini-2.5-flash-image', label: 'Flash', icon: '\u26A1', cost: '1' },
+                { value: 'gemini-3-pro-image-preview', label: 'Pro', icon: '\u2728', cost: '3' },
+              ] as const).map((opt) => {
+                const isActive = imageModel === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => onModelChange(opt.value)}
+                    className={cn(
+                      'flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all',
+                      isActive
+                        ? opt.value.includes('pro')
+                          ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm'
+                          : 'bg-slate-600 text-white shadow-sm'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                    )}
+                    title={`${opt.label} — ${opt.cost} credit${opt.cost !== '1' ? 's' : ''}/image`}
+                  >
+                    <span className="text-[11px]">{opt.icon}</span>
+                    {opt.label}
+                    <span className={cn(
+                      'text-[10px] tabular-nums',
+                      isActive ? 'text-white/70' : 'text-slate-500'
+                    )}>{opt.cost}cr</span>
+                  </button>
+                );
+              })}
+            </div>
             <button
               onClick={onOpenAdvancedSettings}
               className="px-3 py-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 border border-slate-600 rounded-lg transition-colors"

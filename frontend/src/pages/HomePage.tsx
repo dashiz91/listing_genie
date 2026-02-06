@@ -1912,6 +1912,8 @@ export const HomePage: React.FC = () => {
           isGenerating={isGenerating}
           showGenerationCelebration={showGenerationCelebration}
           onCelebrationComplete={() => setShowGenerationCelebration(false)}
+          imageModel={formData.imageModel}
+          onModelChange={(model: string) => handleFormChange({ imageModel: model })}
           onBackToEditor={() => setView('create')}
           onOpenAdvancedSettings={() => setAdvancedSettingsOpen(true)}
           onStartOver={handleStartOver}
