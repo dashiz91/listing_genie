@@ -90,7 +90,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
 
   // Brand colors
   const addBrandColor = () => {
-    if (formData.brandColors.length < 5 && !formData.brandColors.includes(brandColorInput)) {
+    if (formData.brandColors.length < 3 && !formData.brandColors.includes(brandColorInput)) {
       onFormChange({ brandColors: [...formData.brandColors, brandColorInput] });
     }
   };
@@ -271,7 +271,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
 
                 {/* Brand Colors */}
                 <div>
-                  <label className="block text-sm text-slate-300 mb-1">Brand Colors (up to 5)</label>
+                  <label className="block text-sm text-slate-300 mb-1">Brand Colors (up to 3)</label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {formData.brandColors.map((color) => (
                       <div
@@ -309,7 +309,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
                     />
                     <button
                       onClick={addBrandColor}
-                      disabled={formData.brandColors.length >= 5}
+                      disabled={formData.brandColors.length >= 3}
                       className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                     >
                       Add
@@ -455,7 +455,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
                     >
                       AI Decides
                     </button>
-                    {[2, 3, 4, 5, 6].map((count) => (
+                    {[2, 3].map((count) => (
                       <button
                         key={count}
                         onClick={() => onFormChange({ colorCount: count })}
