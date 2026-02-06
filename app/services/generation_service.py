@@ -20,7 +20,7 @@ from app.models.database import (
     ColorModeEnum,
 )
 from app.prompts import PromptEngine, ProductContext, get_prompt_engine, get_all_styles
-from app.services.gemini_service import GeminiService
+from app.services.gemini_service import GeminiService, LIGHTING_OVERRIDE
 from app.services.supabase_storage_service import SupabaseStorageService
 from app.schemas.generation import (
     GenerationRequest,
@@ -670,6 +670,9 @@ class GenerationService:
                     )
                     prompt = style_prefix + prompt
                     logger.info(f"[{template_key.upper()}] Added style reference prefix (style is Image #{style_image_index})")
+
+                # Append lighting override (prevents amateur lighting bleed from reference photos)
+                prompt = prompt + LIGHTING_OVERRIDE
 
                 # Generate image with reference(s)
                 generated_image = await self.gemini.generate_image(

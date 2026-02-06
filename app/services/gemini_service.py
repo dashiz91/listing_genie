@@ -113,13 +113,6 @@ class GeminiService:
 
         contents = []
 
-        # Determine if reference images are present (triggers lighting override)
-        has_reference_images = bool(named_images) or bool(reference_image_path) or bool(reference_image_paths)
-
-        # Append lighting override when generating with reference photos
-        if has_reference_images:
-            prompt = prompt + LIGHTING_OVERRIDE
-
         if named_images:
             # New path: interleave text labels with images, then prompt last
             # Each item is (label, source) where source is a path string or PIL Image

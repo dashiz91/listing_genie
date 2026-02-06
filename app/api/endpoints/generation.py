@@ -16,7 +16,7 @@ from PIL import Image
 
 from app.core.auth import User, get_optional_user, get_current_user
 from app.db.session import get_db
-from app.services.gemini_service import GeminiService, get_gemini_service, _load_image_from_path
+from app.services.gemini_service import GeminiService, get_gemini_service, _load_image_from_path, LIGHTING_OVERRIDE
 from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.generation_service import GenerationService
 from app.services.vision_service import VisionService, get_vision_service as get_unified_vision_service
@@ -1343,6 +1343,9 @@ async def generate_aplus_hero_pair(
                 prompt = f"CLIENT DIRECTION:\n{request.custom_instructions}\n\n{prompt}"
                 hero_change_summary = "Direct prepend (AI enhancement unavailable)"
 
+        # Append lighting override (prevents amateur lighting bleed from reference photos)
+        prompt = prompt + LIGHTING_OVERRIDE
+
         # Assemble reference images and execute via unified pipeline
         ref_images = assemble_reference_images(
             session, "aplus_hero",
@@ -1549,6 +1552,9 @@ async def generate_aplus_module(
                 logger.warning(f"AI enhancement failed for module {request.module_index}, prepending note: {e}")
                 prompt = f"CLIENT DIRECTION:\n{request.custom_instructions}\n\n{prompt}"
                 ai_change_summary = "Direct prepend (AI enhancement unavailable)"
+
+        # Append lighting override (prevents amateur lighting bleed from reference photos)
+        prompt = prompt + LIGHTING_OVERRIDE
 
         # === Build GenerationContext and execute ===
         logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, chained={is_chained}, canvas_ext={use_canvas_extension})")
