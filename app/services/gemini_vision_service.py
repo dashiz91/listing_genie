@@ -532,6 +532,7 @@ Make each framework's palette distinct but appropriate for the product.
         colors = framework.get('colors', [])
         if not isinstance(colors, list):
             colors = []
+        colors = colors[:3]  # Enforce 3-color maximum
         color_palette = ""
         primary_hex = "#000000"
         accent_hex = "#000000"

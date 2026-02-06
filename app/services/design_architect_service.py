@@ -369,6 +369,12 @@ class DesignArchitectService:
             if len(data['frameworks']) < 4:
                 logger.warning(f"Only got {len(data['frameworks'])} frameworks, expected 4")
 
+            # Enforce 3-color maximum per framework
+            for fw in data.get('frameworks', []):
+                if 'colors' in fw and len(fw['colors']) > 3:
+                    logger.info(f"Truncating framework colors from {len(fw['colors'])} to 3")
+                    fw['colors'] = fw['colors'][:3]
+
             return data
 
         except json.JSONDecodeError as e:
@@ -402,8 +408,8 @@ class DesignArchitectService:
                 image_copy = copy
                 break
 
-        # Build color section
-        colors = framework.get('colors', [])
+        # Build color section (max 3 colors)
+        colors = framework.get('colors', [])[:3]
         color_section = "[COLOR PALETTE - EXACT VALUES]\n"
         for color in colors:
             color_section += f"- {color['role'].upper()}: {color['hex']} ({color['name']}) - {color['usage']}\n"
