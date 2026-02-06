@@ -1,12 +1,13 @@
 """
 Tests for Image Generation API Endpoints
 """
+import asyncio
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from PIL import Image
-import io
 
+from app.dependencies import get_storage_service
 from app.main import app
 from app.schemas.generation import (
     GenerationRequest,
@@ -18,12 +19,75 @@ from app.models.database import Base, GenerationSession
 from app.db.session import engine, SessionLocal
 
 
+class DummyStorageService:
+    """Storage stub for tests (no external services required)."""
+
+    generated_bucket = "generated"
+    uploads_bucket = "uploads"
+
+    def save_generated_image(self, session_id, image_type, image):
+        return f"supabase://generated/{session_id}/{image_type}.png"
+
+    def save_generated_image_versioned(self, session_id, image_type, image, version):
+        return f"supabase://generated/{session_id}/{image_type}.png"
+
+    def get_generated_url(self, session_id, image_type, expires_in=3600):
+        return f"https://example.test/{session_id}/{image_type}.png"
+
+    def health_check(self):
+        return {"status": "accessible"}
+
+
+class _LegacyBucket:
+    def __init__(self, names):
+        self._names = names
+
+    def list(self, prefix):
+        return [{"name": name} for name in self._names]
+
+
+class _LegacyStorageAPI:
+    def __init__(self, names):
+        self._bucket = _LegacyBucket(names)
+
+    def from_(self, name):
+        return self._bucket
+
+
+class LegacyAplusStorageService(DummyStorageService):
+    """Storage stub where canonical A+ key is missing but versioned file exists."""
+
+    def __init__(self, names):
+        self.generated_bucket = "generated"
+        self.uploads_bucket = "uploads"
+        self.client = MagicMock()
+        self.client.storage = _LegacyStorageAPI(names)
+        self.saved_calls = []
+
+    def get_generated_url(self, session_id, image_type, expires_in=3600):
+        raise FileNotFoundError(f"Missing canonical key: {image_type}")
+
+    def save_generated_image_versioned(self, session_id, image_type, image, version):
+        self.saved_calls.append(
+            {
+                "session_id": session_id,
+                "image_type": image_type,
+                "version": version,
+            }
+        )
+        return f"supabase://generated/{session_id}/{image_type}.png"
+
+
 @pytest.fixture(scope="function")
 def client():
     """Create test client with fresh database"""
     Base.metadata.create_all(bind=engine)
-    yield TestClient(app)
-    Base.metadata.drop_all(bind=engine)
+    app.dependency_overrides[get_storage_service] = lambda: DummyStorageService()
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(get_storage_service, None)
+        Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture
@@ -100,10 +164,8 @@ class TestGenerationEndpoints:
         assert "/api/generate/{session_id}" in paths
 
     @patch('app.services.gemini_service.GeminiService.generate_image')
-    @patch('app.services.storage_service.StorageService.save_generated_image')
     def test_start_generation_creates_session(
         self,
-        mock_save,
         mock_generate,
         client,
         sample_request,
@@ -112,7 +174,6 @@ class TestGenerationEndpoints:
         """Test that generation creates a session in database"""
         # Setup mocks
         mock_generate.return_value = mock_pil_image
-        mock_save.return_value = "storage/generated/test-id/main.png"
 
         response = client.post("/api/generate/", json=sample_request)
 
@@ -124,7 +185,7 @@ class TestGenerationEndpoints:
             assert "session_id" in data
             assert "status" in data
             assert "images" in data
-            assert len(data["images"]) == 5
+            assert len(data["images"]) == 6
 
     def test_get_session_not_found(self, client):
         """Test getting non-existent session returns 404"""
@@ -149,14 +210,12 @@ class TestGenerationService:
     def test_create_session_from_request(self, client, sample_request):
         """Test session creation from request"""
         from app.services.generation_service import GenerationService
-        from app.services.gemini_service import GeminiService
-        from app.services.storage_service import StorageService
         from app.schemas.generation import GenerationRequest
 
         db = SessionLocal()
         try:
-            gemini = GeminiService()
-            storage = StorageService()
+            gemini = MagicMock()
+            storage = DummyStorageService()
             service = GenerationService(db=db, gemini=gemini, storage=storage)
 
             request = GenerationRequest(**sample_request)
@@ -165,7 +224,7 @@ class TestGenerationService:
             assert session.id is not None
             assert session.product_title == sample_request["product_title"]
             assert len(session.keywords) == 2
-            assert len(session.images) == 5
+            assert len(session.images) == 6
 
             # Check all image types created
             image_types = {img.image_type.value for img in session.images}
@@ -173,6 +232,7 @@ class TestGenerationService:
             assert "infographic_1" in image_types
             assert "infographic_2" in image_types
             assert "lifestyle" in image_types
+            assert "transformation" in image_types
             assert "comparison" in image_types
 
         finally:
@@ -181,14 +241,12 @@ class TestGenerationService:
     def test_get_session_status(self, client, sample_request):
         """Test retrieving session status"""
         from app.services.generation_service import GenerationService
-        from app.services.gemini_service import GeminiService
-        from app.services.storage_service import StorageService
         from app.schemas.generation import GenerationRequest
 
         db = SessionLocal()
         try:
-            gemini = GeminiService()
-            storage = StorageService()
+            gemini = MagicMock()
+            storage = DummyStorageService()
             service = GenerationService(db=db, gemini=gemini, storage=storage)
 
             request = GenerationRequest(**sample_request)
@@ -205,24 +263,59 @@ class TestGenerationService:
     def test_get_session_results(self, client, sample_request):
         """Test getting session image results"""
         from app.services.generation_service import GenerationService
-        from app.services.gemini_service import GeminiService
-        from app.services.storage_service import StorageService
         from app.schemas.generation import GenerationRequest
 
         db = SessionLocal()
         try:
-            gemini = GeminiService()
-            storage = StorageService()
+            gemini = MagicMock()
+            storage = DummyStorageService()
             service = GenerationService(db=db, gemini=gemini, storage=storage)
 
             request = GenerationRequest(**sample_request)
             session = service.create_session(request)
 
             results = service.get_session_results(session)
-            assert len(results) == 5
+            assert len(results) == 6
             for result in results:
                 assert result.status.value == "pending"
 
+        finally:
+            db.close()
+
+    def test_edit_aplus_uses_versioned_fallback_when_canonical_missing(self, client, sample_request):
+        """Test A+ edit fallback to latest versioned image when canonical key is missing."""
+        from app.services.generation_service import GenerationService
+        from app.schemas.generation import GenerationRequest
+        from app.models.database import ImageTypeEnum as DBImageTypeEnum
+
+        db = SessionLocal()
+        try:
+            gemini = MagicMock()
+            gemini.model = "gemini-test-model"
+            gemini.edit_image = AsyncMock(return_value=Image.new("RGB", (1464, 600), color="white"))
+
+            storage = LegacyAplusStorageService(
+                names=["aplus_full_image_0_v3.png", "aplus_full_image_1_v3.png"]
+            )
+            service = GenerationService(db=db, gemini=gemini, storage=storage)
+
+            request = GenerationRequest(**sample_request)
+            session = service.create_session(request)
+
+            result = asyncio.run(
+                service.edit_single_image(
+                    session=session,
+                    image_type=DBImageTypeEnum.APLUS_0,
+                    edit_instructions="Make headline text larger and bolder.",
+                )
+            )
+
+            assert result.status.value == "complete"
+            assert result.storage_path.endswith("/aplus_full_image_0.png")
+            assert gemini.edit_image.await_count == 1
+            source_path = gemini.edit_image.await_args.kwargs["source_image_path"]
+            assert source_path.endswith("/aplus_full_image_0_v3.png")
+            assert storage.saved_calls[0]["image_type"] == "aplus_full_image_0"
         finally:
             db.close()
 
@@ -237,16 +330,15 @@ class TestAsyncGeneration:
         paths = response.json()["paths"]
         assert "/api/generate/async" in paths
 
-    @patch('app.services.gemini_service.GeminiService.generate_image')
+    @patch('app.services.generation_service.GenerationService.generate_all_images', new_callable=AsyncMock)
     def test_async_generation_returns_immediately(
         self,
-        mock_generate,
+        mock_generate_all,
         client,
         sample_request
     ):
         """Test async endpoint returns processing status immediately"""
-        # Don't set return value - we want it to queue
-        mock_generate.return_value = None
+        mock_generate_all.return_value = []
 
         response = client.post("/api/generate/async", json=sample_request)
 
@@ -323,8 +415,6 @@ class TestRetryLogic:
     def test_generation_stats_structure(self, client, sample_request):
         """Test generation stats return correct structure"""
         from app.services.generation_service import GenerationService
-        from app.services.gemini_service import GeminiService
-        from app.services.storage_service import StorageService
         from app.schemas.generation import GenerationRequest
         from app.db.session import SessionLocal, engine
         from app.models.database import Base
@@ -334,8 +424,8 @@ class TestRetryLogic:
 
         db = SessionLocal()
         try:
-            gemini = GeminiService()
-            storage = StorageService()
+            gemini = MagicMock()
+            storage = DummyStorageService()
             service = GenerationService(db=db, gemini=gemini, storage=storage)
 
             request = GenerationRequest(**sample_request)
@@ -345,10 +435,10 @@ class TestRetryLogic:
 
             assert "session_id" in stats
             assert "total_images" in stats
-            assert stats["total_images"] == 5
+            assert stats["total_images"] == 6
             assert "by_status" in stats
             assert "retry_counts" in stats
-            assert len(stats["retry_counts"]) == 5
+            assert len(stats["retry_counts"]) == 6
 
         finally:
             db.close()

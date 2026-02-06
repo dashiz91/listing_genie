@@ -4,6 +4,7 @@ Orchestrates prompt building, image generation, and storage with robust error ha
 """
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -415,6 +416,95 @@ class GenerationService:
         if attempt < len(RetryConfig.VARIATIONS):
             return RetryConfig.VARIATIONS[attempt]
         return RetryConfig.VARIATIONS[-1]
+
+    def _find_latest_versioned_image_name(
+        self,
+        session_id: str,
+        base_keys: List[str],
+    ) -> Optional[str]:
+        """
+        Find the newest versioned image filename in a session folder.
+
+        Supports multiple historical naming patterns so older projects
+        can still be edited after storage key conventions changed.
+        """
+        try:
+            files = self.storage.client.storage.from_(self.storage.generated_bucket).list(session_id)
+        except Exception as e:
+            logger.warning(f"Failed to list generated files for {session_id}: {e}")
+            return None
+
+        best_name = None
+        best_version = -1
+
+        for item in files or []:
+            raw_name = item.get("name", "")
+            name = raw_name.split("/")[-1] if "/" in raw_name else raw_name
+            for base_key in base_keys:
+                match = re.match(rf"^{re.escape(base_key)}_v(\d+)\.png$", name)
+                if not match:
+                    continue
+                version = int(match.group(1))
+                if version > best_version:
+                    best_version = version
+                    best_name = name
+
+        return best_name
+
+    def _resolve_aplus_source_image_path(self, session_id: str, aplus_idx: str) -> tuple[str, str]:
+        """
+        Resolve the best source image path for A+ edit operations.
+
+        Returns:
+            (source_image_path, canonical_save_key)
+        """
+        canonical_key = f"aplus_full_image_{aplus_idx}"
+        canonical_path = f"supabase://{self.storage.generated_bucket}/{session_id}/{canonical_key}.png"
+
+        # Fast path: canonical latest key exists.
+        try:
+            self.storage.get_generated_url(session_id, canonical_key, expires_in=60)
+            return canonical_path, canonical_key
+        except Exception:
+            pass
+
+        # Legacy fallback: some sessions only have older/non-canonical names.
+        candidate_names = [
+            f"aplus_{aplus_idx}.png",
+        ]
+        try:
+            files = self.storage.client.storage.from_(self.storage.generated_bucket).list(session_id)
+            names = {
+                (item.get("name", "").split("/")[-1] if "/" in item.get("name", "") else item.get("name", ""))
+                for item in (files or [])
+            }
+        except Exception as e:
+            logger.warning(f"Failed to list generated files for fallback lookup ({session_id}): {e}")
+            names = set()
+
+        for name in candidate_names:
+            if name in names:
+                fallback_path = f"supabase://{self.storage.generated_bucket}/{session_id}/{name}"
+                logger.info(
+                    f"Using legacy A+ source key for module {aplus_idx}: {name} "
+                    f"(canonical {canonical_key}.png missing)"
+                )
+                return fallback_path, canonical_key
+
+        # Versioned fallback: pick latest *_vN.png variant.
+        latest_versioned = self._find_latest_versioned_image_name(
+            session_id=session_id,
+            base_keys=[canonical_key, f"aplus_{aplus_idx}"],
+        )
+        if latest_versioned:
+            fallback_path = f"supabase://{self.storage.generated_bucket}/{session_id}/{latest_versioned}"
+            logger.info(
+                f"Using versioned A+ source for module {aplus_idx}: {latest_versioned} "
+                f"(canonical {canonical_key}.png missing)"
+            )
+            return fallback_path, canonical_key
+
+        raise ValueError(f"No A+ image found for module {aplus_idx}")
 
     async def generate_single_image(
         self,
@@ -848,15 +938,11 @@ class GenerationService:
         existing_image_path = None
 
         if is_aplus:
-            # Derive storage key: aplus_0 → aplus_full_image_0
             aplus_idx = template_key.replace("aplus_", "")
-            storage_key = f"aplus_full_image_{aplus_idx}"
-            existing_image_path = f"supabase://{self.storage.generated_bucket}/{session.id}/{storage_key}.png"
-            # Verify image exists by trying to get URL
-            try:
-                self.storage.get_generated_url(session.id, storage_key, expires_in=60)
-            except Exception:
-                raise ValueError(f"No A+ image found for module {aplus_idx}")
+            existing_image_path, storage_key = self._resolve_aplus_source_image_path(
+                session_id=session.id,
+                aplus_idx=aplus_idx,
+            )
         else:
             # Find the listing image record
             for img in session.images:
@@ -1618,3 +1704,4 @@ class GenerationResult:
     @property
     def primary_version(self) -> int:
         return self.saved[self.primary_key][2]
+

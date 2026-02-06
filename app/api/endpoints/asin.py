@@ -10,16 +10,30 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from app.core.auth import get_current_user, User
-from app.services.amazon_scraper_service import (
-    get_amazon_scraper,
-    AmazonScraperError,
-    AmazonProductData,
-)
 from app.services.supabase_storage_service import SupabaseStorageService
 from app.dependencies import get_storage_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _load_scraper_components():
+    """
+    Lazily import scraper components so optional scraping dependencies don't
+    break app startup or unrelated tests.
+    """
+    try:
+        from app.services.amazon_scraper_service import (
+            get_amazon_scraper,
+            AmazonScraperError,
+        )
+        return get_amazon_scraper, AmazonScraperError
+    except ModuleNotFoundError as e:
+        logger.error(f"[ASIN] Scraper dependencies missing: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="ASIN import is unavailable: scraping dependencies are not installed"
+        )
 
 
 class ASINImportRequest(BaseModel):
@@ -61,12 +75,13 @@ async def import_from_asin(
     Returns data in a format ready to populate the listing generator form.
     """
     logger.info(f"[ASIN] User {user.id} importing ASIN: {request.asin} (marketplace: {request.marketplace})")
+    get_amazon_scraper, AmazonScraperError = _load_scraper_components()
 
     scraper = get_amazon_scraper()
 
     try:
         # Fetch product data from Amazon
-        product: AmazonProductData = await scraper.fetch_product(
+        product = await scraper.fetch_product(
             asin=request.asin,
             marketplace=request.marketplace
         )
@@ -137,6 +152,7 @@ async def validate_asin(
 
     Returns the normalized ASIN if valid.
     """
+    get_amazon_scraper, AmazonScraperError = _load_scraper_components()
     scraper = get_amazon_scraper()
 
     try:
