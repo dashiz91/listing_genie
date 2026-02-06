@@ -703,8 +703,10 @@ class ApiClient {
   /**
    * Get the Amazon OAuth authorization URL to redirect the seller to.
    */
-  async getAmazonAuthUrl(): Promise<AmazonAuthUrlResponse> {
-    const response = await this.client.post<AmazonAuthUrlResponse>('/amazon/auth/url');
+  async getAmazonAuthUrl(marketplaceId?: string): Promise<AmazonAuthUrlResponse> {
+    const response = await this.client.post<AmazonAuthUrlResponse>('/amazon/auth/url', {
+      marketplace_id: marketplaceId,
+    });
     return response.data;
   }
 
@@ -722,12 +724,15 @@ class ApiClient {
   async pushListingImages(
     sessionId: string,
     asin: string,
-    sku: string
+    sku: string,
+    options?: { marketplaceId?: string; imagePaths?: string[] }
   ): Promise<AmazonPushResponse> {
     const response = await this.client.post<AmazonPushResponse>('/amazon/push/listing-images', {
       session_id: sessionId,
       asin,
       sku,
+      marketplace_id: options?.marketplaceId,
+      image_paths: options?.imagePaths,
     });
     return response.data;
   }

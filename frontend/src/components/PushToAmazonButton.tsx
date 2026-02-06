@@ -68,22 +68,20 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({ sessionId, asin
     pollRef.current = setInterval(async () => {
       try {
         const result = await apiClient.getAmazonPushStatus(jobId);
-        setState({
-          phase: result.status === 'completed' ? 'completed' :
-                 result.status === 'failed' ? 'failed' :
-                 'pushing',
-          ...(result.status === 'completed' ? { message: result.message || 'Images pushed successfully!' } : {}),
-          ...(result.status === 'failed' ? { error: result.error || 'Push failed. Please try again.' } : {}),
-          ...(['queued', 'uploading', 'processing'].includes(result.status) ? {
+        if (result.status === 'completed') {
+          setState({ phase: 'completed', message: result.step || 'Images pushed successfully!' });
+          if (pollRef.current) clearInterval(pollRef.current);
+        } else if (result.status === 'failed') {
+          setState({ phase: 'failed', error: result.error_message || 'Push failed. Please try again.' });
+          if (pollRef.current) clearInterval(pollRef.current);
+        } else {
+          setState({
+            phase: 'pushing',
             jobId,
             status: result.status,
             progress: result.progress,
-            message: result.message,
-          } : {}),
-        } as PushState);
-
-        if (result.status === 'completed' || result.status === 'failed') {
-          if (pollRef.current) clearInterval(pollRef.current);
+            message: result.step,
+          });
         }
       } catch {
         // Don't stop polling on transient errors
@@ -138,7 +136,8 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({ sessionId, asin
   const statusLabel = (status: AmazonPushJobStatus): string => {
     switch (status) {
       case 'queued': return 'Queued';
-      case 'uploading': return 'Uploading images...';
+      case 'preparing': return 'Preparing images...';
+      case 'submitting': return 'Submitting to Amazon...';
       case 'processing': return 'Amazon is processing...';
       case 'completed': return 'Complete!';
       case 'failed': return 'Failed';

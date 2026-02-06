@@ -528,21 +528,27 @@ export interface ImageVersion {
 // Amazon Seller Central Push
 // ============================================================================
 
+export type AmazonConnectionMode = 'env' | 'oauth' | 'manual' | 'none';
+
 export interface AmazonAuthStatus {
   connected: boolean;
-  seller_id?: string;
-  marketplace?: string;
+  seller_id: string | null;
+  marketplace_id: string;
+  connection_mode: AmazonConnectionMode;
+  last_connected_at: string | null;
 }
 
 export interface AmazonAuthUrlResponse {
   auth_url: string;
+  state: string;
+  expires_in_seconds: number;
 }
 
 export interface AmazonDisconnectResponse {
-  success: boolean;
+  disconnected: boolean;
 }
 
-export type AmazonPushJobStatus = 'queued' | 'uploading' | 'processing' | 'completed' | 'failed';
+export type AmazonPushJobStatus = 'queued' | 'preparing' | 'submitting' | 'processing' | 'completed' | 'failed';
 
 export interface AmazonPushResponse {
   job_id: string;
@@ -551,10 +557,18 @@ export interface AmazonPushResponse {
 
 export interface AmazonPushStatusResponse {
   job_id: string;
+  kind: string;
   status: AmazonPushJobStatus;
-  progress?: number;
-  message?: string;
-  error?: string;
+  progress: number;
+  step: string;
+  asin: string | null;
+  sku: string | null;
+  session_id: string | null;
+  submission_id: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string | null;
+  completed_at: string | null;
 }
 
 // A+ Module dimensions (for UI reference)

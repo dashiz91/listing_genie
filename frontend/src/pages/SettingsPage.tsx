@@ -103,7 +103,7 @@ export const SettingsPage: React.FC = () => {
       setAmazonAuth(data);
     } catch (err) {
       console.error('Failed to fetch Amazon auth status:', err);
-      setAmazonAuth({ connected: false });
+      setAmazonAuth({ connected: false, seller_id: null, marketplace_id: '', connection_mode: 'none', last_connected_at: null });
     } finally {
       setAmazonLoading(false);
     }
@@ -129,11 +129,11 @@ export const SettingsPage: React.FC = () => {
       url.searchParams.delete('amazon_connect');
       window.history.replaceState({}, '', url.toString());
     } else if (amazonConnect === 'error') {
-      const errorMsg = params.get('error_message') || 'Failed to connect Amazon account. Please try again.';
+      const errorMsg = params.get('reason') || 'Failed to connect Amazon account. Please try again.';
       setAmazonMessage({ type: 'error', text: errorMsg });
       const url = new URL(window.location.href);
       url.searchParams.delete('amazon_connect');
-      url.searchParams.delete('error_message');
+      url.searchParams.delete('reason');
       window.history.replaceState({}, '', url.toString());
     }
   }, [fetchAmazonAuth]);
@@ -516,7 +516,8 @@ export const SettingsPage: React.FC = () => {
                 <p className="text-sm font-medium text-green-400">Connected</p>
                 <p className="text-xs text-slate-400">
                   Seller ID: {amazonAuth.seller_id || 'N/A'}
-                  {amazonAuth.marketplace && ` | Marketplace: ${amazonAuth.marketplace}`}
+                  {amazonAuth.marketplace_id && ` | Marketplace: ${amazonAuth.marketplace_id}`}
+                  {amazonAuth.connection_mode && amazonAuth.connection_mode !== 'none' && ` | Via: ${amazonAuth.connection_mode}`}
                 </p>
               </div>
             </div>
@@ -530,7 +531,7 @@ export const SettingsPage: React.FC = () => {
                 setAmazonMessage(null);
                 try {
                   await apiClient.disconnectAmazon();
-                  setAmazonAuth({ connected: false });
+                  setAmazonAuth({ connected: false, seller_id: null, marketplace_id: '', connection_mode: 'none', last_connected_at: null });
                   setAmazonMessage({ type: 'success', text: 'Amazon account disconnected.' });
                 } catch (err) {
                   console.error('Failed to disconnect:', err);
