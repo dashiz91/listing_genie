@@ -88,7 +88,7 @@ Framework Personalities:
 - Framework 4: "Elevated Everyday" - Transforms the ordinary into something special
 
 Each framework needs:
-1. COLOR PALETTE (5 colors with hex codes) - Based on what you SEE in the product
+1. COLOR PALETTE (3 colors ONLY with hex codes: primary, secondary, accent) - Based on what you SEE in the product. Premium brands use FEWER colors.
 2. TYPOGRAPHY - Specific font names that match the emotional personality
 3. STORY ARC - An EMOTIONAL journey (not feature-based):
    - Theme: The feeling that connects all images
@@ -137,9 +137,7 @@ Return valid JSON with this structure:
       "colors": [
         {{"hex": "#XXXXXX", "name": "Name", "role": "primary", "usage": "60% - description"}},
         {{"hex": "#XXXXXX", "name": "Name", "role": "secondary", "usage": "30% - description"}},
-        {{"hex": "#XXXXXX", "name": "Name", "role": "accent", "usage": "10% - description"}},
-        {{"hex": "#XXXXXX", "name": "Name", "role": "text_dark", "usage": "Dark text"}},
-        {{"hex": "#XXXXXX", "name": "Name", "role": "text_light", "usage": "Light text"}}
+        {{"hex": "#XXXXXX", "name": "Name", "role": "accent", "usage": "10% - description"}}
       ],
       "typography": {{
         "headline_font": "Font Name",
@@ -227,7 +225,7 @@ Don't copy pixels. Capture the FEELING:
 - How does space breathe?
 
 Extract:
-- COLOR PALETTE: Dominant colors (5 hex codes)
+- COLOR PALETTE: Dominant colors (3 hex codes ONLY — primary, secondary, accent)
 - TYPOGRAPHY FEEL: What font style matches the emotional tone?
 - LIGHTING: How is it lit? What mood does this create?
 - EMOTIONAL ESSENCE: What feeling does it convey?
@@ -267,9 +265,7 @@ Return valid JSON:
       "colors": [
         {{"hex": "#XXXXXX", "name": "Color Name", "role": "primary", "usage": "60% - Main brand color from style reference"}},
         {{"hex": "#XXXXXX", "name": "Color Name", "role": "secondary", "usage": "30% - Supporting color from style reference"}},
-        {{"hex": "#XXXXXX", "name": "Color Name", "role": "accent", "usage": "10% - Pop color from style reference"}},
-        {{"hex": "#XXXXXX", "name": "Color Name", "role": "text_dark", "usage": "Dark text on light backgrounds"}},
-        {{"hex": "#XXXXXX", "name": "Color Name", "role": "text_light", "usage": "Light text on dark backgrounds"}}
+        {{"hex": "#XXXXXX", "name": "Color Name", "role": "accent", "usage": "10% - Pop color from style reference"}}
       ],
       "typography": {{
         "headline_font": "Font Name matching style reference feel",

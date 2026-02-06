@@ -185,12 +185,12 @@ LOCKED PALETTE MODE: The user has LOCKED these specific colors: {', '.join(locke
 """
             else:
                 color_mode_instructions = """
-EXTRACT COLORS: Study the style reference image and extract:
-- The dominant color → PRIMARY
-- The supporting color → SECONDARY
-- The accent/pop color → ACCENT
-- Derive appropriate text_dark and text_light colors for readability
+EXTRACT COLORS (3 ONLY): Study the style reference image and extract:
+- The dominant color → PRIMARY (60%)
+- The supporting color → SECONDARY (30%)
+- The accent/pop color → ACCENT (10%)
 
+ONLY 3 colors. Premium brands use FEWER colors. Text colors derive from the palette.
 Use the ACTUAL colors you see in the style reference. Do NOT invent colors.
 """
 
@@ -320,7 +320,7 @@ USER PROVIDED ONLY 2 COLORS:
 
                 color_rules += f"""
 ADDITIONAL RULES:
-- text_dark and text_light: You may generate these for readability
+- ONLY 3 colors per framework (primary, secondary, accent). No text_dark or text_light.
 - ALL 4 frameworks MUST have IDENTICAL color hex codes for primary/secondary/accent
 - The frameworks should differ in typography, layout, voice - NOT in colors
 
@@ -460,6 +460,12 @@ Make each framework's palette distinct but appropriate for the product.
             logger.info("=" * 60)
 
             logger.info(f"[Gemini Vision] Generated {len(frameworks_data.get('frameworks', []))} frameworks")
+
+            # Enforce 3-color maximum per framework
+            for fw in frameworks_data.get('frameworks', []):
+                if 'colors' in fw and len(fw['colors']) > 3:
+                    logger.info(f"Truncating framework colors from {len(fw['colors'])} to 3")
+                    fw['colors'] = fw['colors'][:3]
 
             return frameworks_data
 
