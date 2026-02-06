@@ -17,6 +17,20 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Lighting Override — appended to every generation prompt that uses reference
+# photos. Prevents Gemini from reproducing amateur lighting conditions from
+# the source product photo. See docs/lighting-override-findings.md for details.
+# ---------------------------------------------------------------------------
+LIGHTING_OVERRIDE = (
+    "\n\nLIGHTING OVERRIDE: Disregard all lighting, shadows, and ambient "
+    "conditions from the reference photo. Apply fresh, professional studio "
+    "lighting appropriate for this scene. Every surface of the product must "
+    "be cleanly illuminated — no dark patches, muddy shadows, or harsh "
+    "contrast carried from the source photo. Light the product as if it were "
+    "photographed in a top-tier studio, not an amateur setting."
+)
+
 # Storage service singleton for loading images
 _storage_service: Optional["SupabaseStorageService"] = None
 
@@ -98,6 +112,13 @@ class GeminiService:
             raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
 
         contents = []
+
+        # Determine if reference images are present (triggers lighting override)
+        has_reference_images = bool(named_images) or bool(reference_image_path) or bool(reference_image_paths)
+
+        # Append lighting override when generating with reference photos
+        if has_reference_images:
+            prompt = prompt + LIGHTING_OVERRIDE
 
         if named_images:
             # New path: interleave text labels with images, then prompt last
