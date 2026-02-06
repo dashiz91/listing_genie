@@ -165,7 +165,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
         onFormChange({
           styleReferenceFile: file,
           styleReferencePreview: reader.result as string,
-          colorPalette: style.colors.slice(0, 6),
+          colorPalette: style.colors.slice(0, 3),
         });
       };
       reader.readAsDataURL(file);
@@ -173,7 +173,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
       console.error('Failed to load style:', err);
       onFormChange({
         styleReferencePreview: style.preview_image,
-        colorPalette: style.colors.slice(0, 6),
+        colorPalette: style.colors.slice(0, 3),
       });
     }
   }, [onFormChange]);

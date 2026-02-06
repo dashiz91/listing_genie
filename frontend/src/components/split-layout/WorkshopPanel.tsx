@@ -222,7 +222,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
           styleReferenceFile: file,
           styleReferencePreview: reader.result as string,
           // Also set the color palette from the style
-          colorPalette: style.colors.slice(0, 6),
+          colorPalette: style.colors.slice(0, 3),
         });
       };
       reader.readAsDataURL(file);
@@ -231,7 +231,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
       // Fallback: just set the preview URL directly
       onFormChange({
         styleReferencePreview: style.preview_image,
-        colorPalette: style.colors.slice(0, 6),
+        colorPalette: style.colors.slice(0, 3),
       });
     }
   }, [onFormChange]);

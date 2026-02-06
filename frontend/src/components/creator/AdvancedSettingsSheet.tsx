@@ -11,7 +11,7 @@ import { StyleLibrary } from '@/components/StyleLibrary';
 import type { WorkshopFormData } from '../split-layout/WorkshopPanel';
 
 // Default colors for quick picks
-const DEFAULT_COLORS = ['#4CAF50', '#2196F3', '#FF9800', '#E91E63', '#9C27B0'];
+const DEFAULT_COLORS = ['#4CAF50', '#2196F3', '#FF9800'];
 
 interface AdvancedSettingsSheetProps {
   open: boolean;
@@ -101,7 +101,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
 
   // Palette colors
   const addPaletteColor = () => {
-    if (formData.colorPalette.length < 6 && !formData.colorPalette.includes(paletteColorInput)) {
+    if (formData.colorPalette.length < 3 && !formData.colorPalette.includes(paletteColorInput)) {
       onFormChange({ colorPalette: [...formData.colorPalette, paletteColorInput] });
     }
   };
@@ -127,7 +127,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
         onFormChange({
           styleReferenceFile: file,
           styleReferencePreview: reader.result as string,
-          colorPalette: style.colors.slice(0, 6),
+          colorPalette: style.colors.slice(0, 3),
         });
       };
       reader.readAsDataURL(file);
@@ -135,7 +135,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
       console.error('Failed to load style:', err);
       onFormChange({
         styleReferencePreview: style.preview_image,
-        colorPalette: style.colors.slice(0, 6),
+        colorPalette: style.colors.slice(0, 3),
       });
     }
   }, [onFormChange]);
@@ -497,7 +497,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
                       </div>
                     ))}
                   </div>
-                  {formData.colorPalette.length < 6 && (
+                  {formData.colorPalette.length < 3 && (
                     <div className="flex gap-2">
                       <input
                         type="color"
