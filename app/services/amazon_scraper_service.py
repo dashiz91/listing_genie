@@ -125,16 +125,18 @@ class AmazonScraperService:
         url = f"https://www.amazon.{marketplace}/dp/{asin}"
         logger.info(f"Fetching Amazon product: {url}")
 
-        # Fetch with retries
-        max_retries = 3
+        # Fetch with retries (4 attempts to handle CAPTCHA/bot detection)
+        max_retries = 4
         last_error = None
 
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             for attempt in range(max_retries):
                 try:
-                    # Add delay between retries
+                    # Add delay between retries (longer backoff for CAPTCHA/bot detection)
                     if attempt > 0:
-                        await asyncio.sleep(2 * attempt)
+                        delay = 2 + (attempt * 2)  # 4s, 6s
+                        logger.info(f"[ASIN] Retry {attempt + 1}/{max_retries} for {asin} after {delay}s delay")
+                        await asyncio.sleep(delay)
 
                     response = await client.get(url, headers=self._get_headers())
 
@@ -152,6 +154,14 @@ class AmazonScraperService:
                     # Parse the HTML
                     return self._parse_product_page(asin, response.text)
 
+                except AmazonScraperError as e:
+                    if "CAPTCHA" in str(e):
+                        # CAPTCHA = retry silently with different user agent
+                        logger.warning(f"[ASIN] CAPTCHA on attempt {attempt + 1}/{max_retries} for {asin}")
+                        last_error = e
+                        continue
+                    # Non-CAPTCHA scraper errors (404, parse failures) — don't retry
+                    raise
                 except httpx.TimeoutException:
                     logger.warning(f"Timeout on attempt {attempt + 1} for ASIN {asin}")
                     last_error = AmazonScraperError("Request timed out. Amazon may be slow or blocking requests.")
