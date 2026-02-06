@@ -81,10 +81,10 @@ async def import_from_asin(
     response = ASINImportResponse(
         asin=product.asin,
         title=product.title[:200] if product.title else None,  # Truncate to fit schema
-        brand_name=product.brand_name,
-        feature_1=product.features[0] if len(product.features) > 0 else None,
-        feature_2=product.features[1] if len(product.features) > 1 else None,
-        feature_3=product.features[2] if len(product.features) > 2 else None,
+        brand_name=product.brand_name[:100] if product.brand_name else None,
+        feature_1=product.features[0][:500] if len(product.features) > 0 else None,
+        feature_2=product.features[1][:500] if len(product.features) > 1 else None,
+        feature_3=product.features[2][:500] if len(product.features) > 2 else None,
         category=product.category,
         source_image_urls=product.image_urls,
     )

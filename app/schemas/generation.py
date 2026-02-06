@@ -1,9 +1,25 @@
 """
 Pydantic Schemas for Image Generation API
 """
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import List, Optional, Dict
 from enum import Enum
+
+
+# Max length for individual feature strings across all schemas
+MAX_FEATURE_LENGTH = 500
+
+
+def _truncate_features(v: list[str]) -> list[str]:
+    """Truncate each feature string to MAX_FEATURE_LENGTH instead of rejecting."""
+    return [s[:MAX_FEATURE_LENGTH] if isinstance(s, str) else s for s in v]
+
+
+def _truncate_feature(v: str | None) -> str | None:
+    """Truncate a single feature string to MAX_FEATURE_LENGTH."""
+    if isinstance(v, str) and len(v) > MAX_FEATURE_LENGTH:
+        return v[:MAX_FEATURE_LENGTH]
+    return v
 
 
 class ImageTypeEnum(str, Enum):
@@ -169,9 +185,11 @@ class DesignFramework(BaseModel):
 class GenerationRequest(BaseModel):
     """Request to generate listing images"""
     product_title: str = Field(..., min_length=1, max_length=200)
-    feature_1: Optional[str] = Field(None, max_length=500)  # Now optional
-    feature_2: Optional[str] = Field(None, max_length=500)  # Now optional
-    feature_3: Optional[str] = Field(None, max_length=500)  # Now optional
+    feature_1: Optional[str] = Field(None, max_length=500)
+    feature_2: Optional[str] = Field(None, max_length=500)
+    feature_3: Optional[str] = Field(None, max_length=500)
+
+    _truncate_f1 = field_validator("feature_1", "feature_2", "feature_3", mode="before")(_truncate_feature)
     target_audience: Optional[str] = Field(None, max_length=150)  # Now optional
     keywords: List[KeywordInput] = Field(default_factory=list, max_length=20)
     upload_path: str = Field(..., description="Path to uploaded primary product image")
@@ -261,6 +279,8 @@ class StylePreviewRequest(BaseModel):
     product_title: str = Field(..., min_length=1, max_length=200)
     feature_1: Optional[str] = Field(None, max_length=500)
     upload_path: str = Field(..., description="Path to uploaded product image")
+
+    _truncate_f1 = field_validator("feature_1", mode="before")(_truncate_feature)
     logo_path: Optional[str] = Field(None, description="Path to uploaded brand logo image")
     brand_colors: List[str] = Field(default_factory=list)
     style_ids: List[str] = Field(
@@ -378,6 +398,8 @@ class FrameworkGenerationRequest(BaseModel):
         description="Optional preferred primary color (hex)"
     )
 
+    _truncate_features = field_validator("features", mode="before")(_truncate_features)
+
 
 class FrameworkGenerationResponse(BaseModel):
     """Response with 4 AI-generated design frameworks with preview images"""
@@ -429,6 +451,8 @@ class FrameworkGenerationWithImageRequest(BaseModel):
         description="When true, skip generating AI preview images and use the style_reference_path as the preview"
     )
 
+    _truncate_features = field_validator("features", mode="before")(_truncate_features)
+
 
 class GenerateWithFrameworkRequest(BaseModel):
     """Request to generate images with a selected framework"""
@@ -451,6 +475,8 @@ class GenerateWithFrameworkRequest(BaseModel):
     single_image_type: Optional[str] = Field(None, description="If provided, only generate this image type (main, infographic_1, etc.)")
     create_only: bool = Field(False, description="If true, create session but skip image generation")
     image_model: Optional[str] = Field(None, description="Override Gemini model (e.g. gemini-2.5-flash-preview-image-generation)")
+
+    _truncate_features = field_validator("features", mode="before")(_truncate_features)
 
 
 # ============================================================================
