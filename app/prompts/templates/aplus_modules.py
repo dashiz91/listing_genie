@@ -199,12 +199,19 @@ DON'T REPEAT LISTING CONTENT:
 
 HERO PAIR SPECIAL:
 Write one 200-300 word prompt for a SINGLE tall 4:3 photograph (~1464x1098).
-This is a pure product photography shot — cinematic, dramatic, editorial.
-Describe the product, lighting, background/environment, mood, and camera angle.
+Photography-first: the product should dominate the frame (60-70% of composition).
+Cinematic, dramatic lighting. Rich textured or solid brand-color background.
+
+Text rules (STRICT):
+- Brand name or logo in ONE corner — small, tasteful, not competing with the product
+- Optionally ONE bold word (2-3 words max) as a product name or tagline
+- NO font names, font sizes, px values, or CSS styling in the prompt
+- NO paragraphs, feature text, descriptions, or sentences
+- Think Bose, Apple, Stanley hero banners — the image IS the message
+
+Describe: the product pose/angle, lighting direction, background material/color, mood.
 Reference PRODUCT_PHOTO, STYLE_REFERENCE, and BRAND_LOGO by name.
-Do NOT include any text overlay instructions, font names, typography, or layout rules.
-Do NOT mention banner splitting, safe zones, or composition sections.
-Just describe a stunning photograph.
+Do NOT mention banner splitting, safe zones, midpoints, or composition sections.
 
 OUTPUT — respond with ONLY valid JSON:
 {{
@@ -279,8 +286,9 @@ APLUS_HERO_HEADER = """=== REFERENCE IMAGES ===
 {reference_images_desc}
 Channel the style reference's mood, lighting, and atmosphere.
 
-Single tall 4:3 photograph (~1464x1098). Compose as ONE seamless image.
-Focus entirely on stunning product photography with cinematic lighting and atmosphere.
+Single tall 4:3 photograph (~1464x1098). Product dominates the frame.
+Photography-first: cinematic lighting, rich background, editorial quality.
+Brand name or logo small in one corner. No feature text, no descriptions.
 Never include website UI, Amazon navigation, or browser chrome.
 
 """
@@ -337,9 +345,10 @@ def _default_hero_brief(product_title: str, brand_name: str) -> str:
     """Fallback hero brief when visual script has no hero_pair_prompt."""
     return (
         f"Dramatic product hero photograph for {product_title} by {brand_name}. "
-        f"Single tall 4:3 image (~1464x1098). Product dominates the frame, dramatically large. "
+        f"Product dominates 60-70% of the frame, dramatically large, slightly angled. "
         f"CINEMATIC textured background (marble, fabric, atmospheric haze) — not a flat solid color. "
         f"Dramatic directional lighting — side light with rim separation, professional studio quality. "
+        f"Brand name '{brand_name}' small in bottom-right corner — tasteful, not competing with product. "
         f"Use PRODUCT_PHOTO for the real product. Match STYLE_REFERENCE mood and atmosphere."
     )
 
