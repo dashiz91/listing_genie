@@ -8,6 +8,7 @@ Phase 1:
 from __future__ import annotations
 
 import logging
+import re
 from typing import Optional, Literal
 from urllib.parse import urlencode
 
@@ -55,7 +56,7 @@ class AmazonDisconnectResponse(BaseModel):
 
 class PushListingImagesRequest(BaseModel):
     session_id: str = Field(min_length=1)
-    asin: str = Field(min_length=10, max_length=20)
+    asin: Optional[str] = Field(default=None, max_length=20)
     sku: str = Field(min_length=1, max_length=80)
     marketplace_id: Optional[str] = None
     image_paths: Optional[list[str]] = None
@@ -261,6 +262,9 @@ async def push_listing_images(
     db: Session = Depends(get_db),
 ):
     service = AmazonPushService(db)
+    normalized_asin = (request.asin or "").strip().upper() or None
+    if normalized_asin and not re.fullmatch(r"[A-Z0-9]{10}", normalized_asin):
+        raise HTTPException(status_code=400, detail="ASIN must be exactly 10 alphanumeric characters")
 
     # Ensure account is connected before creating a job.
     connection = service.auth.get_connection(user.id)
@@ -270,7 +274,7 @@ async def push_listing_images(
     job = service.create_listing_images_job(
         user_id=user.id,
         session_id=request.session_id,
-        asin=request.asin,
+        asin=normalized_asin,
         sku=request.sku,
         marketplace_id=request.marketplace_id or connection.marketplace_id,
         image_paths=request.image_paths,

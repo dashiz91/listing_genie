@@ -52,7 +52,7 @@ class AmazonPushService:
         *,
         user_id: str,
         session_id: str,
-        asin: str,
+        asin: Optional[str],
         sku: str,
         marketplace_id: Optional[str],
         image_paths: Optional[List[str]] = None,

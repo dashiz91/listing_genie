@@ -9,13 +9,8 @@ interface PreviewToolbarProps {
   onDeviceModeChange: (mode: DeviceMode) => void;
   onDownloadAll: () => void;
   onStartOver: () => void;
-  onSaveToProjects?: () => void;
-  onViewProjects?: () => void;
   onFullscreen?: () => void;
-  onExportImage?: () => void;
   isDownloading?: boolean;
-  isExporting?: boolean;
-  isSaved?: boolean;
   isFullscreen?: boolean;
   hasCompleteImages?: boolean;
   className?: string;
@@ -26,13 +21,8 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
   onDeviceModeChange,
   onDownloadAll,
   onStartOver,
-  onSaveToProjects,
-  onViewProjects,
   onFullscreen,
-  onExportImage,
   isDownloading = false,
-  isExporting = false,
-  isSaved = false,
   isFullscreen = false,
   hasCompleteImages = true,
   className,
@@ -111,75 +101,10 @@ export const PreviewToolbar: React.FC<PreviewToolbarProps> = ({
           </button>
         )}
 
-        {/* Export Button */}
-        {onExportImage && (
-          <button
-            onClick={onExportImage}
-            disabled={isExporting || !hasCompleteImages}
-            className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-              'text-slate-400 hover:text-white hover:bg-slate-700',
-              'disabled:opacity-50 disabled:cursor-not-allowed'
-            )}
-            title="Export as PNG"
-          >
-            {isExporting ? (
-              <Spinner size="sm" className="text-slate-400" />
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            )}
-            <span className="hidden sm:inline">Export</span>
-          </button>
-        )}
       </div>
 
       {/* Right side - Actions */}
       <div className="flex items-center gap-2">
-        {/* Saved indicator or Save button */}
-        {isSaved ? (
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm font-medium">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Saved
-            </span>
-            {onViewProjects && (
-              <button
-                onClick={onViewProjects}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-300 hover:text-white transition-colors"
-              >
-                View in Projects
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </button>
-            )}
-          </div>
-        ) : onSaveToProjects ? (
-          <button
-            onClick={onSaveToProjects}
-            disabled={!hasCompleteImages}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-              'bg-green-600 text-white hover:bg-green-700',
-              'disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed'
-            )}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
-              />
-            </svg>
-            <span>Save to Projects</span>
-          </button>
-        ) : null}
-
         {/* Download All Button */}
         <button
           onClick={onDownloadAll}

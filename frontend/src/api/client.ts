@@ -720,12 +720,13 @@ class ApiClient {
   }
 
   /**
-   * Push listing images to Amazon Seller Central for a given ASIN/SKU.
+   * Push listing images to Amazon Seller Central for a given SKU.
+   * ASIN is optional.
    */
   async pushListingImages(
     sessionId: string,
-    asin: string,
     sku: string,
+    asin?: string,
     options?: { marketplaceId?: string; imagePaths?: string[] }
   ): Promise<AmazonPushResponse> {
     const response = await this.client.post<AmazonPushResponse>('/amazon/push/listing-images', {

@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { cn, normalizeColors } from '@/lib/utils';
 import { apiClient } from '@/api/client';
 import type { SessionImage, DesignFramework } from '@/api/types';
@@ -8,8 +7,6 @@ import { ThumbnailGallery } from './ThumbnailGallery';
 import { MainImageViewer } from './MainImageViewer';
 import { ProductInfoPanel } from './ProductInfoPanel';
 import { PreviewToolbar } from './PreviewToolbar';
-import { SaveConfirmModal } from './SaveConfirmModal';
-import { CelebrationOverlay } from './CelebrationOverlay';
 import { AmazonHeader } from './AmazonHeader';
 import { AmazonBreadcrumbs } from './AmazonBreadcrumbs';
 import {
@@ -24,6 +21,7 @@ import { Spinner } from '@/components/ui/spinner';
 import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker';
 import type { ReferenceImage } from '@/api/types';
 import type { ListingVersionState } from '@/pages/HomePage';
+import type { AplusModule } from '@/components/preview-slots/AplusSection';
 
 type DeviceMode = 'desktop' | 'mobile';
 
@@ -63,6 +61,7 @@ interface AmazonListingPreviewProps {
 
   // A+ content to render inside the same card container
   aplusContent?: React.ReactNode;
+  aplusModules?: AplusModule[];
 
   // Re-plan all prompts (listing + A+)
   onReplanAll?: () => void;
@@ -101,6 +100,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   deviceMode: controlledDeviceMode,
   onDeviceModeChange,
   aplusContent,
+  aplusModules = [],
   onReplanAll,
   isReplanning = false,
 }) => {
@@ -129,22 +129,12 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
   const [regenNote, setRegenNote] = useState('');
   const regenFocusImages = useFocusImages();
 
-  // Save to Projects state
-  const [saveModalOpen, setSaveModalOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
-  const [showCelebration, setShowCelebration] = useState(false);
-
-  // Fullscreen and export state
+  // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
 
   // Prompt viewer state (dev mode) — image type string or null
   const [showPromptModal, setShowPromptModal] = useState<string | null>(null);
-
-  // Navigation
-  const navigate = useNavigate();
 
   // Get sorted images based on custom order
   const sortedImages = useMemo(
@@ -236,43 +226,68 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePreviousVersion, handleNextVersion]);
 
-  // Download a single image
+  const slugify = useCallback((text: string) => {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }, []);
+
+  const downloadFromUrl = useCallback(async (url: string, fileName: string) => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(downloadUrl);
+  }, []);
+
+  // Download a single listing image.
   const downloadImage = useCallback(
     async (imageType: string, label: string) => {
       if (!sessionId) return;
       const url = apiClient.getImageUrl(sessionId, imageType);
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      // Amazon-ready filename format
-      a.download = `${productTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${label
-        .toLowerCase()
-        .replace(/\s+/g, '-')}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(downloadUrl);
+      const fileName = `${slugify(productTitle)}-${slugify(label)}.png`;
+      await downloadFromUrl(url, fileName);
     },
-    [sessionId, productTitle]
+    [sessionId, productTitle, slugify, downloadFromUrl]
   );
 
-  // Download all images
+  // Download all listing + A+ images.
   const handleDownloadAll = useCallback(async () => {
     setIsDownloading(true);
     try {
-      const completeImages = images.filter((img) => img.status === 'complete');
+      const completeImages = images
+        .filter((img) => img.status === 'complete')
+        .sort((a, b) => DEFAULT_IMAGE_ORDER.indexOf(a.type) - DEFAULT_IMAGE_ORDER.indexOf(b.type));
+
       for (let i = 0; i < completeImages.length; i++) {
         const img = completeImages[i];
         await downloadImage(img.type, `${i + 1}-${IMAGE_LABELS[img.type] || img.type}`);
-        // Small delay between downloads
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      for (let i = 0; i < aplusModules.length; i++) {
+        const module = aplusModules[i];
+        const desktop = module.versions[module.activeVersionIndex];
+        if (desktop?.imageUrl) {
+          const fileName = `${slugify(productTitle)}-aplus-module-${i + 1}-desktop.png`;
+          await downloadFromUrl(desktop.imageUrl, fileName);
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+
+        const mobile = module.mobileVersions[module.mobileActiveVersionIndex];
+        if (mobile?.imageUrl) {
+          const fileName = `${slugify(productTitle)}-aplus-module-${i + 1}-mobile.png`;
+          await downloadFromUrl(mobile.imageUrl, fileName);
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
       }
     } finally {
       setIsDownloading(false);
     }
-  }, [images, downloadImage]);
+  }, [images, downloadImage, aplusModules, productTitle, slugify, downloadFromUrl]);
 
   // Handle edit click — default all reference images to selected
   const handleEditClick = useCallback((imageType: string) => {
@@ -359,48 +374,6 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
     [onGenerateSingle]
   );
 
-  // Count complete images
-  const completeImageCount = useMemo(
-    () => images.filter((img) => img.status === 'complete').length,
-    [images]
-  );
-
-  // Handle save to projects
-  const handleSaveToProjects = useCallback(() => {
-    setSaveModalOpen(true);
-  }, []);
-
-  // Confirm save
-  const handleConfirmSave = useCallback(async () => {
-    setIsSaving(true);
-    try {
-      // The session is already stored in backend database
-      // Just mark it as "saved" in local state and show celebration
-      // In a full implementation, we might call an API to mark it as finalized
-
-      // Simulate a brief delay for UX
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      setSaveModalOpen(false);
-      setIsSaved(true);
-      setShowCelebration(true);
-    } catch (error) {
-      console.error('Failed to save project:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, []);
-
-  // Handle celebration complete
-  const handleCelebrationComplete = useCallback(() => {
-    setShowCelebration(false);
-  }, []);
-
-  // Navigate to projects page
-  const handleViewProjects = useCallback(() => {
-    navigate('/app/projects');
-  }, [navigate]);
-
   // Toggle fullscreen mode
   const handleFullscreenToggle = useCallback(() => {
     setIsFullscreen((prev) => !prev);
@@ -428,112 +401,6 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
     };
   }, [isFullscreen]);
 
-  // Export preview as PNG
-  const handleExportImage = useCallback(async () => {
-    if (!previewContainerRef.current || !sessionId) return;
-
-    setIsExporting(true);
-    try {
-      // Use canvas approach for export
-      const element = previewContainerRef.current;
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      if (!ctx) {
-        throw new Error('Could not get canvas context');
-      }
-
-      // Set canvas size (higher resolution for better quality)
-      const scale = 2;
-      const rect = element.getBoundingClientRect();
-      canvas.width = rect.width * scale;
-      canvas.height = rect.height * scale;
-
-      // Draw white background
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // For now, create a simple composite image by drawing each image
-      // In production, you'd use html-to-image or similar library
-      const completeImages = images.filter((img) => img.status === 'complete');
-
-      // Calculate grid layout
-      const padding = 20 * scale;
-      const imageSize = Math.min(
-        (canvas.width - padding * 3) / 2,
-        (canvas.height - padding * 4) / 3
-      );
-
-      let x = padding;
-      let y = padding;
-
-      for (let i = 0; i < completeImages.length; i++) {
-        const img = completeImages[i];
-        const imgUrl = apiClient.getImageUrl(sessionId, img.type);
-
-        try {
-          const image = new Image();
-          image.crossOrigin = 'anonymous';
-
-          await new Promise<void>((resolve, reject) => {
-            image.onload = () => {
-              // Draw image maintaining aspect ratio
-              const aspectRatio = image.width / image.height;
-              let drawWidth = imageSize;
-              let drawHeight = imageSize;
-
-              if (aspectRatio > 1) {
-                drawHeight = imageSize / aspectRatio;
-              } else {
-                drawWidth = imageSize * aspectRatio;
-              }
-
-              const offsetX = (imageSize - drawWidth) / 2;
-              const offsetY = (imageSize - drawHeight) / 2;
-
-              ctx.drawImage(image, x + offsetX, y + offsetY, drawWidth, drawHeight);
-              resolve();
-            };
-            image.onerror = reject;
-            image.src = imgUrl;
-          });
-        } catch (err) {
-          console.warn(`Failed to load image ${img.type}:`, err);
-        }
-
-        // Move to next position
-        x += imageSize + padding;
-        if (x + imageSize > canvas.width) {
-          x = padding;
-          y += imageSize + padding;
-        }
-      }
-
-      // Add title
-      ctx.fillStyle = '#1f2937';
-      ctx.font = `bold ${24 * scale}px Inter, sans-serif`;
-      ctx.fillText(productTitle, padding, canvas.height - padding);
-
-      // Convert to blob and download
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${productTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-amazon-preview.png`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }
-      }, 'image/png');
-    } catch (error) {
-      console.error('Export failed:', error);
-    } finally {
-      setIsExporting(false);
-    }
-  }, [images, sessionId, productTitle]);
-
   // Overlay for the main image viewer (shared across all layout modes)
   const imageOverlay = selectedImage?.status === 'complete' ? (
     <ImageActionOverlay
@@ -556,13 +423,8 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
         onDeviceModeChange={setDeviceMode}
         onDownloadAll={handleDownloadAll}
         onStartOver={onStartOver || (() => {})}
-        onSaveToProjects={handleSaveToProjects}
-        onViewProjects={handleViewProjects}
         onFullscreen={handleFullscreenToggle}
-        onExportImage={handleExportImage}
         isDownloading={isDownloading}
-        isExporting={isExporting}
-        isSaved={isSaved}
         isFullscreen={isFullscreen}
         hasCompleteImages={hasCompleteImages}
       />
@@ -1039,24 +901,6 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
           </div>
         </SheetContent>
       </Sheet>
-
-      {/* Save Confirmation Modal */}
-      <SaveConfirmModal
-        isOpen={saveModalOpen}
-        onClose={() => setSaveModalOpen(false)}
-        onConfirm={handleConfirmSave}
-        productTitle={productTitle}
-        imageCount={completeImageCount}
-        isLoading={isSaving}
-      />
-
-      {/* Celebration Overlay */}
-      <CelebrationOverlay
-        isVisible={showCelebration}
-        onComplete={handleCelebrationComplete}
-        message="Saved!"
-        subMessage="Your listing is saved to Projects"
-      />
 
       {/* Prompt Viewer Modal (Dev Mode) */}
       {showPromptModal && sessionId && (

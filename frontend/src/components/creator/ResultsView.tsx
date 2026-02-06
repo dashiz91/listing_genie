@@ -153,7 +153,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   const accentColor = frameworkColors.find((c) => c.role === 'primary')?.hex || '#C85A35';
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className={cn('flex-1 overflow-auto', showPushBanner && 'pb-32')}>
       {/* Top bar */}
       <div className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
@@ -229,35 +229,6 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
       {/* Generation progress bar */}
       <GenerationProgressBar images={images} isGenerating={isGenerating} />
 
-      {/* Persistent (non-modal) nudge when all listing slots are ready */}
-      {showPushBanner && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
-          <div className="rounded-xl border border-[#FF9900]/30 bg-gradient-to-r from-[#FF9900]/12 to-slate-800/80 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[#FFB84D]">
-                Listing images are ready to publish
-              </p>
-              <p className="text-xs text-slate-300 mt-1">
-                You can keep tweaking images anytime, but you can also push this version to Amazon now.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <PushToAmazonButton
-                sessionId={sessionId!}
-                label="Push This Version"
-                className="bg-[#FF9900]/20 border-[#FF9900]/40 hover:bg-[#FF9900]/30"
-              />
-              <button
-                onClick={() => setShowPushNudge(false)}
-                className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Celebration overlay */}
       <CelebrationOverlay
         isVisible={showGenerationCelebration}
@@ -276,6 +247,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           sessionId={sessionId}
           images={images}
           framework={selectedFramework}
+          aplusModules={aplusModules}
           onGenerateSingle={onGenerateSingle}
           onGenerateAll={onGenerateAll}
           onRetry={onRetry}
@@ -317,6 +289,37 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           ) : undefined}
         />
       </div>
+
+      {/* Sticky bottom nudge when all listing slots are ready */}
+      {showPushBanner && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 px-3 sm:px-6">
+          <div className="pointer-events-auto max-w-5xl mx-auto rounded-2xl border border-[#FF9900]/55 bg-gradient-to-r from-[#C85A35] via-[#FF9900] to-[#FFC266] p-[1px] shadow-[0_16px_40px_rgba(200,90,53,0.45)]">
+            <div className="rounded-[15px] bg-slate-950/94 px-4 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-base sm:text-lg font-semibold text-[#FFB84D]">
+                  Your listing is ready to publish
+                </p>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                  Keep editing if you want, or push this version to Amazon now.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <PushToAmazonButton
+                  sessionId={sessionId!}
+                  label="Push This Version"
+                  className="px-4 py-2 text-sm bg-[#FF9900]/25 border-[#FF9900]/50 hover:bg-[#FF9900]/35"
+                />
+                <button
+                  onClick={() => setShowPushNudge(false)}
+                  className="px-2 py-1 text-xs text-slate-400 hover:text-slate-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

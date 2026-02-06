@@ -1,6 +1,6 @@
 /**
  * PushToAmazonButton — "Push to Amazon" action for the results view.
- * Checks Amazon connection, collects ASIN + SKU, pushes listing images,
+ * Checks Amazon connection, collects SKU (+ optional ASIN), pushes listing images,
  * and polls for completion status.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -54,6 +54,7 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
     if (state.phase !== 'form') {
       setSelectedSkuOption('');
       setSkuSearch('');
+      setSkuLookupError(null);
     }
   }, [state.phase]);
 
@@ -82,14 +83,22 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
     return () => document.removeEventListener('mousedown', handleClick);
   }, [state.phase]);
 
-  const loadSkuOptions = useCallback(async (query?: string) => {
+  const loadSkuOptions = useCallback(async (query?: string, showError: boolean = true) => {
     setIsLoadingSkus(true);
-    setSkuLookupError(null);
+    if (showError) setSkuLookupError(null);
     try {
       const result = await apiClient.getAmazonSellerSkus(query, 20);
       setSkuOptions(result.skus || []);
-    } catch {
-      setSkuLookupError('Could not load SKUs from Amazon. You can still enter SKU manually.');
+    } catch (err: unknown) {
+      if (showError) {
+        const error = err as { response?: { data?: { detail?: string } } };
+        const detail = error.response?.data?.detail;
+        if (typeof detail === 'string' && detail.toLowerCase().includes('not connected')) {
+          setSkuLookupError('Amazon account is not connected for this user. Connect it in Settings.');
+        } else {
+          setSkuLookupError("Couldn't fetch SKUs right now. You can still type your SKU manually.");
+        }
+      }
       setSkuOptions([]);
     } finally {
       setIsLoadingSkus(false);
@@ -98,9 +107,19 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
 
   useEffect(() => {
     if (state.phase === 'form') {
-      loadSkuOptions();
+      loadSkuOptions(undefined, false);
     }
   }, [state.phase, loadSkuOptions]);
+
+  useEffect(() => {
+    if (state.phase !== 'form') return;
+    if (skuOptions.length !== 1) return;
+    if (sku.trim()) return;
+    const only = skuOptions[0];
+    setSelectedSkuOption(only.sku);
+    setSku(only.sku);
+    if (!asin && only.asin) setAsin(only.asin);
+  }, [state.phase, skuOptions, sku, asin]);
 
   const startPoll = useCallback((jobId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -145,25 +164,23 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
   const handleSubmit = async () => {
     const trimmedAsin = asin.trim().toUpperCase();
     const trimmedSku = sku.trim();
-
-    if (!trimmedAsin) {
-      setFormError('ASIN is required');
-      return;
-    }
-    if (!/^[A-Z0-9]{10}$/.test(trimmedAsin)) {
-      setFormError('ASIN must be exactly 10 alphanumeric characters');
-      return;
-    }
     if (!trimmedSku) {
       setFormError('SKU is required');
       return;
     }
+    if (trimmedAsin && !/^[A-Z0-9]{10}$/.test(trimmedAsin)) {
+      setFormError('ASIN must be exactly 10 alphanumeric characters');
+      return;
+    }
+
+    const selected = skuOptions.find((opt) => opt.sku.toLowerCase() === trimmedSku.toLowerCase());
+    const resolvedAsin = trimmedAsin || selected?.asin || undefined;
 
     setFormError(null);
     setState({ phase: 'pushing', jobId: '', status: 'queued', message: 'Starting push...' });
 
     try {
-      const result = await apiClient.pushListingImages(sessionId, trimmedAsin, trimmedSku);
+      const result = await apiClient.pushListingImages(sessionId, trimmedSku, resolvedAsin);
       setState({ phase: 'pushing', jobId: result.job_id, status: result.status, message: 'Push queued...' });
       startPoll(result.job_id);
     } catch (err: unknown) {
@@ -247,7 +264,7 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
               <div className="p-6 space-y-4">
                 <div>
                   <h3 className="text-base font-semibold text-white">Push to Amazon</h3>
-                  <p className="text-sm text-slate-400 mt-1">Enter the ASIN and SKU for the listing to update.</p>
+                  <p className="text-sm text-slate-400 mt-1">Use SKU to push this listing. ASIN is optional.</p>
                 </div>
 
                 {formError && (
@@ -257,16 +274,6 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
                 )}
 
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1.5">ASIN</label>
-                    <Input
-                      value={asin}
-                      onChange={(e) => setAsin(e.target.value)}
-                      placeholder="e.g., B0XXXXXXXXX"
-                      className="bg-slate-900 border-slate-700 text-white font-mono"
-                      maxLength={10}
-                    />
-                  </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1.5">Find SKU from your account</label>
                     <div className="flex gap-2">
@@ -279,7 +286,7 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
                       <Button
                         variant="outline"
                         className="border-slate-600 text-slate-300"
-                        onClick={() => loadSkuOptions(skuSearch)}
+                        onClick={() => loadSkuOptions(skuSearch, true)}
                         disabled={isLoadingSkus}
                       >
                         {isLoadingSkus ? <Spinner size="sm" className="text-slate-300" /> : 'Search'}
@@ -317,7 +324,20 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
                       className="bg-slate-900 border-slate-700 text-white font-mono"
                     />
                     <p className="text-xs text-slate-500 mt-1">
-                      Find your SKU in Seller Central under Inventory &gt; Manage Inventory.
+                      Required. Find it in Seller Central under Inventory &gt; Manage Inventory.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">ASIN <span className="text-slate-500">(optional)</span></label>
+                    <Input
+                      value={asin}
+                      onChange={(e) => setAsin(e.target.value)}
+                      placeholder="Auto-filled when available"
+                      className="bg-slate-900 border-slate-700 text-white font-mono"
+                      maxLength={10}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Optional. Leave empty if you only have SKU.
                     </p>
                   </div>
                 </div>

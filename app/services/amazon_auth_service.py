@@ -175,9 +175,9 @@ class AmazonAuthService:
         self.db.commit()
 
     def get_connection(self, user_id: str) -> Optional[AmazonConnection]:
-        # Highest precedence: env-configured connection (fast internal testing path).
+        # Optional env-configured connection (internal testing only).
         env_refresh = (settings.amazon_spapi_refresh_token or "").strip()
-        if env_refresh:
+        if settings.amazon_allow_env_connection and env_refresh:
             return AmazonConnection(
                 refresh_token=env_refresh,
                 seller_id=(settings.amazon_spapi_seller_id or "").strip() or None,

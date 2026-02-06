@@ -95,7 +95,9 @@ class Settings(BaseSettings):
     # Default marketplace (US)
     amazon_default_marketplace_id: str = "ATVPDKIKX0DER"
 
-    # Optional env-based direct connection (for rapid internal testing)
+    # Optional env-based direct connection (for rapid internal testing).
+    # Disabled by default so each user must connect their own Seller Central account.
+    amazon_allow_env_connection: bool = False
     amazon_spapi_refresh_token: str = ""
     amazon_spapi_seller_id: str = ""
     amazon_spapi_marketplace_id: str = ""

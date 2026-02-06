@@ -135,6 +135,42 @@ def test_listing_push_creates_job_and_status_available(client, monkeypatch):
     assert status_payload["kind"] == "listing_images"
 
 
+def test_listing_push_accepts_sku_without_asin(client, monkeypatch):
+    async def noop_background(job_id: str):
+        return None
+
+    monkeypatch.setattr(amazon_endpoints, "_run_listing_push_job", noop_background)
+
+    def fake_get_connection(self, user_id):
+        return AmazonConnection(
+            refresh_token="refresh-test",
+            seller_id="A1SELLER123",
+            marketplace_id="ATVPDKIKX0DER",
+            mode="oauth",
+            connected_at=None,
+        )
+
+    monkeypatch.setattr(AmazonAuthService, "get_connection", fake_get_connection)
+
+    response = client.post(
+        "/api/amazon/push/listing-images",
+        json={
+            "session_id": "session-123",
+            "sku": "MY-SKU-ONLY",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "queued"
+    assert payload["job_id"]
+
+    status_response = client.get(f"/api/amazon/push/status/{payload['job_id']}")
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["asin"] is None
+    assert status_payload["sku"] == "MY-SKU-ONLY"
+
+
 def test_disconnect_clears_saved_connection(client):
     db = SessionLocal()
     try:
