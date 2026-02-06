@@ -274,23 +274,23 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
     }
   }, [images, downloadImage]);
 
-  // Handle edit click
+  // Handle edit click — default all reference images to selected
   const handleEditClick = useCallback((imageType: string) => {
     setEditingImageType(imageType);
     setEditInstructions('');
-    focusImages.reset();
+    focusImages.selectAll(availableReferenceImages.map(i => i.path));
     setEditPanelOpen(true);
-  }, [focusImages]);
+  }, [focusImages, availableReferenceImages]);
 
-  // Handle regenerate click — open note panel
+  // Handle regenerate click — open note panel, default all refs selected
   const handleRegenerateClick = useCallback(
     (imageType: string) => {
       setRegenImageType(imageType);
       setRegenNote('');
-      regenFocusImages.reset();
+      regenFocusImages.selectAll(availableReferenceImages.map(i => i.path));
       setRegenPanelOpen(true);
     },
-    []
+    [availableReferenceImages]
   );
 
   // Submit regenerate with optional note

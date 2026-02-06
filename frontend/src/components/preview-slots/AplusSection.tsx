@@ -406,9 +406,29 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                     <ImageActionOverlay
                       versionInfo={{ current: activeIndex + 1, total: totalVersions }}
                       onRegenerate={() => {
-                        setRegenModuleIndex(idx); setRegenNote(''); regenFocusImages.reset();
+                        setRegenModuleIndex(idx);
+                        setRegenNote('');
+                        // Default all reference images to selected
+                        const regenPaths = availableReferenceImages.map(i => i.path);
+                        if (idx > 1) {
+                          const prev = modules[idx - 1];
+                          const prevVer = prev?.versions[prev.activeVersionIndex];
+                          if (prevVer?.imagePath) regenPaths.unshift(prevVer.imagePath);
+                        }
+                        regenFocusImages.selectAll(regenPaths);
                       }}
-                      onEdit={onEditModule || onEditMobileModule ? () => { setEditingModuleIndex(idx); setEditInstructions(''); focusImages.reset(); } : undefined}
+                      onEdit={onEditModule || onEditMobileModule ? () => {
+                        setEditingModuleIndex(idx);
+                        setEditInstructions('');
+                        // Default all reference images to selected
+                        const editPaths = availableReferenceImages.map(i => i.path);
+                        if (idx > 1) {
+                          const prev = modules[idx - 1];
+                          const prevVer = prev?.versions[prev.activeVersionIndex];
+                          if (prevVer?.imagePath) editPaths.unshift(prevVer.imagePath);
+                        }
+                        focusImages.selectAll(editPaths);
+                      } : undefined}
                       onDownload={() => handleDownload(module, idx, viewportMode)}
                       onViewPrompt={sessionId ? () => setPromptModalIndex(idx) : undefined}
                       onMobileTransform={!isMobile && onGenerateMobileModule ? () => onGenerateMobileModule(idx) : undefined}
