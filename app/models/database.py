@@ -244,6 +244,38 @@ class UserSettings(Base):
     plan_tier = Column(String(50), default="free")  # free, starter, pro, business
     # Note: using updated_at for credits reset tracking instead of separate column
 
+    # Amazon SP-API connection (per-user OAuth)
+    amazon_refresh_token_encrypted = Column(Text, nullable=True)
+    amazon_seller_id = Column(String(64), nullable=True)
+    amazon_marketplace_id = Column(String(32), nullable=True)
+    amazon_connected_at = Column(DateTime, nullable=True)
+
     # Timestamps
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class AmazonPushJob(Base):
+    """Tracks async push jobs to Amazon (listing images, A+ content, etc.)."""
+    __tablename__ = "amazon_push_jobs"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), nullable=False, index=True)
+    kind = Column(String(40), nullable=False, default="listing_images")  # listing_images, aplus_content
+    status = Column(String(40), nullable=False, default="queued", index=True)
+    progress = Column(Integer, nullable=False, default=0)  # 0..100
+    step = Column(String(255), nullable=True)
+
+    session_id = Column(String(36), nullable=True, index=True)
+    asin = Column(String(20), nullable=True, index=True)
+    sku = Column(String(80), nullable=True, index=True)
+    marketplace_id = Column(String(32), nullable=True)
+    submission_id = Column(String(128), nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    payload_json = Column(JSON, nullable=True)
+    response_json = Column(JSON, nullable=True)
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    completed_at = Column(DateTime, nullable=True)

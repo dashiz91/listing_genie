@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.endpoints import health, generation, upload, images, projects, assets, settings, asin, admin, styles
+from app.api.endpoints import health, generation, upload, images, projects, assets, settings, asin, admin, styles, amazon
 
 api_router = APIRouter(prefix="/api")
 
@@ -66,4 +66,11 @@ api_router.include_router(
 api_router.include_router(
     styles.router,
     tags=["styles"]
+)
+
+# Amazon SP-API endpoints
+api_router.include_router(
+    amazon.router,
+    prefix="/amazon",
+    tags=["amazon"]
 )

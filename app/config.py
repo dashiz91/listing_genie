@@ -73,6 +73,36 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""  # For server-side operations
     supabase_jwt_secret: str = ""  # For JWT verification
 
+    # Frontend URL (used for OAuth callback redirects)
+    frontend_url: str = "http://localhost:5173"
+
+    # Amazon Selling Partner API (SP-API)
+    amazon_lwa_client_id: str = ""
+    amazon_lwa_client_secret: str = ""
+    amazon_oauth_redirect_uri: str = ""
+    amazon_spapi_app_id: str = ""  # amzn1.sellerapps.app.*
+    amazon_authorization_base_url: str = "https://sellercentral.amazon.com/apps/authorize/consent"
+    amazon_lwa_token_url: str = "https://api.amazon.com/auth/o2/token"
+    amazon_oauth_version: str = ""  # e.g. "beta" for draft app auth flow
+
+    # SP-API endpoint/region + AWS signing credentials
+    amazon_spapi_endpoint: str = "https://sellingpartnerapi-na.amazon.com"
+    amazon_spapi_region: str = "us-east-1"
+    amazon_aws_access_key_id: str = ""
+    amazon_aws_secret_access_key: str = ""
+    amazon_aws_session_token: str = ""
+
+    # Default marketplace (US)
+    amazon_default_marketplace_id: str = "ATVPDKIKX0DER"
+
+    # Optional env-based direct connection (for rapid internal testing)
+    amazon_spapi_refresh_token: str = ""
+    amazon_spapi_seller_id: str = ""
+    amazon_spapi_marketplace_id: str = ""
+
+    # Optional encryption key for stored refresh tokens (Fernet key preferred)
+    amazon_token_encryption_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False

@@ -116,6 +116,38 @@ def init_db():
         except Exception as e:
             logger.warning(f"Could not add email column to user_settings: {e}")
 
+        # Amazon SP-API connection columns.
+        try:
+            us_columns = [col["name"] for col in inspector.get_columns("user_settings")]
+            with engine.connect() as conn:
+                if "amazon_refresh_token_encrypted" not in us_columns:
+                    if "postgresql" in SQLALCHEMY_DATABASE_URL:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS amazon_refresh_token_encrypted TEXT"))
+                    else:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN amazon_refresh_token_encrypted TEXT"))
+                    logger.info("Added amazon_refresh_token_encrypted column to user_settings")
+                if "amazon_seller_id" not in us_columns:
+                    if "postgresql" in SQLALCHEMY_DATABASE_URL:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS amazon_seller_id VARCHAR(64)"))
+                    else:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN amazon_seller_id VARCHAR(64)"))
+                    logger.info("Added amazon_seller_id column to user_settings")
+                if "amazon_marketplace_id" not in us_columns:
+                    if "postgresql" in SQLALCHEMY_DATABASE_URL:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS amazon_marketplace_id VARCHAR(32)"))
+                    else:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN amazon_marketplace_id VARCHAR(32)"))
+                    logger.info("Added amazon_marketplace_id column to user_settings")
+                if "amazon_connected_at" not in us_columns:
+                    if "postgresql" in SQLALCHEMY_DATABASE_URL:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS amazon_connected_at TIMESTAMP"))
+                    else:
+                        conn.execute(text("ALTER TABLE user_settings ADD COLUMN amazon_connected_at DATETIME"))
+                    logger.info("Added amazon_connected_at column to user_settings")
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"Could not add Amazon columns to user_settings: {e}")
+
 
 def get_db():
     """Dependency injection for database sessions"""
