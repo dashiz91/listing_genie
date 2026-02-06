@@ -108,7 +108,7 @@ def get_aplus_prompt(
 
     prompt = template.format(
         product_title=product_title,
-        brand_name=brand_name or "Premium Brand",
+        brand_name=brand_name or product_title,
         features=", ".join(features) if features else "Quality craftsmanship",
         target_audience=target_audience or "Discerning customers",
         framework_name=framework_name,
@@ -372,9 +372,10 @@ def build_hero_pair_prompt(
             parts.append(f"BOTTOM HALF:\n{modules[1]['generation_prompt']}")
         hero_brief = "\n\n".join(parts) if parts else _default_hero_brief(product_title, brand_name)
 
-    # Replace generic "Premium Brand" with actual brand name in AI-generated text
-    if brand_name and brand_name != "Premium Brand":
-        hero_brief = hero_brief.replace("Premium Brand", brand_name)
+    # Replace generic "Premium Brand" with actual brand/product name in AI-generated text
+    replacement = brand_name or product_title
+    if replacement:
+        hero_brief = hero_brief.replace("Premium Brand", replacement)
 
     header = APLUS_HERO_HEADER.format(
         reference_images_desc=_ref_desc(has_style_ref, has_logo, False),
@@ -435,7 +436,7 @@ def build_aplus_module_prompt(
         mood = mod.get("mood", "premium and cinematic")
         role = mod.get("role", "editorial")
         scene_prompt = (
-            f"Create a {role} composition for {product_title} by {brand_name or 'Premium Brand'}. "
+            f"Create a {role} composition for {product_title} by {brand_name or product_title}. "
             f"{scene_desc} "
             f"The mood is {mood}. Use PRODUCT_PHOTO for the real product — honor its materials, "
             f"proportions, and character. Match STYLE_REFERENCE visual style. "
@@ -443,9 +444,10 @@ def build_aplus_module_prompt(
             f"Wide 2.4:1 format. Keep text 10% from edges."
         )
 
-    # Replace generic "Premium Brand" with actual brand name in AI-generated text
-    if brand_name and brand_name != "Premium Brand":
-        scene_prompt = scene_prompt.replace("Premium Brand", brand_name)
+    # Replace generic "Premium Brand" with actual brand/product name in AI-generated text
+    replacement = brand_name or product_title
+    if replacement:
+        scene_prompt = scene_prompt.replace("Premium Brand", replacement)
 
     # Build the clean prompt: header + scene description
     header = APLUS_MODULE_HEADER.format(
@@ -503,7 +505,7 @@ def get_visual_script_prompt(
     prompt = VISUAL_SCRIPT_PROMPT.format(
         module_count=module_count,
         product_title=product_title,
-        brand_name=brand_name or "Premium Brand",
+        brand_name=brand_name or product_title,
         features=", ".join(features) if features else "Quality craftsmanship",
         target_audience=target_audience or "Discerning customers",
         framework_name=framework.get("framework_name", "Professional"),
