@@ -51,7 +51,7 @@ CREATE FEELING, NOT INFORMATION:
 
 FORMAT:
 Wide cinematic banner (2.4:1). Editorial, not catalog.
-Breathing room at edges — the design extends beyond the frame.
+SAFE ZONE: Keep ALL text and important content at least 10% away from ALL edges. Content near edges WILL be cropped.
 
 ABSOLUTE RULES:
 - NEVER include website UI, Amazon navigation, browser chrome
@@ -442,11 +442,12 @@ Do NOT write `generation_prompt` for modules 0 or 1.
 hero_pair_prompt must include:
 1. Format: "Single tall 4:3 image (~1464×1098). Split at midpoint."
 2. Product: ONE product crossing midline — large, dynamic angle
-3. Background: exact hex from palette, continuous top to bottom
-4. Typography: bottom half only — brand name + product name
-5. Top half: NO text, pure product photography
-6. Reference images: "Use PRODUCT_PHOTO. Match STYLE_REFERENCE mood."
-7. Rules: no website UI, no Amazon navigation, no product packaging
+3. Background: CINEMATIC environment with depth — NOT a flat solid color. Use palette colors as DOMINANT TONES in a textured setting (fabric, marble, concrete, wood, atmospheric haze). Premium brands NEVER use plain flat backgrounds.
+4. Lighting: DRAMATIC directional light (side or rim), NOT flat/even. Specify exact direction.
+5. Typography: bottom half only — brand name + product name
+6. Top half: NO text, pure product photography
+7. Reference images: "Use PRODUCT_PHOTO. Match STYLE_REFERENCE mood."
+8. Rules: no website UI, no Amazon navigation, no product packaging
 
 ═══════════════════════════════════════════════════════════════════════════════
                          REFERENCE IMAGES
@@ -580,7 +581,8 @@ CRAFT NON-NEGOTIABLES:
 - Use STYLE_REFERENCE for visual mood and lighting direction.
 - If BRAND_LOGO is provided, reproduce it faithfully where the archetype calls for it.
 - ONLY 3 brand colors in the SCENE — lighting, surfaces, atmosphere. Never flat overlays. NO extra colors.
-- Wide format (2.4:1) — cinematic, not catalog. Breathing room at edges.
+- Wide format (2.4:1) — cinematic, not catalog.
+- SAFE ZONE: Keep ALL text and important content at least 10% away from ALL edges. Content near edges WILL be cropped.
 - This must look like a frame from a luxury brand commercial, NOT a product photo.
 - NEVER include website UI, Amazon navigation, browser chrome.
 - Text: SHORT, BOLD, HIGH CONTRAST, baked into image. Readable at 50% zoom.
@@ -648,7 +650,7 @@ REFERENCE IMAGES:
 ═══ COMPOSITION RULES (NON-NEGOTIABLE) ═══
 - ONE continuous photograph, NOT two stacked panels
 - Product naturally spans vertical center of image
-- Background: one continuous color/gradient top to bottom — no dividing lines
+- Background: CINEMATIC textured environment (fabric, marble, concrete, atmospheric haze) — NOT a flat solid color. Use palette colors as dominant tones with depth and texture. No dividing lines.
 - Bottom half: brand name + product name as BOLD text, integrated naturally
 - If BRAND_LOGO provided, place logo in bottom half near brand name
 - Top half: pure product photography, minimal or no text
