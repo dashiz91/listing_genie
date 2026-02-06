@@ -1524,6 +1524,11 @@ export const HomePage: React.FC = () => {
       const currentSessionId = sessionIdRef.current;
       if (!currentSessionId) return;
 
+      // Keep hero pair linked: editing module 0/1 should regenerate both modules.
+      if (moduleIndex <= 1) {
+        return handleGenerateHeroPair(editInstructions, referenceImagePaths);
+      }
+
       // Mark generating
       setAplusModules((prev) =>
         prev.map((m, i) => (i === moduleIndex ? { ...m, status: 'generating' as SlotStatus } : m))
@@ -1569,7 +1574,7 @@ export const HomePage: React.FC = () => {
         );
       }
     },
-    [formData.imageModel]
+    [formData.imageModel, handleGenerateHeroPair]
   );
 
   // Handle generate mobile A+ module (recompose desktop → mobile 4:3)
