@@ -5,6 +5,7 @@ Philosophy: The Visual Script does the thinking (scene descriptions).
 Per-module delivery just wraps them lightly — same architecture as listing images.
 """
 import json
+import re
 from typing import Optional
 
 
@@ -43,7 +44,7 @@ CREATE FEELING, NOT INFORMATION:
 
 FORMAT:
 Wide cinematic banner (2.4:1). Editorial, not catalog.
-SAFE ZONE: Keep ALL text and important content at least 10% away from ALL edges. Content near edges WILL be cropped.
+Center your composition — generous margins on all sides.
 
 ABSOLUTE RULES:
 - NEVER include website UI, Amazon navigation, browser chrome
@@ -144,8 +145,7 @@ DESIGN SYSTEM (must match listing images exactly):
 - Framework: {framework_name} — {design_philosophy}
 - Colors (3 ONLY): {color_palette}
   Use ONLY these 3 hex colors + black/white for contrast. No invented hues.
-- Typography: {typography}
-  Use these EXACT font names in every text description — no substitutes.
+- Typography: Headlines in {headline_font_desc}, body text in {body_font_desc}
 - Visual treatment: {visual_treatment}
 
 {listing_context}
@@ -181,7 +181,9 @@ Module 5: Confidence — close the deal.
 
 WRITING YOUR SCENE DESCRIPTIONS:
 - Write one vivid, specific scene per module — paint a cinematographer's shot brief
-- Include EXACT hex colors and font names from the design system INLINE in the description
+- Include EXACT hex colors INLINE in the description (e.g., "deep navy #1A1D21 background")
+- Describe text rendering in plain visual language: "bold serif headline" or "clean sans-serif label"
+- NEVER include pixel sizes (42px), font-weight numbers (700), CSS properties, or technical formatting
 - Include any text to render (headlines, brand name, labels) naturally in the description
 - When rendering brand name text, use EXACTLY "{brand_name}" — never "Premium Brand" or any generic placeholder
 - Reference PRODUCT_PHOTO, STYLE_REFERENCE, BRAND_LOGO by name where relevant
@@ -190,7 +192,7 @@ WRITING YOUR SCENE DESCRIPTIONS:
 - Each module should look visually DIFFERENT (variety of compositions, angles, environments)
 - Format: wide 2.4:1 cinematic banners (think editorial magazine, not catalog)
 - Specify lighting direction (never flat), camera angle, and background for each
-- SAFE ZONE: remind to keep text/content 10% from edges (will be cropped)
+- Center compositions with generous margins — keep text and key content away from the very edges
 
 DON'T REPEAT LISTING CONTENT:
 - Listings already showed product beauty, features, lifestyle, transformation
@@ -273,7 +275,7 @@ APLUS_MODULE_HEADER = """=== REFERENCE IMAGES ===
 Channel the style reference's mood, lighting, and atmosphere.
 
 Amazon A+ Content banner. Wide 2.4:1 format.
-SAFE ZONE: Keep all text and important content at least 10% from edges (will be cropped).
+Center your composition with generous margins on all sides.
 NEVER include website UI, Amazon navigation, or browser chrome.
 
 """
@@ -328,6 +330,37 @@ RULES:
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
+
+def _strip_css_specs(text: str) -> str:
+    """Remove CSS-like typography specs that image models render as garbled text.
+
+    Strips patterns like:
+      - "using headline_font Playfair Display, headline_weight Bold, headline_size 42px"
+      - "letter_spacing 0.5px"
+      - standalone "42px", "24px"
+    """
+    # Remove "using <css_property> <value>, <css_property> <value>, ..." blocks
+    # Matches: "using headline_font X, headline_weight Y, headline_size Z"
+    text = re.sub(
+        r'\s*using\s+(?:(?:headline|subhead|body)_(?:font|weight|size)|letter_spacing)'
+        r'[\s\S]*?(?=(?:,\s*and\b|\.|\n|$))',
+        '', text
+    )
+    # Remove any remaining standalone CSS property references
+    text = re.sub(
+        r',?\s*(?:headline|subhead|body)_(?:font|weight|size|spacing)\s+[^,\n.]*',
+        '', text
+    )
+    text = re.sub(r',?\s*letter_spacing\s+[^,\n.]*', '', text)
+    # Remove standalone px/pt values like "42px" or "0.5px"
+    text = re.sub(r'\s*\b\d+(?:\.\d+)?px\b', '', text)
+    # Clean up leftover artifacts
+    text = re.sub(r',\s*,', ',', text)
+    text = re.sub(r',\s*\.', '.', text)
+    text = re.sub(r'\s*,\s*and\b', ' and', text)
+    text = re.sub(r'\s{2,}', ' ', text)
+    return text.strip()
+
 
 def _ref_desc(has_style_ref: bool, has_logo: bool, is_chained: bool) -> str:
     """Build reference images description matching listing prompt style."""
@@ -448,13 +481,18 @@ def build_aplus_module_prompt(
             f"The mood is {mood}. Use PRODUCT_PHOTO for the real product — honor its materials, "
             f"proportions, and character. Match STYLE_REFERENCE visual style. "
             f"Dramatic directional lighting. Cinematic color grading. "
-            f"Wide 2.4:1 format. Keep text 10% from edges."
+            f"Wide 2.4:1 format. Center composition with generous margins."
         )
 
     # Replace generic "Premium Brand" with actual brand/product name in AI-generated text
     replacement = brand_name or product_title
     if replacement:
         scene_prompt = scene_prompt.replace("Premium Brand", replacement)
+
+    # Strip CSS-like specs that image models render as garbled text.
+    # Catches patterns like "headline_size 42px", "letter_spacing 0.5px",
+    # "headline_weight Bold", "subhead_font Inter" from older visual scripts.
+    scene_prompt = _strip_css_specs(scene_prompt)
 
     # Build the clean prompt: header + scene description
     header = APLUS_MODULE_HEADER.format(
@@ -509,6 +547,15 @@ def get_visual_script_prompt(
             + "\n\nA+ must NOT duplicate these concepts. Go deeper, not wider.\n"
         )
 
+    # Extract clean font descriptions — never send raw JSON/CSS specs to image models
+    typo = framework.get("typography", {})
+    headline_font = typo.get("headline_font", "bold serif")
+    body_font = typo.get("body_font", "clean sans-serif")
+    headline_weight = typo.get("headline_weight", "Bold")
+    # Describe fonts visually, not technically
+    headline_font_desc = f"{headline_weight.lower()} {headline_font} lettering" if headline_weight else headline_font
+    body_font_desc = f"{body_font}"
+
     prompt = VISUAL_SCRIPT_PROMPT.format(
         module_count=module_count,
         product_title=product_title,
@@ -520,7 +567,8 @@ def get_visual_script_prompt(
         color_palette=", ".join(
             c.get("hex", "") for c in framework.get("colors", [])[:3]
         ) or "#C85A35",
-        typography=json.dumps(framework.get("typography", {})),
+        headline_font_desc=headline_font_desc,
+        body_font_desc=body_font_desc,
         visual_treatment=json.dumps(framework.get("visual_treatment", {})),
         listing_context=listing_context,
     )
