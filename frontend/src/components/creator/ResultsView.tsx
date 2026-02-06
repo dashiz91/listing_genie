@@ -122,14 +122,24 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   // Unified viewport mode
   const [unifiedViewportMode, setUnifiedViewportMode] = useState<'desktop' | 'mobile'>('desktop');
   const [showPushNudge, setShowPushNudge] = useState(true);
+  const listingImageTypes = new Set([
+    'main',
+    'infographic_1',
+    'infographic_2',
+    'lifestyle',
+    'transformation',
+    'comparison',
+  ]);
 
   const handleViewportModeChange = useCallback((mode: 'desktop' | 'mobile') => {
     setUnifiedViewportMode(mode);
     onAplusViewportChange(mode);
   }, [onAplusViewportChange]);
 
-  const completeCount = images.filter(i => i.status === 'complete').length;
-  const allListingImagesReady = images.length > 0 && completeCount === images.length;
+  const listingImages = images.filter((img) => listingImageTypes.has(img.type));
+  const hasAnyListingComplete = listingImages.some((img) => img.status === 'complete');
+  const allListingImagesReady =
+    listingImages.length > 0 && listingImages.every((img) => img.status === 'complete');
   const showPushBanner = !!sessionId && allListingImagesReady && showPushNudge;
 
   useEffect(() => {
@@ -194,7 +204,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               })}
             </div>
             {/* Push to Amazon (visible when session has generated images) */}
-            {sessionId && images.some(i => i.status === 'complete') && !showPushBanner && (
+            {sessionId && hasAnyListingComplete && !showPushBanner && (
               <PushToAmazonButton sessionId={sessionId} />
             )}
             <button
