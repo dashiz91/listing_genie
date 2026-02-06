@@ -757,7 +757,12 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                     if (isMobile) {
                       onEditMobileModule?.(editingModuleIndex, editInstructions.trim(), refs);
                     } else {
-                      onEditModule?.(editingModuleIndex, editInstructions.trim(), refs);
+                      // Hero pair edits (modules 0/1) must run through the paired flow.
+                      if (editingModuleIndex <= 1) {
+                        onRegenerateModule?.(editingModuleIndex, editInstructions.trim(), refs);
+                      } else {
+                        onEditModule?.(editingModuleIndex, editInstructions.trim(), refs);
+                      }
                     }
                     setEditingModuleIndex(null);
                     setEditInstructions('');
