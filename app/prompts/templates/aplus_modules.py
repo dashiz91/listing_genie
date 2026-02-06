@@ -183,6 +183,7 @@ WRITING YOUR SCENE DESCRIPTIONS:
 - Write one vivid, specific scene per module — paint a cinematographer's shot brief
 - Include EXACT hex colors and font names from the design system INLINE in the description
 - Include any text to render (headlines, brand name, labels) naturally in the description
+- When rendering brand name text, use EXACTLY "{brand_name}" — never "Premium Brand" or any generic placeholder
 - Reference PRODUCT_PHOTO, STYLE_REFERENCE, BRAND_LOGO by name where relevant
 - Keep rendered text SHORT (2-5 words per element) — Gemini renders short text well
 - At least 2 modules must include a real person with face visible, genuine emotion
@@ -371,6 +372,10 @@ def build_hero_pair_prompt(
             parts.append(f"BOTTOM HALF:\n{modules[1]['generation_prompt']}")
         hero_brief = "\n\n".join(parts) if parts else _default_hero_brief(product_title, brand_name)
 
+    # Replace generic "Premium Brand" with actual brand name in AI-generated text
+    if brand_name and brand_name != "Premium Brand":
+        hero_brief = hero_brief.replace("Premium Brand", brand_name)
+
     header = APLUS_HERO_HEADER.format(
         reference_images_desc=_ref_desc(has_style_ref, has_logo, False),
     )
@@ -437,6 +442,10 @@ def build_aplus_module_prompt(
             f"Dramatic directional lighting. Cinematic color grading. "
             f"Wide 2.4:1 format. Keep text 10% from edges."
         )
+
+    # Replace generic "Premium Brand" with actual brand name in AI-generated text
+    if brand_name and brand_name != "Premium Brand":
+        scene_prompt = scene_prompt.replace("Premium Brand", brand_name)
 
     # Build the clean prompt: header + scene description
     header = APLUS_MODULE_HEADER.format(
