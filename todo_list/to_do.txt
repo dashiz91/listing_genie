@@ -23,16 +23,30 @@ So many tools like this popping up these days, like selluna.ai or listingoptimiz
 ]
 
 Connect it to seller central to push lisitng and +A single image only modules
+
+make it so import doesnt get affected by captcha trigger or a smarter wayto get the scrapping neede (a retry with backoff for no trigger captcha?idk u try some stuff please, customer no friction)]
+
+make editing existing project more obvious on ui
+have import automatically retry if captcha, user shoud click only ONCE ever. 
 ================================================================================
                               CURATED BY CLAUDE
 ================================================================================
 
 PENDING
 -------
-(No pending items)
+z - Push to Amazon Seller Central (story 011) - SP-API listing images + A+ Content push. BLOCKED on SP-API app approval.
+    z.1 - Frontend UI DONE: Settings page Amazon Connection card, ResultsView Push button, API client/types wired
+    z.2 - Backend in progress (parallel reviewer): Amazon auth service, push service, SP-API integration
+    z.3 - Pending: End-to-end test once backend is deployed
 
 COMPLETED
 ---------
+y - A+ Prompt System Rebuild - rewrote VISUAL_SCRIPT_PROMPT with listing-quality instructions, replaced per-module and hero pair prompt delivery, updated TypeScript types for new script structure
+v - Premium A+ Content Quality Overhaul - text rendering in images, module archetypes (exploded, trust, lifestyle, dramatic), cinematic hero lighting, logo in A+ refs
+w - 3-color maximum enforcement - framework JSON schemas reduced from 5→3 colors, frontend limits updated, truncation safety nets
+x - A+ module aspect ratio fix - changed 16:9→21:9 to prevent edge cropping (was ~27% crop, now ~4%)
+u - Generation Loading UX overhaul: fixed polling stop/restart bug, added progress bar, batched generation (2 at a time), GenerationLoader for A+ modules, celebration overlay, upload PIL fallback
+t - Bug fixes: Feature field VARCHAR(100→500) for ASIN long text, mobile sidebar responsive layout, PIL upload seek(0) fix
 s - Homepage Simplification (story 010) - KREA.ai-inspired clean interface, advanced settings sheet, results view after generation
 a - A+ Preview Integration (story 003)
 b - Profile Dropdown (story 001)
@@ -50,3 +64,4 @@ o - Alt text generation for images - backend API added
 p - Pre-generated style library - 11 styles in 6 categories (Seasonal, Minimalist, Luxury, Vibrant, Natural, Iconic)
 q - Loading Animation Improvement - enhanced visual effects
 r - Supabase Email Branding - Resend SMTP on staging+prod, branded templates, noreply@reddstudio.ai
+s2 - Premium Loading System - unified Spinner component replacing 60+ ad-hoc spinners, WorkflowStepper pipeline (Import→Analyze→Generate→A+), narrative GenerationLoader, per-image progress bar, amber→slate/redd theme, CSS cleanup
