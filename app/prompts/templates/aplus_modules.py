@@ -198,11 +198,13 @@ DON'T REPEAT LISTING CONTENT:
 - If listings showed a lifestyle context, A+ shows DIFFERENT lifestyle contexts
 
 HERO PAIR SPECIAL:
-Write one 200-300 word prompt for a SINGLE tall 4:3 photograph (~1464x1098) that will be split at the midpoint into two A+ banners.
-Compose as ONE seamless photo — the viewer should NOT see the crop line.
-Top half: product photography with dramatic lighting. Bottom half: brand name + product name as bold text.
-Do NOT compose as two separate sections. No website UI or browser chrome.
+Write one 200-300 word prompt for a SINGLE tall 4:3 photograph (~1464x1098).
+This is a pure product photography shot — cinematic, dramatic, editorial.
+Describe the product, lighting, background/environment, mood, and camera angle.
 Reference PRODUCT_PHOTO, STYLE_REFERENCE, and BRAND_LOGO by name.
+Do NOT include any text overlay instructions, font names, typography, or layout rules.
+Do NOT mention banner splitting, safe zones, or composition sections.
+Just describe a stunning photograph.
 
 OUTPUT — respond with ONLY valid JSON:
 {{
@@ -277,10 +279,9 @@ APLUS_HERO_HEADER = """=== REFERENCE IMAGES ===
 {reference_images_desc}
 Channel the style reference's mood, lighting, and atmosphere.
 
-Single tall 4:3 photograph (~1464x1098), later split at midpoint into two A+ banners.
-Compose as ONE seamless photo — the viewer should not see the crop line.
-Top half: product photography. Bottom half: brand name + product name as bold text.
-Do NOT compose as two separate sections. Never include website UI or browser chrome.
+Single tall 4:3 photograph (~1464x1098). Compose as ONE seamless image.
+Focus entirely on stunning product photography with cinematic lighting and atmosphere.
+Never include website UI, Amazon navigation, or browser chrome.
 
 """
 
@@ -335,14 +336,11 @@ def _ref_desc(has_style_ref: bool, has_logo: bool, is_chained: bool) -> str:
 def _default_hero_brief(product_title: str, brand_name: str) -> str:
     """Fallback hero brief when visual script has no hero_pair_prompt."""
     return (
-        f"Dramatic product hero for {product_title} by {brand_name}. "
-        f"Single tall 4:3 image (~1464x1098). Product crosses midline, dramatically large. "
+        f"Dramatic product hero photograph for {product_title} by {brand_name}. "
+        f"Single tall 4:3 image (~1464x1098). Product dominates the frame, dramatically large. "
         f"CINEMATIC textured background (marble, fabric, atmospheric haze) — not a flat solid color. "
-        f"Dramatic directional lighting — side light with rim separation. "
-        f"Typography in bottom half only — brand name smaller, product name large and bold. "
-        f"Top half is pure product photography, no text. "
-        f"Use PRODUCT_PHOTO for the real product. Match STYLE_REFERENCE mood. "
-        f"If BRAND_LOGO provided, place logo in bottom half near brand name."
+        f"Dramatic directional lighting — side light with rim separation, professional studio quality. "
+        f"Use PRODUCT_PHOTO for the real product. Match STYLE_REFERENCE mood and atmosphere."
     )
 
 
