@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 
 interface VersionNavigatorProps {
   currentVersion: number;
@@ -129,7 +130,7 @@ export const VersionNavigator: React.FC<VersionNavigatorProps> = ({
         >
           {isProcessing ? (
             <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+              <Spinner size="sm" className="text-white" />
               <span>Processing...</span>
             </>
           ) : (

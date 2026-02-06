@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { apiClient, AssetItem } from '../api/client';
+import { Spinner } from '@/components/ui/spinner';
 
 type AssetType = 'logos' | 'style-refs' | 'products' | 'generated';
 
@@ -84,7 +85,7 @@ export const AssetsPage: React.FC = () => {
 
   const LoadingState = () => (
     <div className="flex flex-col items-center justify-center py-16 px-4">
-      <div className="w-12 h-12 border-4 border-slate-600 border-t-redd-500 rounded-full animate-spin mb-4" />
+      <Spinner size="xl" className="text-redd-500 mb-4" />
       <p className="text-slate-400">Loading assets...</p>
     </div>
   );

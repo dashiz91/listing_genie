@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import type { UploadResponse } from '../api/types';
+import { Spinner } from '@/components/ui/spinner';
 
 // Cached upload for quick reuse
 interface CachedUpload {
@@ -337,7 +338,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           />
           <div className="flex flex-col items-center">
             {isUploading ? (
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-redd-500 mb-4"></div>
+              <Spinner size="xl" className="text-redd-500 mb-4" />
             ) : (
               <svg className="w-12 h-12 text-slate-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -358,7 +359,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       {/* Uploading overlay */}
       {isUploading && uploads.length > 0 && (
         <div className="mt-2 flex items-center text-sm text-slate-300">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-redd-500 mr-2"></div>
+          <Spinner size="sm" className="text-redd-500 mr-2" />
           Uploading...
         </div>
       )}

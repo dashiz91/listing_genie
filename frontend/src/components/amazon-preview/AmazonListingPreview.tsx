@@ -20,6 +20,7 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { ImageActionOverlay } from '@/components/shared/ImageActionOverlay';
+import { Spinner } from '@/components/ui/spinner';
 import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker';
 import type { ReferenceImage } from '@/api/types';
 import type { ListingVersionState } from '@/pages/HomePage';
@@ -765,9 +766,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 >
                   {isReplanning ? (
                     <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
+                      <Spinner size="sm" className="text-current" />
                       Re-planning...
                     </>
                   ) : (
@@ -877,9 +876,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
                 >
                   {isReplanning ? (
                     <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
+                      <Spinner size="sm" className="text-current" />
                       Re-planning...
                     </>
                   ) : (

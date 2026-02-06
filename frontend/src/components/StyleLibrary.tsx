@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Spinner } from '@/components/ui/spinner';
 
 interface StylePreset {
   id: string;
@@ -251,7 +252,7 @@ export const StyleLibrary: React.FC<StyleLibraryProps> = ({
         {/* Styles grid */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-2 border-redd-500 border-t-transparent rounded-full animate-spin" />
+            <Spinner size="lg" className="text-redd-500" />
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 pb-6">

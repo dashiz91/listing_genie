@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 import { GenerationLoader } from '../generation-loader';
 
 interface MainImageViewerProps {
@@ -139,8 +140,6 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
         <GenerationLoader
           imageType={imageType}
           aspectRatio="1:1"
-          accentColor={accentColor}
-          estimatedSeconds={12}
           className="rounded-lg overflow-hidden"
         />
         {showStuckHint && onCancel && (
@@ -172,7 +171,7 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
         {/* Loading skeleton */}
         {!isImageLoaded && !isImageError && (
           <div className="absolute inset-0 bg-slate-100 animate-pulse flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-slate-300 border-t-redd-500 rounded-full animate-spin" />
+            <Spinner size="xl" className="text-redd-500" />
           </div>
         )}
 

@@ -5,6 +5,7 @@ import { APLUS_DIMENSIONS, APLUS_MOBILE_DIMENSIONS } from '@/api/types';
 import { apiClient } from '@/api/client';
 import { PromptModal } from '@/components/PromptModal';
 import { GenerationLoader } from '@/components/generation-loader';
+import { Spinner } from '@/components/ui/spinner';
 import { ImageActionOverlay } from '@/components/shared/ImageActionOverlay';
 import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
@@ -304,11 +305,11 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
       {/* Art Director planning state */}
       {isGeneratingScript && (
         <div className="px-4 pt-4">
-          <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <div className="w-6 h-6 border-2 border-amber-300 rounded-full animate-spin" style={{ borderTopColor: accentColor }} />
+          <div className="flex items-center gap-3 p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
+            <Spinner size="md" className="text-redd-500" />
             <div>
-              <p className="text-sm font-medium text-amber-800">Art Director is planning...</p>
-              <p className="text-xs text-amber-600">Designing your A+ section as one unified visual narrative</p>
+              <p className="text-sm font-medium text-slate-200">Art Director is planning...</p>
+              <p className="text-xs text-slate-400">Designing your A+ section as one unified visual narrative</p>
             </div>
           </div>
         </div>
@@ -460,10 +461,8 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
                 >
                   <div className="absolute inset-0">
                     <GenerationLoader
-                      imageType={isMobile ? `aplus_${idx}_mobile` : `aplus_${idx}`}
-                      accentColor={accentColor}
-                      estimatedSeconds={15}
-                      compact={true}
+                      imageType={isMobile ? `aplus_mobile_${idx}` : `aplus_${idx}`}
+                      compact
                       className="w-full h-full"
                     />
                     {/* Cancel button overlay (appears after 5s) */}

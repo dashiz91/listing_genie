@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { DesignFramework } from '../api/types';
 import { normalizeColors } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 
 interface FrameworkSelectorProps {
   frameworks: DesignFramework[];
@@ -128,7 +129,7 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-redd-500 mx-auto mb-2"></div>
+                      <Spinner size="lg" className="text-redd-500 mx-auto mb-2" />
                       <span className="text-sm text-slate-400">Generating preview...</span>
                     </div>
                   </div>
@@ -270,7 +271,7 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
       >
         {isLoading ? (
           <span className="flex items-center justify-center space-x-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            <Spinner size="sm" className="text-white" />
             <span>Generating All 6 Images...</span>
           </span>
         ) : !selectedFramework ? (

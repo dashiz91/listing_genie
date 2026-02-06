@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { apiClient } from '../api/client';
 import type { SessionImage, GenerationStatus, PromptHistory } from '../api/types';
 import { normalizeColors } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 
 interface ImageGalleryProps {
   sessionId: string;
@@ -181,7 +182,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                 </>
               ) : image.status === 'processing' ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-redd-500"></div>
+                  <Spinner size="lg" className="text-redd-500" />
                 </div>
               ) : image.status === 'pending' ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
@@ -311,7 +312,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
             <div className="p-4 overflow-y-auto max-h-[60vh]">
               {loadingPrompt ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-redd-500"></div>
+                  <Spinner size="lg" className="text-redd-500" />
                   <span className="ml-2 text-slate-300">Loading prompt...</span>
                 </div>
               ) : promptError ? (

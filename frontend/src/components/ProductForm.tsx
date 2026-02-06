@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { BrandVibe } from '../api/types';
+import { Spinner } from '@/components/ui/spinner';
 
 export interface ProductFormData {
   productTitle: string;
@@ -638,7 +639,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       >
         {isGenerating ? (
           <span className="flex items-center justify-center space-x-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            <Spinner size="sm" className="text-white" />
             <span>Generating Previews...</span>
           </span>
         ) : (

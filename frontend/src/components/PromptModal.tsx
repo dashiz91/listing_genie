@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { PromptHistory } from '@/api/types';
 import { apiClient } from '@/api/client';
 import { normalizeColors } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 
 interface PromptModalProps {
   /** Session ID for fetching prompt data */
@@ -111,7 +112,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
           <div className="p-4 overflow-y-auto flex-1">
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-redd-500" />
+                <Spinner size="lg" className="text-redd-500" />
                 <span className="ml-2 text-slate-300">Loading prompt...</span>
               </div>
             ) : error ? (

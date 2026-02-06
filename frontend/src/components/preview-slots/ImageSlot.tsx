@@ -146,8 +146,7 @@ export const ImageSlot: React.FC<ImageSlotProps> = ({
             <GenerationLoader
               imageType={label}
               aspectRatio={aspectRatio}
-              accentColor={accentColor}
-              estimatedSeconds={8}
+              compact
               className="w-full h-full"
             />
           )}
@@ -157,7 +156,15 @@ export const ImageSlot: React.FC<ImageSlotProps> = ({
             <div className="relative w-full h-full group">
               {/* Loading shimmer while image loads */}
               {!imageLoaded && (
-                <div className="absolute inset-0 bg-slate-800 animate-pulse" />
+                <div className="absolute inset-0 bg-slate-800 overflow-hidden">
+                  <div
+                    className="absolute inset-0 animate-shimmer"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent 0%, rgba(200,90,53,0.08) 50%, transparent 100%)',
+                      backgroundSize: '200% 100%',
+                    }}
+                  />
+                </div>
               )}
               <img
                 src={imageUrl}

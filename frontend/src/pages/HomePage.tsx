@@ -17,6 +17,8 @@ import type { SlotStatus } from '../components/preview-slots/ImageSlot';
 import { useCredits } from '../contexts/CreditContext';
 import { OutOfCreditsModal } from '../components/OutOfCreditsModal';
 import { CreatorView, AdvancedSettingsSheet, ResultsView } from '../components/creator';
+import type { WorkflowStep } from '../components/ui/workflow-stepper';
+import { Spinner } from '../components/ui/spinner';
 
 // Listing image version tracking (uses unified ImageVersion)
 export interface ListingVersionState {
@@ -156,6 +158,35 @@ export const HomePage: React.FC = () => {
   // View state: 'create' for the clean editor, 'results' for full-width Amazon preview
   const [view, setView] = useState<'create' | 'results'>(hasProjectToLoad ? 'results' : 'create');
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
+
+  // Workflow pipeline state — tracks which steps are complete/active
+  type WorkflowStepId = 'import' | 'analyze' | 'generate' | 'aplus';
+  const [completedSteps, setCompletedSteps] = useState<Set<WorkflowStepId>>(new Set());
+  const [activeStep, setActiveStep] = useState<WorkflowStepId | null>(null);
+
+  // Build workflow steps array for the stepper component
+  const workflowSteps: WorkflowStep[] = useMemo(() => {
+    const stepDefs: { id: WorkflowStepId; label: string }[] = [
+      { id: 'import', label: 'Import' },
+      { id: 'analyze', label: 'Analyze' },
+      { id: 'generate', label: 'Generate' },
+      { id: 'aplus', label: 'A+ Content' },
+    ];
+    return stepDefs.map(s => ({
+      id: s.id,
+      label: s.label,
+      status: activeStep === s.id
+        ? 'active' as const
+        : completedSteps.has(s.id)
+          ? 'complete' as const
+          : 'pending' as const,
+      detail: activeStep === s.id
+        ? s.id === 'generate'
+          ? `${images.filter(i => i.status === 'complete').length} of ${images.length}`
+          : undefined
+        : undefined,
+    }));
+  }, [activeStep, completedSteps, images]);
 
   // Generation celebration state
   const [showGenerationCelebration, setShowGenerationCelebration] = useState(false);
@@ -481,6 +512,49 @@ export const HomePage: React.FC = () => {
       setView('results');
     }
   }, [isGenerating, view]);
+
+  // Sync workflow stepper with isAnalyzing
+  useEffect(() => {
+    if (isAnalyzing) {
+      setActiveStep('analyze');
+    } else if (activeStep === 'analyze') {
+      // Analyze completed
+      if (frameworks.length > 0) {
+        setCompletedSteps(prev => new Set(prev).add('analyze'));
+      }
+      setActiveStep(null);
+    }
+  }, [isAnalyzing, frameworks.length]);
+
+  // Sync workflow stepper with isGenerating
+  useEffect(() => {
+    if (isGenerating) {
+      setActiveStep('generate');
+    } else if (activeStep === 'generate') {
+      const anyComplete = images.some(i => i.status === 'complete');
+      if (anyComplete) {
+        setCompletedSteps(prev => new Set(prev).add('generate'));
+      }
+      setActiveStep(null);
+    }
+  }, [isGenerating]);
+
+  // Sync workflow stepper with A+ generation
+  const anyAplusGenerating = useMemo(
+    () => aplusModules.some(m => m.status === 'generating' || m.mobileStatus === 'generating'),
+    [aplusModules]
+  );
+  useEffect(() => {
+    if (anyAplusGenerating || isGeneratingScript) {
+      setActiveStep('aplus');
+    } else if (activeStep === 'aplus') {
+      const anyAplusComplete = aplusModules.some(m => m.versions.length > 0);
+      if (anyAplusComplete) {
+        setCompletedSteps(prev => new Set(prev).add('aplus'));
+      }
+      setActiveStep(null);
+    }
+  }, [anyAplusGenerating, isGeneratingScript]);
 
   // Can analyze?
   const canAnalyze = uploads.length > 0 && formData.productTitle.trim().length > 0 && !isAnalyzing;
@@ -1780,6 +1854,9 @@ export const HomePage: React.FC = () => {
       }))
     );
     setAplusViewportMode('desktop');
+    // Reset workflow stepper
+    setCompletedSteps(new Set());
+    setActiveStep(null);
   }, []);
 
   const isGeminiConfigured = health?.dependencies?.gemini === 'configured';
@@ -1819,7 +1896,7 @@ export const HomePage: React.FC = () => {
     return (
       <div className="h-[calc(100vh-80px)] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-slate-600 border-t-redd-500 rounded-full animate-spin" />
+          <Spinner size="xl" className="text-redd-500" />
           <p className="text-slate-400">Loading project...</p>
         </div>
       </div>
@@ -1872,6 +1949,9 @@ export const HomePage: React.FC = () => {
           onToggleOriginalStyleRef={setUseOriginalStyleRef}
           onOpenAdvancedSettings={() => setAdvancedSettingsOpen(true)}
           onStartOver={handleStartOver}
+          workflowSteps={workflowSteps}
+          onImportStart={() => setActiveStep('import')}
+          onImportEnd={() => { setCompletedSteps(prev => new Set(prev).add('import')); setActiveStep(null); }}
         />
       ) : (
         <ResultsView
@@ -1917,6 +1997,7 @@ export const HomePage: React.FC = () => {
           onBackToEditor={() => setView('create')}
           onOpenAdvancedSettings={() => setAdvancedSettingsOpen(true)}
           onStartOver={handleStartOver}
+          workflowSteps={workflowSteps}
         />
       )}
 

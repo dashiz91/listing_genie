@@ -1,5 +1,6 @@
 import React from 'react';
 import type { GenerationStatus } from '../api/types';
+import { Spinner } from '@/components/ui/spinner';
 
 export interface StylePreview {
   style_id: string;
@@ -81,7 +82,7 @@ export const StyleSelector: React.FC<StyleSelectorProps> = ({
                 ) : preview?.status === 'processing' || (!preview && isGenerating) ? (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
+                      <Spinner size="lg" className="text-redd-500 mx-auto mb-2" />
                       <span className="text-sm text-gray-500">Generating...</span>
                     </div>
                   </div>
@@ -156,7 +157,7 @@ export const StyleSelector: React.FC<StyleSelectorProps> = ({
       >
         {isGenerating ? (
           <span className="flex items-center justify-center space-x-2">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            <Spinner size="sm" className="text-white" />
             <span>Generating Previews...</span>
           </span>
         ) : !allPreviewsReady ? (

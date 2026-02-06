@@ -5,6 +5,7 @@ import { AmazonListingPreview } from '../amazon-preview';
 import { GenerationProgressBar } from '../amazon-preview/GenerationProgressBar';
 import { CelebrationOverlay } from '../amazon-preview/CelebrationOverlay';
 import { AplusSection, type AplusModule, type AplusViewportMode } from '../preview-slots/AplusSection';
+import { WorkflowStepper, type WorkflowStep } from '../ui/workflow-stepper';
 import type { ListingVersionState } from '@/pages/HomePage';
 
 interface ResultsViewProps {
@@ -67,6 +68,9 @@ interface ResultsViewProps {
   onBackToEditor: () => void;
   onOpenAdvancedSettings: () => void;
   onStartOver: () => void;
+
+  // Workflow stepper
+  workflowSteps?: WorkflowStep[];
 }
 
 export const ResultsView: React.FC<ResultsViewProps> = ({
@@ -112,6 +116,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   onBackToEditor,
   onOpenAdvancedSettings,
   onStartOver,
+  workflowSteps,
 }) => {
   // Unified viewport mode
   const [unifiedViewportMode, setUnifiedViewportMode] = useState<'desktop' | 'mobile'>('desktop');
@@ -191,6 +196,9 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Workflow stepper (visible during active generation) */}
+      {workflowSteps && <WorkflowStepper steps={workflowSteps} />}
 
       {/* Generation progress bar */}
       <GenerationProgressBar images={images} isGenerating={isGenerating} />

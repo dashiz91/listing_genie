@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 import type { SessionImage } from '@/api/types';
 
 interface QuickEditBarProps {
@@ -133,11 +134,7 @@ export const QuickEditBar: React.FC<QuickEditBarProps> = ({
             )}
 
             {isProcessing && (
-              <div
-                className="w-3.5 h-3.5 ml-1 border-2 border-redd-500 border-t-transparent rounded-full animate-spin"
-                role="status"
-                aria-label={`${label} is processing`}
-              />
+              <Spinner size="sm" className="text-redd-500 ml-1" />
             )}
           </div>
         );

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import type { SessionImage, DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
+import { Spinner } from '@/components/ui/spinner';
 
 // Preview states
 export type PreviewState =
@@ -463,7 +464,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                       />
                     ) : img.status === 'processing' ? (
                       <div className="w-full h-full bg-slate-100 flex items-center justify-center">
-                        <div className="w-5 h-5 border-2 border-redd-500 border-t-transparent rounded-full animate-spin" />
+                        <Spinner size="sm" className="text-redd-500" />
                       </div>
                     ) : (
                       <div className="w-full h-full bg-slate-100 flex items-center justify-center">
@@ -494,7 +495,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                 ) : selectedImage?.status === 'processing' ? (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="w-12 h-12 mx-auto mb-4 border-4 border-redd-500 border-t-transparent rounded-full animate-spin" />
+                      <Spinner size="xl" className="text-redd-500 mx-auto mb-4" />
                       <p className="text-slate-500 text-sm">Generating {IMAGE_LABELS[selectedImage.type]}...</p>
                     </div>
                   </div>
@@ -566,7 +567,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-10 h-10 border-4 border-redd-500 border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="xl" className="text-redd-500" />
                 </div>
               )}
             </div>
@@ -583,7 +584,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({
                     <img src={getImageUrl(img.type)} alt="" className="w-full h-full object-cover" />
                   ) : img.status === 'processing' ? (
                     <div className="w-full h-full bg-slate-100 flex items-center justify-center">
-                      <div className="w-4 h-4 border-2 border-redd-500 border-t-transparent rounded-full animate-spin" />
+                      <Spinner size="sm" className="text-redd-500" />
                     </div>
                   ) : (
                     <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-400 text-xs">

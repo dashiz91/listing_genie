@@ -5,6 +5,7 @@ import type { DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
 import { useCredits } from '@/contexts/CreditContext';
 import { StyleLibrary } from '@/components/StyleLibrary';
+import { Spinner } from '@/components/ui/spinner';
 
 // Collapsible section component
 interface CollapsibleSectionProps {
@@ -466,10 +467,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
           >
             {isImportingAsin ? (
               <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
+                <Spinner size="sm" className="text-current" />
                 Importing...
               </>
             ) : (
@@ -1047,7 +1045,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                         {/* Pulsing icon */}
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="text-center">
-                            <div className="w-10 h-10 border-3 border-redd-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                            <Spinner size="lg" className="text-redd-500 mx-auto mb-2" />
                             <span className="text-xs text-slate-400">Creating style {i}...</span>
                           </div>
                         </div>
@@ -1101,7 +1099,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-6 h-6 border-2 border-redd-500 border-t-transparent rounded-full animate-spin" />
+                          <Spinner size="md" className="text-redd-500" />
                         </div>
                       )}
                       {/* Selected check */}
@@ -1308,7 +1306,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             >
               {isAnalyzing ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" className="text-white" />
                   Analyzing Product...
                 </span>
               ) : (
@@ -1366,7 +1364,7 @@ export const WorkshopPanel: React.FC<WorkshopPanelProps> = ({
             >
               {isGenerating ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" className="text-white" />
                   Generating Images...
                 </span>
               ) : selectedFramework ? (

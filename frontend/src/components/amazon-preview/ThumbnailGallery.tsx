@@ -18,6 +18,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 import type { SessionImage } from '@/api/types';
 
 interface ThumbnailGalleryProps {
@@ -120,7 +121,7 @@ const SortableThumbnail: React.FC<SortableThumbnailProps> = ({
         />
       ) : isProcessing ? (
         <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-          <div className="w-6 h-6 border-2 border-redd-500 border-t-transparent rounded-full animate-spin" />
+          <Spinner size="md" className="text-redd-500" />
         </div>
       ) : (
         <div className="w-full h-full bg-slate-800 flex items-center justify-center">
@@ -286,7 +287,7 @@ export const ThumbnailGallery: React.FC<ThumbnailGalleryProps> = ({
               />
             ) : isProcessing ? (
               <div className="w-full h-full bg-slate-800 flex items-center justify-center">
-                <div className="w-6 h-6 border-2 border-redd-500 border-t-transparent rounded-full animate-spin" />
+                <Spinner size="md" className="text-redd-500" />
               </div>
             ) : (
               <div className="w-full h-full bg-slate-800 flex items-center justify-center">

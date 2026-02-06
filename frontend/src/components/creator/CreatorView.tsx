@@ -5,6 +5,8 @@ import type { DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
 import { useCredits } from '@/contexts/CreditContext';
 import { StyleLibrary } from '@/components/StyleLibrary';
+import { Spinner } from '@/components/ui/spinner';
+import { WorkflowStepper, type WorkflowStep } from '@/components/ui/workflow-stepper';
 import type { WorkshopFormData } from '../split-layout/WorkshopPanel';
 
 interface CreatorViewProps {
@@ -40,6 +42,11 @@ interface CreatorViewProps {
 
   // Start over
   onStartOver: () => void;
+
+  // Workflow stepper
+  workflowSteps?: WorkflowStep[];
+  onImportStart?: () => void;
+  onImportEnd?: () => void;
 }
 
 export const CreatorView: React.FC<CreatorViewProps> = ({
@@ -62,6 +69,9 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
   onToggleOriginalStyleRef,
   onOpenAdvancedSettings,
   onStartOver,
+  workflowSteps,
+  onImportStart,
+  onImportEnd,
 }) => {
   const { balance, isAdmin } = useCredits();
 
@@ -102,6 +112,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
 
     setIsImportingAsin(true);
     setAsinError(null);
+    onImportStart?.();
 
     try {
       const result: ASINImportResponse = await apiClient.importFromAsin(asinInput.trim(), {
@@ -145,6 +156,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
       setAsinError(axiosError.response?.data?.detail || errMsg);
     } finally {
       setIsImportingAsin(false);
+      onImportEnd?.();
     }
   };
 
@@ -237,6 +249,9 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
   return (
     <div className="flex-1 overflow-auto">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 pb-24">
+        {/* Workflow stepper */}
+        {workflowSteps && <WorkflowStepper steps={workflowSteps} className="mb-4" />}
+
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">
@@ -535,7 +550,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
             >
               {isAnalyzing ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" className="text-white" />
                   Analyzing Product...
                 </span>
               ) : (
@@ -595,7 +610,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
                     />
                     <div className="absolute inset-0 flex items-center justify-center">
                       <div className="text-center">
-                        <div className="w-10 h-10 border-3 border-redd-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                        <Spinner size="lg" className="text-redd-500 mx-auto mb-2" />
                         <span className="text-xs text-slate-400">Creating style {i + 1}...</span>
                       </div>
                     </div>
@@ -649,7 +664,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-6 h-6 border-2 border-redd-500 border-t-transparent rounded-full animate-spin" />
+                          <Spinner size="md" className="text-redd-500" />
                         </div>
                       )}
                       {isSelected && (
@@ -699,7 +714,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
             >
               {isGenerating ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Spinner size="sm" className="text-white" />
                   Generating Images...
                 </span>
               ) : selectedFramework ? (

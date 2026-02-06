@@ -4,6 +4,7 @@ import { apiClient } from '@/api/client';
 import type { SessionImage, DesignFramework } from '@/api/types';
 import type { UploadWithPreview } from '../ImageUploader';
 import { LivePreview, PreviewState } from '../live-preview/LivePreview';
+import { Spinner } from '@/components/ui/spinner';
 import { AmazonListingPreview } from '../amazon-preview';
 import { AplusSection, type AplusModule, type AplusViewportMode } from '../preview-slots/AplusSection';
 import type { ListingVersionState } from '@/pages/HomePage';
@@ -296,7 +297,7 @@ export const ShowroomPanel: React.FC<ShowroomPanelProps> = ({
               <div className="relative w-24 h-24 mx-auto">
                 <div className="absolute inset-0 rounded-full border-2 border-redd-500/30 animate-ping" />
                 <div className="absolute inset-2 rounded-full border-2 border-redd-500/50 animate-pulse" />
-                <div className="absolute inset-4 rounded-full border-2 border-redd-500 border-t-transparent animate-spin" />
+                <Spinner size="xl" className="text-redd-500 absolute" />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <svg className="w-8 h-8 text-redd-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.53 16.122a3 3 0 00-5.78 1.128 2.25 2.25 0 01-2.4 2.245 4.5 4.5 0 008.4-2.245c0-.399-.078-.78-.22-1.128zm0 0a15.998 15.998 0 003.388-1.62m-5.043-.025a15.994 15.994 0 011.622-3.395m3.42 3.42a15.995 15.995 0 004.764-4.648l3.876-5.814a1.151 1.151 0 00-1.597-1.597L14.146 6.32a15.996 15.996 0 00-4.649 4.763m3.42 3.42a6.776 6.776 0 00-3.42-3.42" />

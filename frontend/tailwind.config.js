@@ -92,15 +92,6 @@ export default {
           "50%": { backgroundPosition: "100% 50%" },
           "100%": { backgroundPosition: "0% 50%" },
         },
-        "progress-glow": {
-          "0%": { boxShadow: "0 0 5px currentColor, 0 0 10px currentColor" },
-          "50%": { boxShadow: "0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor" },
-          "100%": { boxShadow: "0 0 5px currentColor, 0 0 10px currentColor" },
-        },
-        "float": {
-          "0%, 100%": { transform: "translateY(0)" },
-          "50%": { transform: "translateY(-10px)" },
-        },
         "spin-slow": {
           "0%": { transform: "rotate(0deg)" },
           "100%": { transform: "rotate(360deg)" },
@@ -112,8 +103,6 @@ export default {
         "shimmer": "shimmer 2s linear infinite",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
         "gradient-flow": "gradient-flow 3s ease infinite",
-        "progress-glow": "progress-glow 1.5s ease-in-out infinite",
-        "float": "float 3s ease-in-out infinite",
         "spin-slow": "spin-slow 3s linear infinite",
       },
     },

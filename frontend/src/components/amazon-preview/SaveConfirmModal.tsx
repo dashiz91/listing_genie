@@ -8,6 +8,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 
 interface SaveConfirmModalProps {
   isOpen: boolean;
@@ -79,7 +80,7 @@ export const SaveConfirmModal: React.FC<SaveConfirmModalProps> = ({
           >
             {isLoading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <Spinner size="sm" className="text-white" />
                 <span>Saving...</span>
               </>
             ) : (
