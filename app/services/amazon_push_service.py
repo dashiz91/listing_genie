@@ -81,6 +81,34 @@ class AmazonPushService:
             .first()
         )
 
+    async def list_seller_skus(
+        self,
+        *,
+        user_id: str,
+        query: Optional[str] = None,
+        limit: int = 20,
+        marketplace_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        connection = self.auth.get_connection(user_id)
+        if not connection:
+            raise ValueError("Amazon account is not connected")
+        if not connection.seller_id:
+            raise ValueError("Missing seller ID for connected Amazon account")
+        target_marketplace = marketplace_id or connection.marketplace_id
+        if not target_marketplace:
+            raise ValueError("Missing marketplace ID for connected Amazon account")
+
+        access_token = await self.auth.refresh_access_token(connection.refresh_token)
+        result = await self.sp_api.search_listing_skus(
+            access_token=access_token,
+            seller_id=connection.seller_id,
+            marketplace_id=target_marketplace,
+            query=query,
+            page_size=max(1, min(limit, 20)),
+        )
+        skus = result.get("skus") or []
+        return skus[: max(1, min(limit, 100))]
+
     def _update_job(
         self,
         job: AmazonPushJob,

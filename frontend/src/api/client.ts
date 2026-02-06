@@ -26,6 +26,7 @@ import type {
   AmazonDisconnectResponse,
   AmazonPushResponse,
   AmazonPushStatusResponse,
+  AmazonSellerSkusResponse,
 } from './types';
 
 // In production, use VITE_API_URL; in development, use relative /api (proxied by Vite)
@@ -743,6 +744,20 @@ class ApiClient {
   async getAmazonPushStatus(jobId: string): Promise<AmazonPushStatusResponse> {
     const response = await this.client.get<AmazonPushStatusResponse>(
       `/amazon/push/status/${jobId}`
+    );
+    return response.data;
+  }
+
+  /**
+   * List seller SKUs from the connected Seller Central account.
+   */
+  async getAmazonSellerSkus(query?: string, limit: number = 20): Promise<AmazonSellerSkusResponse> {
+    const params = new URLSearchParams();
+    if (query && query.trim()) params.set('query', query.trim());
+    params.set('limit', String(limit));
+    const qs = params.toString();
+    const response = await this.client.get<AmazonSellerSkusResponse>(
+      `/amazon/skus${qs ? `?${qs}` : ''}`
     );
     return response.data;
   }

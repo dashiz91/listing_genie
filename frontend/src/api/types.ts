@@ -571,6 +571,18 @@ export interface AmazonPushStatusResponse {
   completed_at: string | null;
 }
 
+export interface AmazonSellerSku {
+  sku: string;
+  asin: string | null;
+  title: string | null;
+  status: string | null;
+}
+
+export interface AmazonSellerSkusResponse {
+  skus: AmazonSellerSku[];
+  count: number;
+}
+
 // A+ Module dimensions (for UI reference)
 export const APLUS_DIMENSIONS: Record<AplusModuleType, { width: number; height: number }> = {
   full_image: { width: 1464, height: 600 },

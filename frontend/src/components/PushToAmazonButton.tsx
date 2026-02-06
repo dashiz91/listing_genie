@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { apiClient } from '@/api/client';
-import type { AmazonAuthStatus, AmazonPushJobStatus } from '@/api/types';
+import type { AmazonAuthStatus, AmazonPushJobStatus, AmazonSellerSku } from '@/api/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
@@ -14,6 +14,8 @@ interface PushToAmazonButtonProps {
   sessionId: string;
   /** Pre-filled ASIN from ASIN import (if available) */
   asin?: string;
+  label?: string;
+  className?: string;
 }
 
 type PushState =
@@ -25,11 +27,21 @@ type PushState =
   | { phase: 'completed'; message?: string }
   | { phase: 'failed'; error: string };
 
-const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({ sessionId, asin: prefillAsin }) => {
+const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
+  sessionId,
+  asin: prefillAsin,
+  label = 'Push to Amazon',
+  className,
+}) => {
   const [state, setState] = useState<PushState>({ phase: 'idle' });
   const [asin, setAsin] = useState(prefillAsin || '');
   const [sku, setSku] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [skuOptions, setSkuOptions] = useState<AmazonSellerSku[]>([]);
+  const [skuSearch, setSkuSearch] = useState('');
+  const [selectedSkuOption, setSelectedSkuOption] = useState('');
+  const [isLoadingSkus, setIsLoadingSkus] = useState(false);
+  const [skuLookupError, setSkuLookupError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -37,6 +49,13 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({ sessionId, asin
   useEffect(() => {
     if (prefillAsin) setAsin(prefillAsin);
   }, [prefillAsin]);
+
+  useEffect(() => {
+    if (state.phase !== 'form') {
+      setSelectedSkuOption('');
+      setSkuSearch('');
+    }
+  }, [state.phase]);
 
   // Cleanup polling on unmount
   useEffect(() => {
@@ -62,6 +81,26 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({ sessionId, asin
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [state.phase]);
+
+  const loadSkuOptions = useCallback(async (query?: string) => {
+    setIsLoadingSkus(true);
+    setSkuLookupError(null);
+    try {
+      const result = await apiClient.getAmazonSellerSkus(query, 20);
+      setSkuOptions(result.skus || []);
+    } catch {
+      setSkuLookupError('Could not load SKUs from Amazon. You can still enter SKU manually.');
+      setSkuOptions([]);
+    } finally {
+      setIsLoadingSkus(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (state.phase === 'form') {
+      loadSkuOptions();
+    }
+  }, [state.phase, loadSkuOptions]);
 
   const startPoll = useCallback((jobId: string) => {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -152,7 +191,7 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({ sessionId, asin
       <button
         onClick={handleButtonClick}
         disabled={state.phase === 'checking'}
-        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#FF9900] bg-[#FF9900]/10 border border-[#FF9900]/30 rounded-lg hover:bg-[#FF9900]/20 transition-colors disabled:opacity-50"
+        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#FF9900] bg-[#FF9900]/10 border border-[#FF9900]/30 rounded-lg hover:bg-[#FF9900]/20 transition-colors disabled:opacity-50 ${className || ''}`}
       >
         {state.phase === 'checking' ? (
           <Spinner size="sm" className="text-[#FF9900]" />
@@ -161,7 +200,7 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({ sessionId, asin
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
         )}
-        Push to Amazon
+        {label}
       </button>
 
       {/* Dialog overlay */}
@@ -227,6 +266,47 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({ sessionId, asin
                       className="bg-slate-900 border-slate-700 text-white font-mono"
                       maxLength={10}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1.5">Find SKU from your account</label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={skuSearch}
+                        onChange={(e) => setSkuSearch(e.target.value)}
+                        placeholder="Search SKU/title"
+                        className="bg-slate-900 border-slate-700 text-white"
+                      />
+                      <Button
+                        variant="outline"
+                        className="border-slate-600 text-slate-300"
+                        onClick={() => loadSkuOptions(skuSearch)}
+                        disabled={isLoadingSkus}
+                      >
+                        {isLoadingSkus ? <Spinner size="sm" className="text-slate-300" /> : 'Search'}
+                      </Button>
+                    </div>
+                    {skuLookupError && (
+                      <p className="text-xs text-amber-400 mt-1">{skuLookupError}</p>
+                    )}
+                    <select
+                      className="mt-2 w-full px-3 py-2 rounded-md bg-slate-900 border border-slate-700 text-white text-sm"
+                      value={selectedSkuOption}
+                      onChange={(e) => {
+                        const selectedSku = e.target.value;
+                        setSelectedSkuOption(selectedSku);
+                        if (!selectedSku) return;
+                        const match = skuOptions.find((opt) => opt.sku === selectedSku);
+                        setSku(selectedSku);
+                        if (match?.asin) setAsin(match.asin);
+                      }}
+                    >
+                      <option value="">Select SKU from your account (optional)</option>
+                      {skuOptions.map((opt) => (
+                        <option key={opt.sku} value={opt.sku}>
+                          {opt.sku}{opt.asin ? ` · ${opt.asin}` : ''}{opt.title ? ` · ${opt.title}` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1.5">SKU</label>

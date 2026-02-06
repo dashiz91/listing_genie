@@ -82,6 +82,18 @@ class PushJobStatusResponse(BaseModel):
     completed_at: Optional[str]
 
 
+class SellerSku(BaseModel):
+    sku: str
+    asin: Optional[str] = None
+    title: Optional[str] = None
+    status: Optional[str] = None
+
+
+class SellerSkusResponse(BaseModel):
+    skus: list[SellerSku]
+    count: int
+
+
 def _frontend_redirect(return_to: Optional[str], **params: str) -> str:
     safe_path = return_to or "/app/settings"
     if not safe_path.startswith("/"):
@@ -209,6 +221,33 @@ async def disconnect_auth(
     service = AmazonAuthService(db)
     service.disconnect(user.id)
     return AmazonDisconnectResponse(disconnected=True)
+
+
+@router.get("/skus", response_model=SellerSkusResponse)
+async def list_skus(
+    query: Optional[str] = Query(default=None, description="Optional keyword/SKU search"),
+    limit: int = Query(default=20, ge=1, le=100),
+    marketplace_id: Optional[str] = Query(default=None),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = AmazonPushService(db)
+    try:
+        skus = await service.list_seller_skus(
+            user_id=user.id,
+            query=query,
+            limit=limit,
+            marketplace_id=marketplace_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(f"Failed to list seller SKUs: {exc}")
+        raise HTTPException(status_code=502, detail="Failed to fetch SKUs from Amazon") from exc
+    return SellerSkusResponse(
+        skus=[SellerSku(**s) for s in skus],
+        count=len(skus),
+    )
 
 
 # ---------------------------------------------------------------------------

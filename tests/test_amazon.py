@@ -8,6 +8,7 @@ from app.core.auth import User, get_current_user
 from app.db.session import engine, SessionLocal
 from app.models.database import Base, UserSettings
 from app.services.amazon_auth_service import AmazonAuthService, AmazonConnection
+from app.services.amazon_sp_api_service import AmazonSPAPIService
 from app.config import settings
 from app.api.endpoints import amazon as amazon_endpoints
 
@@ -162,3 +163,44 @@ def test_disconnect_clears_saved_connection(client):
         assert saved.amazon_marketplace_id is None
     finally:
         db.close()
+
+
+def test_list_skus_endpoint(client, monkeypatch):
+    def fake_get_connection(self, user_id):
+        return AmazonConnection(
+            refresh_token="refresh-test",
+            seller_id="A1SELLER123",
+            marketplace_id="ATVPDKIKX0DER",
+            mode="oauth",
+            connected_at=None,
+        )
+
+    async def fake_refresh(self, refresh_token):
+        return "access-token-123"
+
+    async def fake_search(
+        self,
+        *,
+        access_token,
+        seller_id,
+        marketplace_id,
+        query=None,
+        page_size=20,
+    ):
+        return {
+            "skus": [
+                {"sku": "SKU-001", "asin": "B012345678", "title": "Sample Item 1", "status": "BUYABLE"},
+                {"sku": "SKU-002", "asin": "B076543210", "title": "Sample Item 2", "status": "DISCOVERABLE"},
+            ],
+            "next_token": None,
+        }
+
+    monkeypatch.setattr(AmazonAuthService, "get_connection", fake_get_connection)
+    monkeypatch.setattr(AmazonAuthService, "refresh_access_token", fake_refresh)
+    monkeypatch.setattr(AmazonSPAPIService, "search_listing_skus", fake_search)
+
+    response = client.get("/api/amazon/skus", params={"query": "SKU", "limit": 10})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] == 2
+    assert payload["skus"][0]["sku"] == "SKU-001"

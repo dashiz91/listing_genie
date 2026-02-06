@@ -12,7 +12,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
-from urllib.parse import quote, urlparse, parse_qsl
+from urllib.parse import quote, urlparse, parse_qsl, urlencode
 
 import httpx
 
@@ -142,6 +142,64 @@ class AmazonSPAPIService:
             out["x-amz-security-token"] = self.aws_session_token
         return out
 
+    async def _signed_request(
+        self,
+        *,
+        method: str,
+        path: str,
+        query_params: Optional[Dict[str, str]],
+        access_token: str,
+        payload_obj: Optional[Dict[str, Any]] = None,
+        timeout_seconds: float = 60.0,
+    ) -> Dict[str, Any]:
+        query_string = urlencode(query_params or {}, doseq=True)
+        url = f"{self.endpoint}{path}"
+        if query_string:
+            url = f"{url}?{query_string}"
+
+        payload_bytes = b""
+        headers: Dict[str, str] = {
+            "x-amz-access-token": access_token,
+            "user-agent": "reddstudio-ai/1.0 (SP-API)",
+            "accept": "application/json",
+        }
+        if payload_obj is not None:
+            payload_bytes = json.dumps(payload_obj, separators=(",", ":")).encode("utf-8")
+            headers["content-type"] = "application/json"
+
+        signed_headers = self._sign_headers(
+            method=method,
+            url=url,
+            headers=headers,
+            payload=payload_bytes,
+        )
+
+        async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+            response = await client.request(
+                method.upper(),
+                url,
+                content=payload_bytes if payload_obj is not None else None,
+                headers=signed_headers,
+            )
+
+        try:
+            response_data: Any = response.json()
+        except Exception:
+            response_data = {"raw": response.text}
+
+        if response.status_code >= 400:
+            logger.error(f"SP-API request failed {response.status_code} {method} {path}: {response_data}")
+            raise AmazonSPAPIError(
+                "SP-API request failed",
+                status_code=response.status_code,
+                details={"response": response_data, "method": method.upper(), "path": path},
+            )
+
+        return {
+            "status_code": response.status_code,
+            "response": response_data,
+        }
+
     # ------------------------------------------------------------------
     # Listings API
     # ------------------------------------------------------------------
@@ -176,44 +234,22 @@ class AmazonSPAPIService:
             raise AmazonSPAPIError("No image URLs provided for listing patch", status_code=400)
 
         path = f"/listings/2021-08-01/items/{seller_id}/{quote(sku, safe='')}"
-        query = f"marketplaceIds={quote(marketplace_id, safe='')}&issueLocale=en_US"
-        url = f"{self.endpoint}{path}?{query}"
-
         payload_obj = {
             "productType": "PRODUCT",
             "patches": self.build_listing_image_attributes(image_urls),
         }
-        payload_bytes = json.dumps(payload_obj, separators=(",", ":")).encode("utf-8")
-
-        headers = {
-            "content-type": "application/json",
-            "x-amz-access-token": access_token,
-            "user-agent": "reddstudio-ai/1.0 (SP-API Listings Push)",
-            "accept": "application/json",
-        }
-        signed_headers = self._sign_headers(
+        result = await self._signed_request(
             method="PATCH",
-            url=url,
-            headers=headers,
-            payload=payload_bytes,
+            path=path,
+            query_params={
+                "marketplaceIds": marketplace_id,
+                "issueLocale": "en_US",
+            },
+            access_token=access_token,
+            payload_obj=payload_obj,
+            timeout_seconds=60.0,
         )
-
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.patch(url, content=payload_bytes, headers=signed_headers)
-
-        response_data: Any
-        try:
-            response_data = response.json()
-        except Exception:
-            response_data = {"raw": response.text}
-
-        if response.status_code >= 400:
-            logger.error(f"SP-API listing patch failed {response.status_code}: {response_data}")
-            raise AmazonSPAPIError(
-                "SP-API listing patch failed",
-                status_code=response.status_code,
-                details={"response": response_data},
-            )
+        response_data = result["response"]
 
         submission_id = None
         if isinstance(response_data, dict):
@@ -224,7 +260,71 @@ class AmazonSPAPIService:
             )
 
         return {
-            "status_code": response.status_code,
+            "status_code": result["status_code"],
             "submission_id": submission_id,
             "response": response_data,
+        }
+
+    async def search_listing_skus(
+        self,
+        *,
+        access_token: str,
+        seller_id: str,
+        marketplace_id: str,
+        query: Optional[str] = None,
+        page_size: int = 20,
+    ) -> Dict[str, Any]:
+        safe_page_size = max(1, min(page_size, 20))
+        params: Dict[str, str] = {
+            "marketplaceIds": marketplace_id,
+            "includedData": "summaries",
+            "issueLocale": "en_US",
+            "pageSize": str(safe_page_size),
+        }
+        if query and query.strip():
+            params["keywords"] = query.strip()
+
+        result = await self._signed_request(
+            method="GET",
+            path=f"/listings/2021-08-01/items/{seller_id}",
+            query_params=params,
+            access_token=access_token,
+            payload_obj=None,
+            timeout_seconds=45.0,
+        )
+        payload = result["response"] if isinstance(result.get("response"), dict) else {}
+        raw_items = payload.get("items") or []
+
+        skus: List[Dict[str, Any]] = []
+        seen = set()
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            sku = item.get("sku")
+            if not sku or sku in seen:
+                continue
+            summaries = item.get("summaries") or []
+            summary = summaries[0] if summaries and isinstance(summaries[0], dict) else {}
+            asin = summary.get("asin")
+            title = summary.get("itemName")
+            status_value = summary.get("status")
+            status = None
+            if isinstance(status_value, list) and status_value:
+                status = status_value[0]
+            elif isinstance(status_value, str):
+                status = status_value
+
+            skus.append(
+                {
+                    "sku": sku,
+                    "asin": asin,
+                    "title": title,
+                    "status": status,
+                }
+            )
+            seen.add(sku)
+
+        return {
+            "skus": skus,
+            "next_token": payload.get("nextToken"),
         }

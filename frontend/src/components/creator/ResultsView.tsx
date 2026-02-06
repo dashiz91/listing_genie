@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { cn, normalizeColors } from '@/lib/utils';
 import type { SessionImage, DesignFramework, ReferenceImage, AplusVisualScript } from '@/api/types';
 import { AmazonListingPreview } from '../amazon-preview';
@@ -121,11 +121,22 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 }) => {
   // Unified viewport mode
   const [unifiedViewportMode, setUnifiedViewportMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [showPushNudge, setShowPushNudge] = useState(true);
 
   const handleViewportModeChange = useCallback((mode: 'desktop' | 'mobile') => {
     setUnifiedViewportMode(mode);
     onAplusViewportChange(mode);
   }, [onAplusViewportChange]);
+
+  const completeCount = images.filter(i => i.status === 'complete').length;
+  const allListingImagesReady = images.length > 0 && completeCount === images.length;
+  const showPushBanner = !!sessionId && allListingImagesReady && showPushNudge;
+
+  useEffect(() => {
+    if (allListingImagesReady) {
+      setShowPushNudge(true);
+    }
+  }, [allListingImagesReady, sessionId]);
 
   // Get accent color from framework
   const frameworkColors = selectedFramework ? normalizeColors(selectedFramework.colors) : [];
@@ -183,7 +194,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               })}
             </div>
             {/* Push to Amazon (visible when session has generated images) */}
-            {sessionId && images.some(i => i.status === 'complete') && (
+            {sessionId && images.some(i => i.status === 'complete') && !showPushBanner && (
               <PushToAmazonButton sessionId={sessionId} />
             )}
             <button
@@ -207,6 +218,35 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
 
       {/* Generation progress bar */}
       <GenerationProgressBar images={images} isGenerating={isGenerating} />
+
+      {/* Persistent (non-modal) nudge when all listing slots are ready */}
+      {showPushBanner && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-4">
+          <div className="rounded-xl border border-[#FF9900]/30 bg-gradient-to-r from-[#FF9900]/12 to-slate-800/80 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-[#FFB84D]">
+                Listing images are ready to publish
+              </p>
+              <p className="text-xs text-slate-300 mt-1">
+                You can keep tweaking images anytime, but you can also push this version to Amazon now.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <PushToAmazonButton
+                sessionId={sessionId!}
+                label="Push This Version"
+                className="bg-[#FF9900]/20 border-[#FF9900]/40 hover:bg-[#FF9900]/30"
+              />
+              <button
+                onClick={() => setShowPushNudge(false)}
+                className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Celebration overlay */}
       <CelebrationOverlay
