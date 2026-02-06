@@ -599,6 +599,24 @@ class GenerationService:
                     # User selected specific focus images — use only those
                     reference_paths = list(reference_image_paths)
                     logger.info(f"[GENERATION] Using {len(reference_paths)} user-selected focus images (overriding defaults)")
+
+                    # Still detect style reference and logo within focus images
+                    # so the style prefix header gets added to the prompt.
+                    # Check against both session path and original upload path
+                    # (they may differ if session stores framework preview).
+                    style_ref_candidates = set()
+                    if session.style_reference_path:
+                        style_ref_candidates.add(session.style_reference_path)
+                    if design_context and design_context.image_inventory:
+                        for inv in (design_context.image_inventory or []):
+                            if inv.get("type") in ("style_reference", "original_style_reference"):
+                                style_ref_candidates.add(inv["path"])
+
+                    for idx, path in enumerate(reference_paths):
+                        if path in style_ref_candidates:
+                            style_image_index = idx + 1  # 1-based
+                        elif session.logo_path and path == session.logo_path:
+                            logo_image_index = idx + 1  # 1-based
                 else:
                     reference_paths = [session.upload_path]
 
