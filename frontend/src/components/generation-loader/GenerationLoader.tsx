@@ -144,7 +144,7 @@ export const GenerationLoader: React.FC<GenerationLoaderProps> = ({
           </div>
 
           <p className="text-slate-500 text-xs mt-3">
-            Usually takes ~15 seconds
+            This may take a minute
           </p>
         </div>
       </div>

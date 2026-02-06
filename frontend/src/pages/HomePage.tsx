@@ -488,7 +488,9 @@ export const HomePage: React.FC = () => {
           }
         });
 
-        if (response.status === 'complete' || response.status === 'partial' || response.status === 'failed') {
+        // Only stop polling on terminal states.
+        // 'partial' is NOT terminal — handleGenerate may still be running remaining batches.
+        if (response.status === 'complete' || response.status === 'failed') {
           setIsGenerating(false);
         }
       } catch (err) {
