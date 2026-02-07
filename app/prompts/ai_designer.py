@@ -88,7 +88,7 @@ Framework Personalities:
 - Framework 4: "Elevated Everyday" - Transforms the ordinary into something special
 
 Each framework needs:
-1. COLOR PALETTE (3 colors ONLY with hex codes: primary, secondary, accent) - Based on what you SEE in the product. Premium brands use FEWER colors.
+1. COLOR PALETTE (2 colors by default: primary + secondary) - Based on what you SEE in the product. Premium brands use FEWER colors. Only add a 3rd accent color if the product truly demands it.
 2. TYPOGRAPHY - Specific font names that match the emotional personality
 3. STORY ARC - An EMOTIONAL journey (not feature-based):
    - Theme: The feeling that connects all images
@@ -136,8 +136,7 @@ Return valid JSON with this structure:
       "design_philosophy": "2-3 sentence vision",
       "colors": [
         {{"hex": "#XXXXXX", "name": "Name", "role": "primary", "usage": "60% - description"}},
-        {{"hex": "#XXXXXX", "name": "Name", "role": "secondary", "usage": "30% - description"}},
-        {{"hex": "#XXXXXX", "name": "Name", "role": "accent", "usage": "10% - description"}}
+        {{"hex": "#XXXXXX", "name": "Name", "role": "secondary", "usage": "40% - description"}}
       ],
       "typography": {{
         "headline_font": "Font Name",
@@ -225,7 +224,7 @@ Don't copy pixels. Capture the FEELING:
 - How does space breathe?
 
 Extract:
-- COLOR PALETTE: Dominant colors (3 hex codes ONLY — primary, secondary, accent)
+- COLOR PALETTE: Dominant colors (2 hex codes by default — primary, secondary. Add accent only if essential)
 - TYPOGRAPHY FEEL: What font style matches the emotional tone?
 - LIGHTING: How is it lit? What mood does this create?
 - EMOTIONAL ESSENCE: What feeling does it convey?

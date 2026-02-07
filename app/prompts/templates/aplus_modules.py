@@ -143,8 +143,8 @@ THE PRODUCT:
 
 DESIGN SYSTEM (must match listing images exactly):
 - Framework: {framework_name} — {design_philosophy}
-- Colors (3 ONLY): {color_palette}
-  Use ONLY these 3 hex colors + black/white for contrast. No invented hues.
+- Colors: {color_palette}
+  Use ONLY these hex colors + black/white for contrast. No invented hues.
 - Typography: Headlines in {headline_font_desc}, body text in {body_font_desc}
 - Visual treatment: {visual_treatment}
 

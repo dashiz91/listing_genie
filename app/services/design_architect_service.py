@@ -150,11 +150,12 @@ Think like you're presenting 4 options to a Fortune 500 client.
 
 CRITICAL REQUIREMENTS FOR EACH FRAMEWORK:
 
-1. COLOR PALETTE (3 colors ONLY with EXACT hex codes):
+1. COLOR PALETTE (2 colors by default, 3 max):
    - Primary (60%): The dominant color
-   - Secondary (30%): Supporting color
-   - Accent (10%): Pop of contrast
+   - Secondary (40%): Supporting color
+   - Accent (optional, only if product demands it): Pop of contrast
    Premium brands use FEWER colors, not more. Think Apple (white + silver + black).
+   Default to 2 colors. Only add a 3rd accent if the product truly needs a pop of contrast.
    Include the color NAME (e.g., "Soft Lilac") and SPECIFIC usage instructions.
    Text colors derive from the palette — dark text uses Primary darkened, light text uses Secondary lightened.
 
@@ -369,11 +370,11 @@ class DesignArchitectService:
             if len(data['frameworks']) < 4:
                 logger.warning(f"Only got {len(data['frameworks'])} frameworks, expected 4")
 
-            # Enforce 3-color maximum per framework
+            # Enforce 4-color maximum per framework (default is 2, but user can configure up to 4)
             for fw in data.get('frameworks', []):
-                if 'colors' in fw and len(fw['colors']) > 3:
-                    logger.info(f"Truncating framework colors from {len(fw['colors'])} to 3")
-                    fw['colors'] = fw['colors'][:3]
+                if 'colors' in fw and len(fw['colors']) > 4:
+                    logger.info(f"Truncating framework colors from {len(fw['colors'])} to 4")
+                    fw['colors'] = fw['colors'][:4]
 
             return data
 
@@ -408,8 +409,8 @@ class DesignArchitectService:
                 image_copy = copy
                 break
 
-        # Build color section (max 3 colors)
-        colors = framework.get('colors', [])[:3]
+        # Build color section (max 4 colors)
+        colors = framework.get('colors', [])[:4]
         color_section = "[COLOR PALETTE - EXACT VALUES]\n"
         for color in colors:
             color_section += f"- {color['role'].upper()}: {color['hex']} ({color['name']}) - {color['usage']}\n"

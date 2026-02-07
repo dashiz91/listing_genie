@@ -453,9 +453,9 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
                           : 'bg-slate-800 border border-slate-600 text-slate-300 hover:bg-slate-700'
                       )}
                     >
-                      AI Decides
+                      Auto (2)
                     </button>
-                    {[2, 3].map((count) => (
+                    {[2, 3, 4].map((count) => (
                       <button
                         key={count}
                         onClick={() => onFormChange({ colorCount: count })}
@@ -497,7 +497,7 @@ export const AdvancedSettingsSheet: React.FC<AdvancedSettingsSheetProps> = ({
                       </div>
                     ))}
                   </div>
-                  {formData.colorPalette.length < 3 && (
+                  {formData.colorPalette.length < 4 && (
                     <div className="flex gap-2">
                       <input
                         type="color"
