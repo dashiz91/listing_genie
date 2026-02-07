@@ -1356,23 +1356,9 @@ async def generate_aplus_hero_pair(
         effective_brand_name = _resolve_effective_brand_name(
             session, db, user.id if user else None
         )
-        focus_paths = request.reference_image_paths or []
-        has_focus_overrides = bool(focus_paths)
-        has_product_ref = (
-            bool(session.upload_path and session.upload_path in focus_paths)
-            if has_focus_overrides
-            else bool(session.upload_path)
-        )
-        has_style_ref = (
-            bool(session.style_reference_path and session.style_reference_path in focus_paths)
-            if has_focus_overrides
-            else bool(session.style_reference_path)
-        )
-        has_logo_ref = (
-            bool(session.logo_path and session.logo_path in focus_paths)
-            if has_focus_overrides
-            else bool(session.logo_path)
-        )
+        has_product_ref = bool(session.upload_path)
+        has_style_ref = bool(session.style_reference_path)
+        has_logo_ref = bool(session.logo_path)
 
         # Auto-generate visual script if missing
         visual_script = session.aplus_visual_script
@@ -1418,7 +1404,6 @@ async def generate_aplus_hero_pair(
             has_style_ref=has_style_ref,
             has_logo=has_logo_ref,
             has_product_ref=has_product_ref,
-            has_focus_refs=has_focus_overrides,
         )
 
         # AI-enhanced prompt rewriting when user provides feedback
@@ -1463,7 +1448,7 @@ async def generate_aplus_hero_pair(
         # Assemble reference images and execute via unified pipeline
         ref_images = assemble_reference_images(
             session, "aplus_hero",
-            focus_overrides=request.reference_image_paths,
+            module_index=0,
         )
         ctx = GenerationContext.for_aplus_hero(
             session=session,
@@ -1531,8 +1516,8 @@ async def generate_aplus_module(
     """
     Generate a single A+ Content module image.
 
-    For sequential/chained generation, pass the previous module's image_path
-    as previous_module_path. The AI will continue the visual design flow.
+    Each module is generated independently with product photo + style reference.
+    Logo is included only for bookend modules (hero pair and last module).
     """
     start_time = time.time()
 
@@ -1564,27 +1549,9 @@ async def generate_aplus_module(
         )
         framework = session.design_framework_json or {}
         visual_script = session.aplus_visual_script
-        is_chained = bool(request.previous_module_path)
-        focus_paths = request.reference_image_paths or []
-        has_focus_overrides = bool(focus_paths)
-        has_product_ref = (
-            bool(session.upload_path and session.upload_path in focus_paths)
-            if has_focus_overrides
-            else bool(session.upload_path)
-        )
-        has_style_ref = (
-            bool(session.style_reference_path and session.style_reference_path in focus_paths)
-            if has_focus_overrides
-            else bool(session.style_reference_path)
-        )
-        has_logo_ref = (
-            bool(session.logo_path and session.logo_path in focus_paths)
-            if has_focus_overrides
-            else bool(session.logo_path)
-        )
-        include_previous_for_prompt = bool(request.previous_module_path) and (
-            not has_focus_overrides or request.previous_module_path in focus_paths
-        )
+        has_product_ref = bool(session.upload_path)
+        has_style_ref = bool(session.style_reference_path)
+        has_logo_ref = bool(session.logo_path)
 
         # === Build prompt ===
         prompt = None
@@ -1602,11 +1569,9 @@ async def generate_aplus_module(
                 module_index=request.module_index,
                 module_count=len(visual_script.get("modules", [])),
                 custom_instructions="",  # handled by AI enhancement below
-                is_chained=include_previous_for_prompt,
                 has_style_ref=has_style_ref,
                 has_logo=has_logo_ref,
                 has_product_ref=has_product_ref,
-                has_focus_refs=has_focus_overrides,
             )
             if prompt:
                 use_named_images = True
@@ -1616,7 +1581,7 @@ async def generate_aplus_module(
         if not prompt:
             if request.module_index == 0:
                 position = "first"
-            elif request.previous_module_path:
+            elif request.module_index > 0:
                 position = "middle"
             else:
                 position = "only"
@@ -1706,13 +1671,14 @@ async def generate_aplus_module(
         prompt = prompt + LIGHTING_OVERRIDE
 
         # === Build GenerationContext and execute ===
-        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, chained={is_chained}, canvas_ext={use_canvas_extension})")
+        module_count = len(visual_script.get("modules", [])) if visual_script else 6
+        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, canvas_ext={use_canvas_extension})")
 
         if use_canvas_extension:
             ref_images = assemble_reference_images(
                 session, f"aplus_{request.module_index}",
                 canvas_image=canvas_image, canvas_debug_path=debug_canvas_path,
-                focus_overrides=request.reference_image_paths,
+                module_index=request.module_index, module_count=module_count,
             )
             ctx = GenerationContext.for_canvas_extension(
                 session=session,
@@ -1724,9 +1690,8 @@ async def generate_aplus_module(
         else:
             ref_images = assemble_reference_images(
                 session, f"aplus_{request.module_index}",
-                previous_module_path=request.previous_module_path,
                 use_named=use_named_images,
-                focus_overrides=request.reference_image_paths,
+                module_index=request.module_index, module_count=module_count,
             )
             ctx = GenerationContext.for_aplus_module(
                 session=session,

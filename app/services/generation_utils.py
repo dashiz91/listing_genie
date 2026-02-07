@@ -170,11 +170,11 @@ def assemble_reference_images(
     session: GenerationSession,
     image_type: str,
     *,
-    focus_overrides: Optional[List[str]] = None,
-    previous_module_path: Optional[str] = None,
     canvas_image: Optional[Any] = None,
     canvas_debug_path: Optional[str] = None,
     use_named: bool = True,
+    module_index: Optional[int] = None,
+    module_count: int = 6,
 ) -> ReferenceImageSet:
     """
     Centralized reference image assembly for ALL generation types.
@@ -183,77 +183,57 @@ def assemble_reference_images(
     - Listing (non-main): upload + additional + style_ref + logo
     - Listing (main): upload + additional + style_ref (no logo)
     - A+ hero: upload + style_ref + logo (as BRAND_LOGO)
-    - A+ module: upload + style_ref + logo (as BRAND_LOGO) + previous (if chained)
+    - A+ middle modules (2 through second-to-last): upload + style_ref (NO logo)
+    - A+ last module: upload + style_ref + logo (as BRAND_LOGO)
     - A+ canvas: canvas + upload + style_ref
-    - Any with focus_overrides: only those images
     - Mobile transform: source desktop only (handled externally)
     """
     from app.prompts.templates.aplus_modules import (
-        IMAGE_LABEL_PRODUCT, IMAGE_LABEL_STYLE, IMAGE_LABEL_PREVIOUS,
+        IMAGE_LABEL_PRODUCT, IMAGE_LABEL_STYLE,
     )
 
     result = ReferenceImageSet()
     is_aplus = image_type.startswith("aplus_")
-    use_focus = bool(focus_overrides)
 
-    # ── Structural images (always included — canvas + previous module) ──
+    # Brand bookend rule: only hero (0-1) and last module get logo
+    is_middle_aplus = (
+        is_aplus
+        and module_index is not None
+        and 2 <= module_index < module_count - 1
+    )
+
+    # ── Structural images (canvas for canvas extension) ──
     if canvas_image is not None:
         result.named_images.append(("CANVAS_TO_COMPLETE", canvas_image))
         if canvas_debug_path:
             result.history_meta.append({"type": "gradient_canvas", "path": canvas_debug_path})
 
-    # ── Content images (focus overrides OR default product/style/logo) ──
-    if use_focus:
-        # Listing focus: only focus images, no defaults
-        # A+ focus: focus images replace product/style, structural images above still included
-        for i, path in enumerate(focus_overrides):
+    # ── Content images: product photo + style reference ──
+    if session.upload_path:
+        if use_named:
+            result.named_images.append((IMAGE_LABEL_PRODUCT, session.upload_path))
+        result.unnamed_paths.append(session.upload_path)
+        result.history_meta.append({"type": "primary", "path": session.upload_path})
+
+    # Additional product photos (listing images only, not A+)
+    if not is_aplus and session.additional_upload_paths:
+        for i, path in enumerate(session.additional_upload_paths):
             result.unnamed_paths.append(path)
-            result.history_meta.append({"type": f"focus_reference_{i}", "path": path})
-    else:
-        # Default content images
-        if session.upload_path:
-            if use_named:
-                result.named_images.append((IMAGE_LABEL_PRODUCT, session.upload_path))
-            result.unnamed_paths.append(session.upload_path)
-            result.history_meta.append({"type": "primary", "path": session.upload_path})
+            result.history_meta.append({"type": f"additional_product_{i+1}", "path": path})
 
-        # Additional product photos (listing images only, not A+)
-        if not is_aplus and session.additional_upload_paths:
-            for i, path in enumerate(session.additional_upload_paths):
-                result.unnamed_paths.append(path)
-                result.history_meta.append({"type": f"additional_product_{i+1}", "path": path})
+    # Style reference (all types)
+    if session.style_reference_path:
+        if use_named:
+            result.named_images.append((IMAGE_LABEL_STYLE, session.style_reference_path))
+        result.unnamed_paths.append(session.style_reference_path)
+        result.history_meta.append({"type": "style_reference", "path": session.style_reference_path})
 
-        # Style reference (all types)
-        if session.style_reference_path:
-            if use_named:
-                result.named_images.append((IMAGE_LABEL_STYLE, session.style_reference_path))
-            result.unnamed_paths.append(session.style_reference_path)
-            result.history_meta.append({"type": "style_reference", "path": session.style_reference_path})
-
-    # Logo (listing non-main + all A+ modules, skip when focus overrides active)
-    if not use_focus and image_type != "main" and session.logo_path:
+    # Logo: listing non-main + A+ bookend modules only (skip middle A+ modules)
+    if image_type != "main" and session.logo_path and not is_middle_aplus:
         if is_aplus and use_named:
             result.named_images.append(("BRAND_LOGO", session.logo_path))
         result.unnamed_paths.append(session.logo_path)
         result.history_meta.append({"type": "logo", "path": session.logo_path})
-
-    # ── Previous module (A+ chaining) ──
-    # When focus overrides are active, only include if user explicitly selected it.
-    # When no focus overrides, always include (default canvas continuity behavior).
-    if previous_module_path and is_aplus:
-        include_prev = not use_focus or previous_module_path in focus_overrides
-        if include_prev:
-            if use_named:
-                result.named_images.append((IMAGE_LABEL_PREVIOUS, previous_module_path))
-            result.unnamed_paths.append(previous_module_path)
-            try:
-                idx = int(image_type.split("_")[1])
-                result.history_meta.append({
-                    "type": f"previous_module_{idx - 1}",
-                    "path": previous_module_path,
-                })
-            except (IndexError, ValueError):
-                result.history_meta.append({"type": "previous_module", "path": previous_module_path})
 
     return result
 

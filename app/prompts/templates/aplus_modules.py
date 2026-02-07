@@ -482,10 +482,8 @@ def _strip_css_specs(text: str) -> str:
 def _ref_desc(
     has_style_ref: bool,
     has_logo: bool,
-    is_chained: bool,
     *,
     has_product_ref: bool = True,
-    has_focus_refs: bool = False,
 ) -> str:
     """Build reference images description matching listing prompt style."""
     lines = []
@@ -495,10 +493,6 @@ def _ref_desc(
         lines.append("- STYLE_REFERENCE: Match this visual style, mood, and color treatment")
     if has_logo:
         lines.append("- BRAND_LOGO: Reproduce this logo where appropriate")
-    if is_chained:
-        lines.append("- PREVIOUS_MODULE: The banner directly above — match its bottom edge for seamless flow")
-    if has_focus_refs:
-        lines.append("- FOCUS_REFERENCE_*: Use the explicitly selected focus references")
     if not lines:
         lines.append("- Use the supplied reference images exactly as provided")
     return "\n".join(lines)
@@ -537,7 +531,6 @@ def build_hero_pair_prompt(
     has_style_ref: bool = True,
     has_logo: bool = False,
     has_product_ref: bool = True,
-    has_focus_refs: bool = False,
 ) -> str:
     """Build clean prompt for hero pair (modules 0+1)."""
     resolved_brand = (brand_name or "").strip()
@@ -562,9 +555,8 @@ def build_hero_pair_prompt(
 
     header = APLUS_HERO_HEADER.format(
         reference_images_desc=_ref_desc(
-            has_style_ref, has_logo, False,
+            has_style_ref, has_logo,
             has_product_ref=has_product_ref,
-            has_focus_refs=has_focus_refs,
         ),
     )
     prompt = header + hero_brief
@@ -585,12 +577,10 @@ def build_aplus_module_prompt(
     module_index: int,
     module_count: int = 5,
     custom_instructions: str = "",
-    is_chained: bool = False,
     *,
     has_style_ref: bool = True,
     has_logo: bool = False,
     has_product_ref: bool = True,
-    has_focus_refs: bool = False,
 ) -> str:
     """Build clean per-module prompt using scene description from visual script."""
     resolved_brand = (brand_name or "").strip()
@@ -657,16 +647,11 @@ def build_aplus_module_prompt(
     effective_has_logo = has_logo and not is_middle_module
     header = APLUS_MODULE_HEADER.format(
         reference_images_desc=_ref_desc(
-            has_style_ref, effective_has_logo, is_chained,
+            has_style_ref, effective_has_logo,
             has_product_ref=has_product_ref,
-            has_focus_refs=has_focus_refs,
         ),
     )
     prompt = header + scene_prompt
-
-    # Add continuity note for chained modules
-    if is_chained and module_index > 0:
-        prompt += APLUS_CONTINUITY_NOTE
 
     if custom_instructions:
         prompt += f"\n\nCLIENT NOTE:\n{custom_instructions}"
