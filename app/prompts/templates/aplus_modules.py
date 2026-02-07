@@ -44,10 +44,8 @@ CREATE FEELING, NOT INFORMATION:
 
 FORMAT:
 Wide cinematic banner (2.4:1). Editorial, not catalog.
-Center your composition — generous margins on all sides.
 
 ABSOLUTE RULES:
-- NEVER include website UI, Amazon navigation, browser chrome
 - Render SHORT bold text baked into the image (headlines 2-5 words max)
 - Render brand name / product name prominently
 - If BRAND_LOGO reference image is provided, reproduce the logo
@@ -107,9 +105,11 @@ def get_aplus_prompt(
     else:
         template = APLUS_FULL_IMAGE_BASE
 
+    resolved_brand = (brand_name or "").strip()
+
     prompt = template.format(
         product_title=product_title,
-        brand_name=brand_name or product_title,
+        brand_name=resolved_brand or "Unspecified Brand",
         features=", ".join(features) if features else "Quality craftsmanship",
         target_audience=target_audience or "Discerning customers",
         framework_name=framework_name,
@@ -122,7 +122,7 @@ def get_aplus_prompt(
     if custom_instructions:
         prompt += f"\n\nCLIENT NOTE:\n{custom_instructions}"
 
-    return prompt
+    return strip_aplus_banner_boilerplate(prompt)
 
 
 # ============================================================================
@@ -162,37 +162,43 @@ MODULE JOBS (each serves a different purpose in the funnel):
 Modules 0+1 (HERO PAIR): Brand desire — "This is a REAL brand."
   Immediate visual impact. Product hero + brand identity.
   The viewer thinks: "Wow, this looks premium."
+  BRAND TEXT: YES — brand name or logo in one corner. This establishes identity.
 
 Module 2: Quality depth — prove craftsmanship.
   Extreme close-ups, material details, construction quality.
   The viewer thinks: "Look at that detail."
+  BRAND TEXT: NO — zero brand name or logo. Let the craft speak for itself.
 
 Module 3: Authority — social proof and trust signals.
   Stats, awards, trust badges, credibility.
   The viewer thinks: "Others trust this."
+  BRAND TEXT: NO — no brand name. Use stats and proof, not branding.
 
 Module 4: Lifestyle — show the life with a real person.
   Product in authentic real-world use, genuine emotion.
   The viewer thinks: "I can see myself using this."
+  BRAND TEXT: NO — no brand name or logo. Pure experience, no branding.
 
 Module 5: Confidence — close the deal.
   Final dramatic product shot. Quiet certainty.
   The viewer thinks: "I'm ready to buy."
+  BRAND TEXT: YES — brand name or logo returns. Bookend the experience.
 
 WRITING YOUR SCENE DESCRIPTIONS:
 - Write one vivid, specific scene per module — paint a cinematographer's shot brief
 - Include EXACT hex colors INLINE in the description (e.g., "deep navy #1A1D21 background")
 - Describe text rendering in plain visual language: "bold serif headline" or "clean sans-serif label"
 - NEVER include pixel sizes (42px), font-weight numbers (700), CSS properties, or technical formatting
-- Include any text to render (headlines, brand name, labels) naturally in the description
-- When rendering brand name text, use EXACTLY "{brand_name}" — never "Premium Brand" or any generic placeholder
+- Include any text to render (headlines, labels) naturally in the description
+- If Brand is "NOT_SPECIFIED", do NOT render any typed brand-name text; if BRAND_LOGO exists, place logo only
+- When rendering brand name text (only when Brand is provided), use EXACTLY "{brand_name}" - never "Premium Brand" or any generic placeholder
+- BRAND PLACEMENT RULE: Only include brand name/logo in the HERO PAIR and the LAST module (bookends). Modules 2-4 must have ZERO brand text or logo — let the content speak for itself. This prevents the repetitive, amateur look of stamping brand on every banner.
 - Reference PRODUCT_PHOTO, STYLE_REFERENCE, BRAND_LOGO by name where relevant
 - Keep rendered text SHORT (2-5 words per element) — Gemini renders short text well
 - At least 2 modules must include a real person with face visible, genuine emotion
 - Each module should look visually DIFFERENT (variety of compositions, angles, environments)
-- Format: wide 2.4:1 cinematic banners (think editorial magazine, not catalog)
 - Specify lighting direction (never flat), camera angle, and background for each
-- Center compositions with generous margins — keep text and key content away from the very edges
+- Do NOT include delivery boilerplate like "Amazon A+ Content banner", "Wide 2.4:1 format", margin-safe-zone notes, or browser/UI exclusion rules
 
 DON'T REPEAT LISTING CONTENT:
 - Listings already showed product beauty, features, lifestyle, transformation
@@ -241,13 +247,13 @@ OUTPUT — respond with ONLY valid JSON:
       "index": 3,
       "role": "authority",
       "scene_prompt": "150-250 word scene description...",
-      "text_elements": ["#1 Brand", "6.5M+ Users"]
+      "text_elements": ["#1 Rated", "6.5M+ Users"]
     }},
     {{
       "index": 4,
       "role": "lifestyle",
       "scene_prompt": "150-250 word scene description with a real person...",
-      "text_elements": ["Aspirational Headline"]
+      "text_elements": ["Aspirational Headline (NO brand name)"]
     }},
     {{
       "index": 5,
@@ -274,10 +280,6 @@ APLUS_MODULE_HEADER = """=== REFERENCE IMAGES ===
 {reference_images_desc}
 Channel the style reference's mood, lighting, and atmosphere.
 
-Amazon A+ Content banner. Wide 2.4:1 format.
-Center your composition with generous margins on all sides.
-NEVER include website UI, Amazon navigation, or browser chrome.
-
 """
 
 APLUS_CONTINUITY_NOTE = """
@@ -291,7 +293,6 @@ Channel the style reference's mood, lighting, and atmosphere.
 Single tall 4:3 photograph (~1464x1098). Product dominates the frame.
 Photography-first: cinematic lighting, rich background, editorial quality.
 Brand name or logo small in one corner. No feature text, no descriptions.
-Never include website UI, Amazon navigation, or browser chrome.
 
 """
 
@@ -331,6 +332,122 @@ RULES:
 # HELPER FUNCTIONS
 # ============================================================================
 
+def strip_aplus_banner_boilerplate(text: str) -> str:
+    """Remove recurring A+ delivery boilerplate so it never reaches Gemini."""
+    if not text:
+        return text
+
+    # Normalize common punctuation variants to make matching robust.
+    cleaned = (
+        text.replace("\r\n", "\n")
+        .replace("\r", "\n")
+        .replace("—", "-")
+        .replace("–", "-")
+    )
+
+    # Remove the exact legacy 3-line block first.
+    for legacy_block in [
+        (
+            "Amazon A+ Content banner. Wide 2.4:1 format.\n"
+            "Center your composition with generous margins on all sides.\n"
+            "NEVER include website UI, Amazon navigation, or browser chrome.\n"
+        ),
+        (
+            "Amazon A+ Content banner. Wide 2.4:1 format.\n"
+            "Center your composition with generous margins on all sides.\n"
+            "NEVER include website UI, Amazon navigation, or browser chrome."
+        ),
+    ]:
+        cleaned = cleaned.replace(legacy_block, "")
+
+    # Remove common sentence-level boilerplate variants.
+    sentence_patterns = [
+        r'Amazon\s*A\+\s*Content\s*banner\.?\s*',
+        r'Wide\s*2\.4\s*:\s*1\s*format\.?\s*',
+        r'Wide\s*cinematic\s*banner\s*\(\s*2\.4\s*:\s*1\s*\)\.?\s*',
+        r'Center(?:\s+your)?\s+composition(?:s)?\s+with\s+generous\s+margins(?:\s+on\s+all\s+sides)?\.?\s*',
+        r'NEVER\s+include\s+website\s+UI,\s*Amazon\s+navigation,\s*(?:or\s*)?browser\s+chrome\.?\s*',
+        r'Never\s+include\s+website\s+UI,\s*Amazon\s+navigation,\s*(?:or\s*)?browser\s+chrome\.?\s*',
+    ]
+    for pattern in sentence_patterns:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
+    # Drop any leftover line that still contains boilerplate concepts.
+    blocked_line_patterns = [
+        r'amazon\s*a\+\s*content\s*banner',
+        r'wide\s*2\.4\s*:\s*1',
+        r'center\s+.*composition.*margin',
+        r'website\s+ui.*amazon\s+navigation',
+        r'browser\s+chrome',
+    ]
+    kept_lines = []
+    for line in cleaned.splitlines():
+        normalized = re.sub(r'\s+', ' ', line.strip().lower())
+        if normalized and any(re.search(pat, normalized, flags=re.IGNORECASE) for pat in blocked_line_patterns):
+            continue
+        kept_lines.append(line)
+
+    cleaned = "\n".join(kept_lines)
+    cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
+
+
+def strip_brand_name_text_when_missing(text: str) -> str:
+    """Remove explicit brand-name rendering instructions when brand is unknown."""
+    if not text:
+        return text
+
+    cleaned = text
+    patterns = [
+        r'(?i)\s*(?:in\s+the\s+[^,.\n]+,\s*)?render\s+the\s+brand\s+name\s+["\'][^"\']+["\'][^.\n]*\.?',
+        r'(?i)\s*brand\s+name\s+["\'][^"\']+["\'][^.\n]*\.?',
+        r'(?i)\s*brand\s+name\s+`[^`]+`[^.\n]*\.?',
+    ]
+    for pattern in patterns:
+        cleaned = re.sub(pattern, '', cleaned)
+
+    cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
+
+
+def _strip_brand_text_from_prompt(text: str, brand_name: str) -> str:
+    """Remove brand name rendering instructions from middle A+ module prompts.
+
+    Middle modules (2-4) should NOT display brand text — only the hero pair
+    and the closing module get branding (bookend strategy, like Bose/Apple).
+    """
+    if not text or not brand_name:
+        return text
+
+    cleaned = text
+    bn = re.escape(brand_name)
+
+    # Remove sentences/phrases that instruct rendering the brand name
+    patterns = [
+        # "render the brand name 'X' in the top-left corner"
+        rf'(?i)[^.]*\brender\b[^.]*\b{bn}\b[^.]*\.?\s*',
+        # "brand name 'X' sits in the corner" / "place 'X' logo"
+        rf'(?i)[^.]*\bplace\b[^.]*\b{bn}\b[^.]*\.?\s*',
+        # "the brand name 'X' appears small in ..."
+        rf'(?i)[^.]*\bbrand\s*name\b[^.]*\b{bn}\b[^.]*\.?\s*',
+        # "'X' logo in the bottom-right"
+        rf'(?i)[^.]*\b{bn}\b[^.]*\blogo\b[^.]*\.?\s*',
+        # "logo ... 'X'"
+        rf'(?i)[^.]*\blogo\b[^.]*\b{bn}\b[^.]*\.?\s*',
+        # Standalone brand mention as text element: "Bold 'X' text" or "'X' in corner"
+        rf'(?i)[^.]*\b{bn}\b[^.]*\b(?:corner|bottom|top|left|right|small|tasteful)\b[^.]*\.?\s*',
+    ]
+    for pattern in patterns:
+        cleaned = re.sub(pattern, '', cleaned)
+
+    # Clean up leftover artifacts
+    cleaned = re.sub(r'[ \t]{2,}', ' ', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
+
+
 def _strip_css_specs(text: str) -> str:
     """Remove CSS-like typography specs that image models render as garbled text.
 
@@ -362,28 +479,49 @@ def _strip_css_specs(text: str) -> str:
     return text.strip()
 
 
-def _ref_desc(has_style_ref: bool, has_logo: bool, is_chained: bool) -> str:
+def _ref_desc(
+    has_style_ref: bool,
+    has_logo: bool,
+    is_chained: bool,
+    *,
+    has_product_ref: bool = True,
+    has_focus_refs: bool = False,
+) -> str:
     """Build reference images description matching listing prompt style."""
-    lines = ["- PRODUCT_PHOTO: The actual product — honor its materials, proportions, character"]
+    lines = []
+    if has_product_ref:
+        lines.append("- PRODUCT_PHOTO: The actual product — honor its materials, proportions, character")
     if has_style_ref:
         lines.append("- STYLE_REFERENCE: Match this visual style, mood, and color treatment")
     if has_logo:
         lines.append("- BRAND_LOGO: Reproduce this logo where appropriate")
     if is_chained:
         lines.append("- PREVIOUS_MODULE: The banner directly above — match its bottom edge for seamless flow")
+    if has_focus_refs:
+        lines.append("- FOCUS_REFERENCE_*: Use the explicitly selected focus references")
+    if not lines:
+        lines.append("- Use the supplied reference images exactly as provided")
     return "\n".join(lines)
 
 
 def _default_hero_brief(product_title: str, brand_name: str) -> str:
     """Fallback hero brief when visual script has no hero_pair_prompt."""
+    resolved_brand = (brand_name or "").strip()
+    brand_byline = f" by {resolved_brand}" if resolved_brand else ""
+    brand_text_rule = (
+        f"Brand name '{resolved_brand}' small in bottom-right corner - tasteful, not competing with product. "
+        if resolved_brand
+        else "If BRAND_LOGO is provided, place logo small in one corner - tasteful, not competing with product. "
+    )
     return (
-        f"Dramatic product hero photograph for {product_title} by {brand_name}. "
+        f"Dramatic product hero photograph for {product_title}{brand_byline}. "
         f"Product dominates 60-70% of the frame, dramatically large, slightly angled. "
-        f"CINEMATIC textured background (marble, fabric, atmospheric haze) — not a flat solid color. "
-        f"Dramatic directional lighting — side light with rim separation, professional studio quality. "
-        f"Brand name '{brand_name}' small in bottom-right corner — tasteful, not competing with product. "
+        f"CINEMATIC textured background (marble, fabric, atmospheric haze) - not a flat solid color. "
+        f"Dramatic directional lighting - side light with rim separation, professional studio quality. "
+        f"{brand_text_rule}"
         f"Use PRODUCT_PHOTO for the real product. Match STYLE_REFERENCE mood and atmosphere."
     )
+
 
 
 # ============================================================================
@@ -398,8 +536,11 @@ def build_hero_pair_prompt(
     *,
     has_style_ref: bool = True,
     has_logo: bool = False,
+    has_product_ref: bool = True,
+    has_focus_refs: bool = False,
 ) -> str:
     """Build clean prompt for hero pair (modules 0+1)."""
+    resolved_brand = (brand_name or "").strip()
     hero_brief = visual_script.get("hero_pair_prompt")
 
     # Fallback for old visual scripts that have per-module generation_prompts
@@ -410,22 +551,28 @@ def build_hero_pair_prompt(
             parts.append(f"TOP HALF:\n{modules[0]['generation_prompt']}")
         if len(modules) > 1 and modules[1].get("generation_prompt"):
             parts.append(f"BOTTOM HALF:\n{modules[1]['generation_prompt']}")
-        hero_brief = "\n\n".join(parts) if parts else _default_hero_brief(product_title, brand_name)
+        hero_brief = "\n\n".join(parts) if parts else _default_hero_brief(product_title, resolved_brand)
 
     # Replace generic "Premium Brand" with actual brand/product name in AI-generated text
-    replacement = brand_name or product_title
+    replacement = resolved_brand
     if replacement:
         hero_brief = hero_brief.replace("Premium Brand", replacement)
+    else:
+        hero_brief = strip_brand_name_text_when_missing(hero_brief)
 
     header = APLUS_HERO_HEADER.format(
-        reference_images_desc=_ref_desc(has_style_ref, has_logo, False),
+        reference_images_desc=_ref_desc(
+            has_style_ref, has_logo, False,
+            has_product_ref=has_product_ref,
+            has_focus_refs=has_focus_refs,
+        ),
     )
     prompt = header + hero_brief
 
     if custom_instructions:
         prompt += f"\n\nCLIENT NOTE:\n{custom_instructions}"
 
-    return prompt
+    return strip_aplus_banner_boilerplate(prompt)
 
 
 def build_aplus_module_prompt(
@@ -442,8 +589,11 @@ def build_aplus_module_prompt(
     *,
     has_style_ref: bool = True,
     has_logo: bool = False,
+    has_product_ref: bool = True,
+    has_focus_refs: bool = False,
 ) -> str:
     """Build clean per-module prompt using scene description from visual script."""
+    resolved_brand = (brand_name or "").strip()
     modules = visual_script.get("modules", [])
 
     # Out-of-range: fall back to legacy prompt
@@ -454,7 +604,7 @@ def build_aplus_module_prompt(
             module_type="full_image",
             position=position,
             product_title=product_title,
-            brand_name=brand_name,
+            brand_name=resolved_brand,
             features=features,
             target_audience=target_audience,
             framework_name=framework.get("framework_name", "Professional"),
@@ -475,28 +625,42 @@ def build_aplus_module_prompt(
         scene_desc = mod.get("scene_description", "")
         mood = mod.get("mood", "premium and cinematic")
         role = mod.get("role", "editorial")
+        brand_byline = f" by {resolved_brand}" if resolved_brand else ""
         scene_prompt = (
-            f"Create a {role} composition for {product_title} by {brand_name or product_title}. "
+            f"Create a {role} composition for {product_title}{brand_byline}. "
             f"{scene_desc} "
             f"The mood is {mood}. Use PRODUCT_PHOTO for the real product — honor its materials, "
             f"proportions, and character. Match STYLE_REFERENCE visual style. "
-            f"Dramatic directional lighting. Cinematic color grading. "
-            f"Wide 2.4:1 format. Center composition with generous margins."
+            f"Dramatic directional lighting. Cinematic color grading."
         )
 
     # Replace generic "Premium Brand" with actual brand/product name in AI-generated text
-    replacement = brand_name or product_title
+    replacement = resolved_brand
     if replacement:
         scene_prompt = scene_prompt.replace("Premium Brand", replacement)
+    else:
+        scene_prompt = strip_brand_name_text_when_missing(scene_prompt)
 
     # Strip CSS-like specs that image models render as garbled text.
     # Catches patterns like "headline_size 42px", "letter_spacing 0.5px",
     # "headline_weight Bold", "subhead_font Inter" from older visual scripts.
     scene_prompt = _strip_css_specs(scene_prompt)
 
+    # Brand bookend rule: only hero (0-1) and last module get brand text.
+    # Middle modules (2 through second-to-last) should have no brand name.
+    is_middle_module = 2 <= module_index < module_count - 1
+    if is_middle_module and resolved_brand:
+        scene_prompt = _strip_brand_text_from_prompt(scene_prompt, resolved_brand)
+
     # Build the clean prompt: header + scene description
+    # Suppress logo reference for middle modules (no branding needed)
+    effective_has_logo = has_logo and not is_middle_module
     header = APLUS_MODULE_HEADER.format(
-        reference_images_desc=_ref_desc(has_style_ref, has_logo, is_chained),
+        reference_images_desc=_ref_desc(
+            has_style_ref, effective_has_logo, is_chained,
+            has_product_ref=has_product_ref,
+            has_focus_refs=has_focus_refs,
+        ),
     )
     prompt = header + scene_prompt
 
@@ -507,7 +671,7 @@ def build_aplus_module_prompt(
     if custom_instructions:
         prompt += f"\n\nCLIENT NOTE:\n{custom_instructions}"
 
-    return prompt
+    return strip_aplus_banner_boilerplate(prompt)
 
 
 def build_canvas_inpainting_prompt(
@@ -556,10 +720,12 @@ def get_visual_script_prompt(
     headline_font_desc = f"{headline_weight.lower()} {headline_font} lettering" if headline_weight else headline_font
     body_font_desc = f"{body_font}"
 
+    resolved_brand = (brand_name or "").strip()
+
     prompt = VISUAL_SCRIPT_PROMPT.format(
         module_count=module_count,
         product_title=product_title,
-        brand_name=brand_name or product_title,
+        brand_name=resolved_brand or "NOT_SPECIFIED",
         features=", ".join(features) if features else "Quality craftsmanship",
         target_audience=target_audience or "Discerning customers",
         framework_name=framework.get("framework_name", "Professional"),
@@ -574,3 +740,4 @@ def get_visual_script_prompt(
     )
 
     return prompt
+
