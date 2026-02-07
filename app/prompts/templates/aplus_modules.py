@@ -164,10 +164,15 @@ Modules 0+1 (HERO PAIR): Brand desire — "This is a REAL brand."
   The viewer thinks: "Wow, this looks premium."
   BRAND TEXT: YES — brand name or logo in one corner. This establishes identity.
 
-Module 2: Quality depth — prove craftsmanship.
-  Extreme close-ups, material details, construction quality.
-  The viewer thinks: "Look at that detail."
-  BRAND TEXT: NO — zero brand name or logo. Let the craft speak for itself.
+Module 2: Quality depth — prove WHY this product is worth it.
+  Create a BRAND NEW composition (NEVER crop or zoom the reference photo).
+  Pick the best approach for this product category:
+  • Crafted/tactile goods → A still life where a key detail fills the frame as its own subject
+  • Consumables/formulas/chemicals → Ingredients, purity, the science visualized
+  • Simple/commodity items → Design choices, testing, engineering made visible
+  IMPORTANT: Generate a fresh scene with dramatic lighting, don't crop or enlarge the product photo.
+  The viewer thinks: "There's real substance here."
+  BRAND TEXT: NO — zero brand name or logo. Let the quality speak for itself.
 
 Module 3: Authority — social proof and trust signals.
   Stats, awards, trust badges, credibility.
