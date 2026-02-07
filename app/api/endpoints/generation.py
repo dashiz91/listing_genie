@@ -7,8 +7,9 @@ import asyncio
 import io
 import json as json_module
 import logging
+import re
 import time
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response, status
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from typing import List, Optional
@@ -46,12 +47,12 @@ from app.models.database import (
     GenerationSession, DesignContext,
     PromptHistory as PromptHistoryModel,
     ImageTypeEnum as DBImageType, ImageTypeEnum as DBImageTypeEnum,
-    ColorModeEnum,
+    ColorModeEnum, UserSettings,
 )
 from app.prompts.templates.aplus_modules import (
     get_aplus_prompt, build_aplus_module_prompt,
     build_canvas_inpainting_prompt, build_hero_pair_prompt,
-    get_visual_script_prompt,
+    get_visual_script_prompt, strip_aplus_banner_boilerplate,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,6 +98,76 @@ from app.schemas.generation import (
 from app.prompts import get_all_styles, generate_random_framework, get_all_presets
 
 router = APIRouter()
+
+
+def _sanitize_aplus_visual_script(visual_script: dict) -> dict:
+    """Strip known A+ boilerplate from generated visual scripts before persistence."""
+    if not isinstance(visual_script, dict):
+        return visual_script
+
+    cleaned = dict(visual_script)
+
+    hero_prompt = cleaned.get("hero_pair_prompt")
+    if isinstance(hero_prompt, str):
+        cleaned["hero_pair_prompt"] = strip_aplus_banner_boilerplate(hero_prompt)
+
+    modules = cleaned.get("modules")
+    if isinstance(modules, list):
+        sanitized_modules = []
+        for module in modules:
+            if not isinstance(module, dict):
+                sanitized_modules.append(module)
+                continue
+
+            module_clean = dict(module)
+            for key in ("scene_prompt", "generation_prompt", "scene_description"):
+                value = module_clean.get(key)
+                if isinstance(value, str):
+                    module_clean[key] = strip_aplus_banner_boilerplate(value)
+            sanitized_modules.append(module_clean)
+        cleaned["modules"] = sanitized_modules
+
+    return cleaned
+
+
+def _resolve_effective_brand_name(
+    session: GenerationSession,
+    db: Session,
+    user_id: Optional[str] = None,
+) -> str:
+    """
+    Resolve the brand name used in prompt generation.
+
+    Priority:
+    1) Session brand_name
+    2) UserSettings.default_brand_name (if available)
+    """
+    session_brand = (session.brand_name or "").strip()
+    if session_brand:
+        return session_brand
+
+    lookup_user_id = user_id or getattr(session, "user_id", None)
+    if lookup_user_id:
+        settings = db.query(UserSettings).filter(
+            UserSettings.user_id == lookup_user_id
+        ).first()
+        if settings and settings.default_brand_name:
+            return settings.default_brand_name.strip()
+
+    return ""
+
+
+def _has_legacy_aplus_boilerplate(text: str) -> bool:
+    """Detect the legacy A+ banner boilerplate block in a normalization-tolerant way."""
+    if not text:
+        return False
+    normalized = re.sub(r"\s+", " ", text.lower())
+    return (
+        "amazon a+ content banner" in normalized
+        and ("wide 2.4:1 format" in normalized or "wide 2.4 : 1 format" in normalized)
+        and "amazon navigation" in normalized
+        and "browser chrome" in normalized
+    )
 
 
 def get_generation_service(
@@ -509,6 +580,7 @@ async def get_generation_stats(
 @router.get("/{session_id}/prompts", response_model=List[PromptHistoryResponse])
 async def get_session_prompts(
     session_id: str,
+    response: Response,
     service: GenerationService = Depends(get_generation_service),
 ):
     """
@@ -523,6 +595,9 @@ async def get_session_prompts(
     session = service.get_session_status(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
 
     context = service.get_design_context(session.id)
     if not context:
@@ -555,6 +630,7 @@ async def get_session_prompts(
 async def get_image_prompt(
     session_id: str,
     image_type: str,
+    response: Response,
     version: Optional[int] = None,
     service: GenerationService = Depends(get_generation_service),
 ):
@@ -570,6 +646,9 @@ async def get_image_prompt(
     session = service.get_session_status(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
 
     context = service.get_design_context(session.id)
     if not context:
@@ -606,10 +685,11 @@ async def get_image_prompt(
             reference_images.append({"type": "logo", "path": session.logo_path})
 
     # Build designer context - everything that was fed to the AI Designer
+    effective_brand_name = _resolve_effective_brand_name(session, service.db)
     designer_context = {
         "product_info": {
             "title": session.product_title,
-            "brand_name": session.brand_name,
+            "brand_name": effective_brand_name or None,
             "features": [session.feature_1, session.feature_2, session.feature_3] if hasattr(session, 'feature_1') else [],
             "target_audience": session.target_audience if hasattr(session, 'target_audience') else None,
         },
@@ -1273,6 +1353,26 @@ async def generate_aplus_hero_pair(
         ).first()
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+        effective_brand_name = _resolve_effective_brand_name(
+            session, db, user.id if user else None
+        )
+        focus_paths = request.reference_image_paths or []
+        has_focus_overrides = bool(focus_paths)
+        has_product_ref = (
+            bool(session.upload_path and session.upload_path in focus_paths)
+            if has_focus_overrides
+            else bool(session.upload_path)
+        )
+        has_style_ref = (
+            bool(session.style_reference_path and session.style_reference_path in focus_paths)
+            if has_focus_overrides
+            else bool(session.style_reference_path)
+        )
+        has_logo_ref = (
+            bool(session.logo_path and session.logo_path in focus_paths)
+            if has_focus_overrides
+            else bool(session.logo_path)
+        )
 
         # Auto-generate visual script if missing
         visual_script = session.aplus_visual_script
@@ -1284,7 +1384,7 @@ async def generate_aplus_hero_pair(
             listing_prompts = framework.get("generation_prompts", [])
             script_prompt = get_visual_script_prompt(
                 product_title=session.product_title,
-                brand_name=session.brand_name or "",
+                brand_name=effective_brand_name,
                 features=features,
                 target_audience=session.target_audience or "",
                 framework=framework,
@@ -1303,7 +1403,9 @@ async def generate_aplus_hero_pair(
                 max_tokens=5000,
                 temperature=0.7,
             )
-            visual_script = json_module.loads(strip_json_fences(raw_text))
+            visual_script = _sanitize_aplus_visual_script(
+                json_module.loads(strip_json_fences(raw_text))
+            )
             session.aplus_visual_script = visual_script
             db.commit()
 
@@ -1311,10 +1413,12 @@ async def generate_aplus_hero_pair(
         prompt = build_hero_pair_prompt(
             visual_script=visual_script,
             product_title=session.product_title,
-            brand_name=session.brand_name or "",
+            brand_name=effective_brand_name,
             custom_instructions="",  # handled by AI enhancement below
-            has_style_ref=bool(session.style_reference_path),
-            has_logo=bool(session.logo_path),
+            has_style_ref=has_style_ref,
+            has_logo=has_logo_ref,
+            has_product_ref=has_product_ref,
+            has_focus_refs=has_focus_overrides,
         )
 
         # AI-enhanced prompt rewriting when user provides feedback
@@ -1342,6 +1446,16 @@ async def generate_aplus_hero_pair(
                 logger.warning(f"AI enhancement failed for hero pair, prepending note: {e}")
                 prompt = f"CLIENT DIRECTION:\n{request.custom_instructions}\n\n{prompt}"
                 hero_change_summary = "Direct prepend (AI enhancement unavailable)"
+
+        # Final guardrail: strip known A+ boilerplate before sending to Gemini
+        prompt = strip_aplus_banner_boilerplate(prompt)
+        if _has_legacy_aplus_boilerplate(prompt):
+            prompt = strip_aplus_banner_boilerplate(prompt)
+        if _has_legacy_aplus_boilerplate(prompt):
+            raise HTTPException(
+                status_code=500,
+                detail="Legacy A+ boilerplate leak detected before Gemini call. Please retry after backend restart.",
+            )
 
         # Append lighting override (prevents amateur lighting bleed from reference photos)
         prompt = prompt + LIGHTING_OVERRIDE
@@ -1445,9 +1559,32 @@ async def generate_aplus_module(
         ).first()
 
         features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
+        effective_brand_name = _resolve_effective_brand_name(
+            session, db, user.id if user else None
+        )
         framework = session.design_framework_json or {}
         visual_script = session.aplus_visual_script
         is_chained = bool(request.previous_module_path)
+        focus_paths = request.reference_image_paths or []
+        has_focus_overrides = bool(focus_paths)
+        has_product_ref = (
+            bool(session.upload_path and session.upload_path in focus_paths)
+            if has_focus_overrides
+            else bool(session.upload_path)
+        )
+        has_style_ref = (
+            bool(session.style_reference_path and session.style_reference_path in focus_paths)
+            if has_focus_overrides
+            else bool(session.style_reference_path)
+        )
+        has_logo_ref = (
+            bool(session.logo_path and session.logo_path in focus_paths)
+            if has_focus_overrides
+            else bool(session.logo_path)
+        )
+        include_previous_for_prompt = bool(request.previous_module_path) and (
+            not has_focus_overrides or request.previous_module_path in focus_paths
+        )
 
         # === Build prompt ===
         prompt = None
@@ -1457,7 +1594,7 @@ async def generate_aplus_module(
         if visual_script:
             prompt = build_aplus_module_prompt(
                 product_title=session.product_title,
-                brand_name=session.brand_name or "",
+                brand_name=effective_brand_name,
                 features=features,
                 target_audience=session.target_audience or "",
                 framework=framework,
@@ -1465,9 +1602,11 @@ async def generate_aplus_module(
                 module_index=request.module_index,
                 module_count=len(visual_script.get("modules", [])),
                 custom_instructions="",  # handled by AI enhancement below
-                is_chained=is_chained,
-                has_style_ref=bool(session.style_reference_path),
-                has_logo=bool(session.logo_path),
+                is_chained=include_previous_for_prompt,
+                has_style_ref=has_style_ref,
+                has_logo=has_logo_ref,
+                has_product_ref=has_product_ref,
+                has_focus_refs=has_focus_overrides,
             )
             if prompt:
                 use_named_images = True
@@ -1511,7 +1650,7 @@ async def generate_aplus_module(
                 module_type=request.module_type.value,
                 position=position,
                 product_title=session.product_title,
-                brand_name=session.brand_name or "",
+                brand_name=effective_brand_name,
                 features=features,
                 target_audience=session.target_audience or "",
                 framework_name=framework_name,
@@ -1552,6 +1691,16 @@ async def generate_aplus_module(
                 logger.warning(f"AI enhancement failed for module {request.module_index}, prepending note: {e}")
                 prompt = f"CLIENT DIRECTION:\n{request.custom_instructions}\n\n{prompt}"
                 ai_change_summary = "Direct prepend (AI enhancement unavailable)"
+
+        # Final guardrail: strip known A+ boilerplate before sending to Gemini
+        prompt = strip_aplus_banner_boilerplate(prompt)
+        if _has_legacy_aplus_boilerplate(prompt):
+            prompt = strip_aplus_banner_boilerplate(prompt)
+        if _has_legacy_aplus_boilerplate(prompt):
+            raise HTTPException(
+                status_code=500,
+                detail="Legacy A+ boilerplate leak detected before Gemini call. Please retry after backend restart.",
+            )
 
         # Append lighting override (prevents amateur lighting bleed from reference photos)
         prompt = prompt + LIGHTING_OVERRIDE
@@ -1660,6 +1809,9 @@ async def generate_aplus_visual_script(
 
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+        effective_brand_name = _resolve_effective_brand_name(
+            session, db, user.id if user else None
+        )
 
         # Build framework dict from session
         framework = session.design_framework_json or {}
@@ -1669,7 +1821,7 @@ async def generate_aplus_visual_script(
         listing_prompts = framework.get("generation_prompts", [])
         prompt = get_visual_script_prompt(
             product_title=session.product_title,
-            brand_name=session.brand_name or "",
+            brand_name=effective_brand_name,
             features=features,
             target_audience=session.target_audience or "",
             framework=framework,
@@ -1694,7 +1846,9 @@ async def generate_aplus_visual_script(
         )
 
         # Parse JSON from response (strip markdown fences if present)
-        visual_script = json_module.loads(strip_json_fences(raw_text))
+        visual_script = _sanitize_aplus_visual_script(
+            json_module.loads(strip_json_fences(raw_text))
+        )
 
         # Store on session
         session.aplus_visual_script = visual_script
@@ -1777,6 +1931,9 @@ async def replan_all_prompts(
             raise HTTPException(status_code=400, detail="No design framework found. Generate frameworks first.")
 
         features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
+        effective_brand_name = _resolve_effective_brand_name(
+            session, db, user.id if user else None
+        )
 
         # === STEP 1: Regenerate listing prompts ===
         logger.info(f"Re-planning listing prompts for session {request.session_id}")
@@ -1789,7 +1946,7 @@ async def replan_all_prompts(
             target_audience=session.target_audience or "",
             global_note=session.global_note,
             has_style_reference=bool(session.style_reference_path),
-            brand_name=session.brand_name or "",
+            brand_name=effective_brand_name,
         )
 
         logger.info(f"Generated {len(listing_prompts)} listing prompts")
@@ -1810,7 +1967,7 @@ async def replan_all_prompts(
 
         visual_script_prompt = get_visual_script_prompt(
             product_title=session.product_title,
-            brand_name=session.brand_name or "",
+            brand_name=effective_brand_name,
             features=features,
             target_audience=session.target_audience or "",
             framework=framework,
@@ -1833,7 +1990,9 @@ async def replan_all_prompts(
             temperature=0.7,
         )
 
-        visual_script = json_module.loads(strip_json_fences(raw_text))
+        visual_script = _sanitize_aplus_visual_script(
+            json_module.loads(strip_json_fences(raw_text))
+        )
 
         # Store on session (flag_modified ensures SQLAlchemy detects JSON change)
         session.aplus_visual_script = visual_script
@@ -1960,7 +2119,7 @@ async def generate_aplus_mobile(
 
             # Build hero-specific recomposition prompt
             recompose_prompt = (
-                "Recompose this Amazon A+ Content hero banner for mobile viewing. "
+                "Recompose this hero banner for mobile viewing. "
                 "The original is two seamless desktop halves (top + bottom) stacked vertically. "
                 "Intelligently rearrange all content to fit a single 4:3 mobile image: "
                 "- Keep the product prominent and centered "
@@ -2048,8 +2207,8 @@ async def generate_aplus_mobile(
 
         # Build recomposition prompt
         recompose_prompt = (
-            "Recompose this Amazon A+ Content banner image for mobile viewing. "
-            "The original is a wide desktop banner (21:9 ratio). "
+            "Recompose this wide desktop banner image for mobile viewing. "
+            "The original is a wide banner (21:9 ratio). "
             "Intelligently rearrange the content to fit a 4:3 mobile ratio: "
             "- Keep the product prominent and centered "
             "- Reflow text and graphics to fit the taller format "
@@ -2303,3 +2462,4 @@ async def generate_alt_text_batch(
             continue
 
     return {"session_id": session_id, "alt_texts": results}
+

@@ -1503,6 +1503,11 @@ class GenerationService:
             self.gemini.model = ctx.model_override
         ctx.model_name = self.gemini.model
 
+        # Final safety net for A+ prompt boilerplate removal (all operations).
+        if ctx.image_type == "aplus_hero" or ctx.image_type.startswith("aplus_"):
+            from app.prompts.templates.aplus_modules import strip_aplus_banner_boilerplate
+            ctx.prompt = strip_aplus_banner_boilerplate(ctx.prompt)
+
         # Step 1: Call Gemini based on operation type
         if ctx.operation == "edit" or ctx.operation == "mobile_transform":
             raw_image = await self.gemini.edit_image(
