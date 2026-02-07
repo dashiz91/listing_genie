@@ -1272,15 +1272,11 @@ export const HomePage: React.FC = () => {
         // Auto-generate visual script if missing
         await ensureVisualScript(sessionId);
 
-        // Canvas extension disabled - each module generated independently
-        const previousModulePath = undefined;
-
-        // Call API to generate A+ module
+        // Call API to generate A+ module (each module generated independently)
         const result = await apiClient.generateAplusModule({
           session_id: sessionId,
           module_type: module.type,
           module_index: moduleIndex,
-          previous_module_path: previousModulePath,
           custom_instructions: note,
           reference_image_paths: referenceImagePaths,
           image_model: formData.imageModel,
@@ -1398,9 +1394,7 @@ export const HomePage: React.FC = () => {
         return; // Stop on hero pair failure
       }
 
-      // Step 3: Generate modules 2+ sequentially with canvas continuity.
-      // Skip chaining for module 2 — module 1 is a cut hero image that trips up generation.
-      let prevPath: string | undefined = undefined;
+      // Step 3: Generate modules 2+ sequentially (each independently).
       for (let i = 2; i < aplusModules.length; i++) {
         setAplusModules((prev) =>
           prev.map((m, idx) =>
@@ -1413,11 +1407,8 @@ export const HomePage: React.FC = () => {
             session_id: sessionId,
             module_type: 'full_image',
             module_index: i,
-            previous_module_path: prevPath,
             image_model: formData.imageModel,
           });
-
-          prevPath = result.image_path;
 
           setAplusModules((prev) =>
             prev.map((m, idx) => {
