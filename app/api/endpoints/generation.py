@@ -1740,7 +1740,7 @@ async def generate_aplus_module(
             image_url=result.primary_url,
             width=target_width,
             height=target_height,
-            is_chained=is_chained,
+            is_chained=False,
             generation_time_ms=generation_time_ms,
             prompt_text=prompt,
             refined_previous=refined_previous_info,
