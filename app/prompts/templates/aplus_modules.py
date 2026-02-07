@@ -144,8 +144,9 @@ THE PRODUCT:
 DESIGN SYSTEM (must match listing images exactly):
 - Framework: {framework_name} — {design_philosophy}
 - Colors: {color_palette}
-  Use ONLY these hex colors + black/white for contrast. No invented hues.
-- Typography: Headlines in {headline_font_desc}, body text in {body_font_desc}
+  Use ONLY these palette colors + black/white for contrast. No invented hues.
+  Describe colors by NAME in your scene descriptions, NEVER include hex codes.
+- Typography: Bold high-impact headlines, clean readable body text. Match the style reference if provided.
 - Visual treatment: {visual_treatment}
 
 {listing_context}
@@ -191,9 +192,9 @@ Module 5: Confidence — close the deal.
 
 WRITING YOUR SCENE DESCRIPTIONS:
 - Write one vivid, specific scene per module — paint a cinematographer's shot brief
-- Include EXACT hex colors INLINE in the description (e.g., "deep navy #1A1D21 background")
-- Describe text rendering in plain visual language: "bold serif headline" or "clean sans-serif label"
-- NEVER include pixel sizes (42px), font-weight numbers (700), CSS properties, or technical formatting
+- Describe colors by NAME only (e.g., "deep navy background", "warm botanical green"), NEVER include hex codes like #1A1D21
+- Describe fonts VISUALLY (e.g., "bold rounded sans-serif headline", "clean modern label"), NEVER include font names like Quicksand or Inter
+- NEVER include pixel sizes (42px), font-weight numbers (700), CSS properties, hex codes, or font names — Gemini renders these as visible text
 - Include any text to render (headlines, labels) naturally in the description
 - If Brand is "NOT_SPECIFIED", do NOT render any typed brand-name text; if BRAND_LOGO exists, place logo only
 - When rendering brand name text (only when Brand is provided), use EXACTLY "{brand_name}" - never "Premium Brand" or any generic placeholder
@@ -701,16 +702,13 @@ def get_visual_script_prompt(
             + "\n\nA+ must NOT duplicate these concepts. Go deeper, not wider.\n"
         )
 
-    # Extract clean font descriptions — never send raw JSON/CSS specs to image models
-    typo = framework.get("typography", {})
-    headline_font = typo.get("headline_font", "bold serif")
-    body_font = typo.get("body_font", "clean sans-serif")
-    headline_weight = typo.get("headline_weight", "Bold")
-    # Describe fonts visually, not technically
-    headline_font_desc = f"{headline_weight.lower()} {headline_font} lettering" if headline_weight else headline_font
-    body_font_desc = f"{body_font}"
-
     resolved_brand = (brand_name or "").strip()
+
+    # Build color palette by name only (no hex codes — Gemini renders them as text)
+    colors = framework.get("colors", [])[:4]
+    color_names = ", ".join(
+        c.get("name", c.get("role", "Color")) for c in colors
+    ) or "brand colors"
 
     prompt = VISUAL_SCRIPT_PROMPT.format(
         module_count=module_count,
@@ -720,11 +718,7 @@ def get_visual_script_prompt(
         target_audience=target_audience or "Discerning customers",
         framework_name=framework.get("framework_name", "Professional"),
         design_philosophy=framework.get("design_philosophy", "Clean and modern"),
-        color_palette=", ".join(
-            c.get("hex", "") for c in framework.get("colors", [])[:3]
-        ) or "#C85A35",
-        headline_font_desc=headline_font_desc,
-        body_font_desc=body_font_desc,
+        color_palette=color_names,
         visual_treatment=json.dumps(framework.get("visual_treatment", {})),
         listing_context=listing_context,
     )

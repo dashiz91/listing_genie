@@ -392,19 +392,18 @@ Without it, you have random AI images. With it, you have a converting listing.
 **COLOR PALETTE** (Use ONLY these colors across ALL 6 images):
 {color_palette}
 
-**TYPOGRAPHY** (Use ONLY these fonts across ALL 6 images):
-- Headlines: {headline_font} {headline_weight}
-- Body/Callouts: {body_font}
+**TYPOGRAPHY** (Consistent across ALL 6 images):
+- Headlines: bold, high-impact lettering
+- Body/Callouts: clean, readable supporting text
 
 ⚠️  CRITICAL RULES:
-1. Every text element uses {headline_font} or {body_font} — NO OTHER FONTS
-2. Every color comes from the palette above — NO INVENTED COLORS
-3. Mention the EXACT font name and hex code in each prompt
-4. This consistency is what separates "professional brand" from "AI slop"
+1. Every color comes from the design palette — NO INVENTED COLORS
+2. Describe colors by NAME only (e.g., "deep botanical green background"), NEVER include hex codes like #4A5D4E in the prompt
+3. Describe fonts VISUALLY (e.g., "bold rounded sans-serif headline"), NEVER include font names like Quicksand or Inter
+4. If STYLE_REFERENCE is provided, say "matching the style reference" for fonts and colors
+5. This consistency is what separates "professional brand" from "AI slop"
 
-When writing prompts, explicitly state:
-- "Typography in {headline_font}" not "elegant serif font"
-- "Background in [specific hex from palette]" not "soft blue"
+NEVER PUT IN PROMPTS: hex codes (#XXXXXX), font names (Quicksand, Inter, Montserrat), px sizes (48px), font weights (700). Gemini will render these as visible text in the image.
 
 ═══════════════════════════════════════════════════════════════════════════════
                     🎯 CONVERSION INSIGHTS (from product analysis)

@@ -409,19 +409,19 @@ class DesignArchitectService:
                 image_copy = copy
                 break
 
-        # Build color section (max 4 colors)
+        # Build color section by NAME only (no hex codes — Gemini renders them as text)
         colors = framework.get('colors', [])[:4]
-        color_section = "[COLOR PALETTE - EXACT VALUES]\n"
+        color_section = "[COLOR PALETTE - BY NAME]\n"
         for color in colors:
-            color_section += f"- {color['role'].upper()}: {color['hex']} ({color['name']}) - {color['usage']}\n"
+            color_section += f"- {color['role'].upper()}: {color.get('name', 'Color')} - {color['usage']}\n"
+        color_section += "Use ONLY these palette colors + black/white. Match the style reference if provided.\n"
 
-        # Build typography section
-        typo = framework.get('typography', {})
-        typo_section = f"""[TYPOGRAPHY - EXACT SPECIFICATIONS]
-Headlines: {typo.get('headline_font', 'Montserrat')} {typo.get('headline_weight', 'Bold')}, {typo.get('headline_size', '48px')}
-Subheads: {typo.get('subhead_font', 'Montserrat')} {typo.get('subhead_weight', 'Regular')}, {typo.get('subhead_size', '24px')}
-Body: {typo.get('body_font', 'Inter')} {typo.get('body_weight', 'Regular')}, {typo.get('body_size', '16px')}
-Letter Spacing: {typo.get('letter_spacing', '0px')}
+        # Build typography section (visual descriptions only, no font names/sizes)
+        typo_section = """[TYPOGRAPHY]
+Headlines: Bold, high-impact lettering matching the design system
+Subheads: Medium weight, supporting text
+Body: Clean, readable text
+If STYLE_REFERENCE is provided, match its typography feel exactly.
 """
 
         # Build story arc section
