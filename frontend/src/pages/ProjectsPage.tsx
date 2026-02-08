@@ -302,6 +302,8 @@ export const ProjectsPage: React.FC = () => {
                 key={project.session_id}
                 project={project}
                 onClick={() => setSelectedProject(project.session_id)}
+                onView={() => setSelectedProject(project.session_id)}
+                continueHref={`/app?project=${encodeURIComponent(project.session_id)}`}
                 onContinue={() => navigate(`/app?project=${project.session_id}`)}
                 onRename={() => setRenameModal({ id: project.session_id, title: project.product_title })}
                 onDelete={() => setDeleteModal({ id: project.session_id, title: project.product_title })}

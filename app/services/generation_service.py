@@ -8,6 +8,7 @@ import re
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Dict, List, Optional
+from urllib.parse import parse_qs, unquote, urlparse
 from sqlalchemy.orm import Session
 
 from app.models.database import (
@@ -21,7 +22,11 @@ from app.models.database import (
     ColorModeEnum,
 )
 from app.prompts import PromptEngine, ProductContext, get_prompt_engine, get_all_styles
-from app.services.gemini_service import GeminiService, LIGHTING_OVERRIDE
+from app.services.gemini_service import (
+    GeminiService,
+    append_lighting_override_once,
+    strip_lighting_override,
+)
 from app.services.supabase_storage_service import SupabaseStorageService
 from app.schemas.generation import (
     GenerationRequest,
@@ -32,7 +37,7 @@ from app.schemas.generation import (
     ImageTypeEnum as SchemaImageType,
     DesignFramework,
 )
-# Note: OpenAIVisionService is imported dynamically to avoid circular imports
+# Note: VisionService provider is resolved dynamically at runtime.
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +82,116 @@ class GenerationService:
         self.prompt_engine = prompt_engine or get_prompt_engine()
         # Store framework for current session (set during create_session)
         self._current_framework: Optional[DesignFramework] = None
+
+    @staticmethod
+    def _strip_style_reference_prefix(prompt: str) -> str:
+        """Remove generated style-reference header block so it is not duplicated."""
+        if not prompt:
+            return prompt
+        trimmed = prompt.lstrip()
+        if not trimmed.startswith("=== STYLE REFERENCE ==="):
+            return prompt
+        split_idx = trimmed.find("\n\n")
+        if split_idx == -1:
+            return prompt
+        return trimmed[split_idx + 2:].lstrip()
+
+    @staticmethod
+    def _strip_feedback_injection_block(prompt: str) -> str:
+        """Remove legacy direct-feedback injection block from a prompt."""
+        if not prompt:
+            return prompt
+        marker = "=== USER FEEDBACK TO APPLY ==="
+        idx = prompt.find(marker)
+        if idx == -1:
+            return prompt
+        return prompt[:idx].rstrip()
+
+    @classmethod
+    def _sanitize_prompt_for_rewrite(cls, prompt: Optional[str]) -> str:
+        """
+        Remove system wrappers before sending prior prompt to AI Designer.
+
+        This keeps the rewrite focused on the actual scene/copy instructions.
+        """
+        cleaned = (prompt or "").strip()
+        cleaned = cls._strip_feedback_injection_block(cleaned)
+        cleaned = strip_lighting_override(cleaned)
+        cleaned = cls._strip_style_reference_prefix(cleaned)
+        return cleaned.strip()
+
+    @staticmethod
+    def _normalize_image_path(path: Optional[str]) -> str:
+        """Normalize image path variants for reliable matching."""
+        if not path:
+            return ""
+
+        normalized = str(path).strip().strip('"').strip("'")
+        if not normalized:
+            return ""
+
+        try:
+            parsed = urlparse(normalized)
+            query = parse_qs(parsed.query)
+            encoded_path = query.get("path", [None])[0]
+            if encoded_path:
+                normalized = unquote(encoded_path)
+            elif parsed.scheme in ("http", "https"):
+                normalized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        except Exception:
+            normalized = normalized.split("?", 1)[0]
+
+        return unquote(normalized).strip()
+
+    @classmethod
+    def _extract_image_filename(cls, path: Optional[str]) -> str:
+        normalized = cls._normalize_image_path(path)
+        if not normalized:
+            return ""
+        no_query = normalized.split("?", 1)[0].split("#", 1)[0]
+        return no_query.rstrip("/").rsplit("/", 1)[-1]
+
+    @classmethod
+    def _paths_match(cls, left: Optional[str], right: Optional[str]) -> bool:
+        """Best-effort path equality across signed URLs, encoded API paths, and raw storage paths."""
+        left_norm = cls._normalize_image_path(left)
+        right_norm = cls._normalize_image_path(right)
+        if not left_norm or not right_norm:
+            return False
+
+        if left_norm == right_norm:
+            return True
+
+        left_no_query = left_norm.split("?", 1)[0].split("#", 1)[0]
+        right_no_query = right_norm.split("?", 1)[0].split("#", 1)[0]
+        if left_no_query == right_no_query:
+            return True
+
+        if left_no_query.endswith(right_no_query) or right_no_query.endswith(left_no_query):
+            return True
+
+        left_filename = cls._extract_image_filename(left_no_query)
+        right_filename = cls._extract_image_filename(right_no_query)
+        return bool(left_filename and right_filename and left_filename == right_filename)
+
+    @staticmethod
+    def _is_mobile_prompt_text(prompt_text: Optional[str]) -> bool:
+        """Identify prompt-history entries that belong to mobile A+ operations."""
+        if not prompt_text:
+            return False
+        normalized = prompt_text.lstrip()
+        return (
+            normalized.startswith("[MOBILE RECOMPOSE]")
+            or normalized.startswith("[HERO MOBILE MERGE]")
+            or normalized.startswith("[MOBILE EDIT]")
+        )
+
+    @staticmethod
+    def _is_mobile_storage_key(storage_key: Optional[str]) -> bool:
+        if not storage_key:
+            return False
+        key = storage_key.lower()
+        return key.endswith("_mobile") or "_mobile_" in key or "hero_mobile" in key
 
     def create_session(self, request: GenerationRequest, user_id: Optional[str] = None) -> GenerationSession:
         """
@@ -309,37 +424,63 @@ class GenerationService:
     def get_latest_prompt(
         self,
         context: DesignContext,
-        image_type: ImageTypeEnum
+        image_type: ImageTypeEnum,
+        include_mobile: bool = True,
     ) -> Optional[PromptHistory]:
         """Get the most recent prompt for an image type"""
-        return self.db.query(PromptHistory).filter(
+        query = self.db.query(PromptHistory).filter(
             PromptHistory.context_id == context.id,
             PromptHistory.image_type == image_type
-        ).order_by(PromptHistory.version.desc()).first()
+        ).order_by(PromptHistory.version.desc())
+        if include_mobile:
+            return query.first()
+
+        for item in query.all():
+            if not self._is_mobile_prompt_text(item.prompt_text):
+                return item
+        return None
 
     def get_prompt_by_version(
         self,
         context: DesignContext,
         image_type: ImageTypeEnum,
-        version: int
+        version: int,
+        include_mobile: bool = True,
     ) -> Optional[PromptHistory]:
         """Get a specific version's prompt for an image type"""
-        return self.db.query(PromptHistory).filter(
-            PromptHistory.context_id == context.id,
-            PromptHistory.image_type == image_type,
-            PromptHistory.version == version
-        ).first()
+        if include_mobile:
+            return self.db.query(PromptHistory).filter(
+                PromptHistory.context_id == context.id,
+                PromptHistory.image_type == image_type,
+                PromptHistory.version == version
+            ).first()
+
+        history = self.get_prompt_history(
+            context=context,
+            image_type=image_type,
+            include_mobile=False,
+        )
+        if version < 1 or version > len(history):
+            return None
+        return history[version - 1]
 
     def get_prompt_history(
         self,
         context: DesignContext,
-        image_type: ImageTypeEnum
+        image_type: ImageTypeEnum,
+        include_mobile: bool = True,
+        mobile_only: bool = False,
     ) -> List[PromptHistory]:
         """Get all prompt versions for an image type"""
-        return self.db.query(PromptHistory).filter(
+        history = self.db.query(PromptHistory).filter(
             PromptHistory.context_id == context.id,
             PromptHistory.image_type == image_type
         ).order_by(PromptHistory.version.asc()).all()
+        if mobile_only:
+            return [item for item in history if self._is_mobile_prompt_text(item.prompt_text)]
+        if include_mobile:
+            return history
+        return [item for item in history if not self._is_mobile_prompt_text(item.prompt_text)]
 
     def _build_product_context(
         self,
@@ -566,10 +707,6 @@ class GenerationService:
         if not image_record:
             raise ValueError(f"No image record found for type: {image_type}")
 
-        # Update status to processing
-        image_record.status = GenerationStatusEnum.PROCESSING
-        self.db.commit()
-
         template_key = image_type.value
 
         # Get or create design context for prompt history
@@ -594,31 +731,35 @@ class GenerationService:
         if session.global_note:
             logger.info(f"[{template_key}] Global note exists but was already processed by AI Designer")
 
-        # Handle regeneration note - use AI Designer to enhance if enabled
+        # Handle regeneration note via AI Designer rewrite (no raw prompt injection)
         if note:
-            user_feedback = note  # Store for prompt history
-
-            if use_ai_enhancement:
-                # Try to get the previous prompt from history
-                latest_prompt = self.get_latest_prompt(design_context, image_type)
+            user_feedback = note.strip()
+            if user_feedback:
+                latest_prompt = self.get_latest_prompt(
+                    design_context,
+                    image_type,
+                    include_mobile=not template_key.startswith("aplus_"),
+                )
                 original_prompt = latest_prompt.prompt_text if latest_prompt else base_prompt
+                original_prompt = self._sanitize_prompt_for_rewrite(original_prompt)
 
-                # Use AI Designer to intelligently enhance the prompt
+                if not use_ai_enhancement:
+                    raise RuntimeError(
+                        "Regeneration feedback requires AI Designer rewrite; direct injection is disabled."
+                    )
+
                 try:
-                    from app.services.openai_vision_service import get_openai_vision_service
-                    vision_service = get_openai_vision_service()
+                    from app.services.vision_service import get_vision_service
+                    vision_service = get_vision_service()
 
-                    # Get framework dict for context
                     framework_dict = None
                     if self._current_framework:
                         framework_dict = self._current_framework.model_dump()
 
-                    # Get product_analysis from DesignContext for regeneration context
                     product_analysis_text = None
                     if design_context and design_context.product_analysis:
                         analysis = design_context.product_analysis
                         if isinstance(analysis, dict):
-                            # Convert structured analysis to readable text
                             parts = []
                             if analysis.get('what_i_see'):
                                 parts.append(f"What I see: {analysis['what_i_see']}")
@@ -633,33 +774,36 @@ class GenerationService:
                             product_analysis_text = "\n".join(parts) if parts else str(analysis)
                         else:
                             product_analysis_text = str(analysis)
-                        logger.info(f"[REGENERATION] Using stored product_analysis for context")
+                        logger.info("[REGENERATION] Using stored product_analysis for context")
 
-                    logger.info(f"Using AI Designer to enhance prompt for {template_key}")
+                    logger.info(f"Using AI Designer rewrite for regeneration {template_key}")
                     from app.services.prompt_builder import get_structural_context
                     enhancement = await vision_service.enhance_prompt_with_feedback(
                         original_prompt=original_prompt,
-                        user_feedback=note,
+                        user_feedback=user_feedback,
                         image_type=template_key,
                         framework=framework_dict,
                         product_analysis=product_analysis_text,
                         structural_context=get_structural_context(template_key),
                     )
 
-                    base_prompt = enhancement["enhanced_prompt"]
+                    base_prompt = self._sanitize_prompt_for_rewrite(
+                        enhancement["enhanced_prompt"]
+                    )
                     change_summary = enhancement.get("interpretation", "AI-enhanced based on feedback")
                     logger.info(f"AI Designer interpretation: {change_summary}")
-
                 except Exception as e:
-                    logger.warning(f"AI enhancement failed, falling back to append: {e}")
-                    # Fallback: just append the note
-                    base_prompt += f"\n\n=== REGENERATION INSTRUCTIONS ===\n{note}\n"
-                    change_summary = "Direct append (AI enhancement unavailable)"
-            else:
-                # Direct append without AI enhancement
-                base_prompt += f"\n\n=== REGENERATION INSTRUCTIONS ===\n{note}\n"
-                change_summary = "Direct append"
-                logger.info(f"Appending regeneration note to prompt for {template_key}")
+                    logger.error(f"AI rewrite failed for regeneration {template_key}: {e}")
+                    raise RuntimeError(
+                        "AI Designer could not rewrite your regeneration feedback. Please retry."
+                    ) from e
+
+        # Mark as actively processing only after preflight/prompt preparation succeeds.
+        # This avoids leaving rows stuck in PROCESSING when preflight throws.
+        image_record.status = GenerationStatusEnum.PROCESSING
+        image_record.error_message = None
+        image_record.completed_at = None
+        self.db.commit()
 
         last_error = None
 
@@ -674,61 +818,73 @@ class GenerationService:
                     f"(attempt {attempt + 1}/{RetryConfig.MAX_RETRIES})"
                 )
 
-                # Build reference image paths:
-                # If user provided custom reference_image_paths (focus images), use those instead
-                # Otherwise build from session data:
-                # 1. Product photo (always first - primary reference)
-                # 2. Additional product photos (for better AI context)
-                # 3. Style reference image (if provided - for all images)
-                # 4. Logo (only for non-main images)
+                # Build reference image paths and semantic roles.
+                # If user provided custom reference_image_paths (focus images), use those instead.
                 style_image_index = None
                 logo_image_index = None
-                additional_count = 0
+                reference_role_by_index: Dict[int, str] = {}
+                additional_indices: List[int] = []
 
                 if reference_image_paths:
-                    # User selected specific focus images — use only those
                     reference_paths = list(reference_image_paths)
                     logger.info(f"[GENERATION] Using {len(reference_paths)} user-selected focus images (overriding defaults)")
-
-                    # Still detect style reference and logo within focus images
-                    # so the style prefix header gets added to the prompt.
-                    # Check against both session path and original upload path
-                    # (they may differ if session stores framework preview).
-                    style_ref_candidates = set()
-                    if session.style_reference_path:
-                        style_ref_candidates.add(session.style_reference_path)
-                    if design_context and design_context.image_inventory:
-                        for inv in (design_context.image_inventory or []):
-                            if inv.get("type") in ("style_reference", "original_style_reference"):
-                                style_ref_candidates.add(inv["path"])
-
-                    for idx, path in enumerate(reference_paths):
-                        if path in style_ref_candidates:
-                            style_image_index = idx + 1  # 1-based
-                        elif session.logo_path and path == session.logo_path:
-                            logo_image_index = idx + 1  # 1-based
                 else:
                     reference_paths = [session.upload_path]
-
-                    # Track image indices for style reference
-                    current_index = 2  # Image 1 is primary product
-
-                    # Add additional product images for better context
                     if session.additional_upload_paths:
                         reference_paths.extend(session.additional_upload_paths)
-                        additional_count = len(session.additional_upload_paths)
-                        current_index += additional_count
-
-                    # Add style reference image (applies to ALL images including main)
                     if session.style_reference_path:
                         reference_paths.append(session.style_reference_path)
-                        style_image_index = current_index
-                        current_index += 1
-
-                    # Only add logo for non-main images (main/hero should be clean)
                     if session.logo_path and image_type != ImageTypeEnum.MAIN:
                         reference_paths.append(session.logo_path)
-                        logo_image_index = current_index
+
+                style_ref_candidates = set()
+                additional_ref_candidates = set(session.additional_upload_paths or [])
+                if session.style_reference_path:
+                    style_ref_candidates.add(session.style_reference_path)
+
+                if design_context and design_context.image_inventory:
+                    for inv in (design_context.image_inventory or []):
+                        inv_path = inv.get("path")
+                        inv_type = (inv.get("type") or "").lower()
+                        if not inv_path:
+                            continue
+                        if inv_type in ("style_reference", "original_style_reference"):
+                            style_ref_candidates.add(inv_path)
+                        elif inv_type.startswith("additional_") or inv_type.startswith("additional_product_"):
+                            additional_ref_candidates.add(inv_path)
+
+                for idx, path in enumerate(reference_paths, start=1):
+                    role = "reference"
+                    if idx == 1:
+                        role = "primary_product"
+                    elif any(self._paths_match(path, candidate) for candidate in style_ref_candidates):
+                        role = "style_reference"
+                        if style_image_index is None:
+                            style_image_index = idx
+                    elif session.logo_path and self._paths_match(path, session.logo_path):
+                        role = "logo"
+                        if logo_image_index is None:
+                            logo_image_index = idx
+                    elif any(self._paths_match(path, candidate) for candidate in additional_ref_candidates):
+                        role = "additional_product"
+                        additional_indices.append(idx)
+                    reference_role_by_index[idx] = role
+
+                # For custom focus selections, treat all remaining support refs as additional product context.
+                if reference_image_paths:
+                    for idx in range(2, len(reference_paths) + 1):
+                        if idx in (style_image_index, logo_image_index):
+                            continue
+                        if reference_role_by_index.get(idx) == "reference":
+                            reference_role_by_index[idx] = "additional_product"
+                            additional_indices.append(idx)
+
+                additional_indices = sorted(set(additional_indices))
+                additional_count = len(additional_indices)
+                additional_order = {
+                    image_idx: order
+                    for order, image_idx in enumerate(additional_indices, start=1)
+                }
 
                 # === COMPREHENSIVE REFERENCE IMAGE LOGGING ===
                 logger.info("=" * 80)
@@ -739,17 +895,18 @@ class GenerationService:
                 logger.info(f"[GENERATION] Attempt: {attempt + 1}/{RetryConfig.MAX_RETRIES}")
                 logger.info("-" * 40)
                 logger.info(f"[GENERATION] REFERENCE IMAGES ({len(reference_paths)} total):")
-                for i, path in enumerate(reference_paths):
+                for idx, path in enumerate(reference_paths, start=1):
+                    role = reference_role_by_index.get(idx, "reference")
                     label = ""
-                    if i == 0:
+                    if role == "primary_product":
                         label = " (PRIMARY PRODUCT)"
-                    elif style_image_index and i + 1 == style_image_index:
+                    elif role == "style_reference":
                         label = " (STYLE REFERENCE)"
-                    elif logo_image_index and i + 1 == logo_image_index:
+                    elif role == "logo":
                         label = " (LOGO)"
-                    elif i > 0 and i < 1 + additional_count:
-                        label = f" (ADDITIONAL PRODUCT {i})"
-                    logger.info(f"[GENERATION]   [Image {i+1}] {path}{label}")
+                    elif role == "additional_product":
+                        label = f" (ADDITIONAL PRODUCT {additional_order.get(idx, idx)})"
+                    logger.info(f"[GENERATION]   [Image {idx}] {path}{label}")
                 logger.info("-" * 40)
                 logger.info(f"[GENERATION] FRAMEWORK: {self._current_framework.framework_name if self._current_framework else 'None'}")
                 logger.info(f"[GENERATION] Has Style Reference: {style_image_index is not None}")
@@ -757,16 +914,16 @@ class GenerationService:
                 logger.info(f"[GENERATION] Additional Images: {additional_count}")
                 logger.info("=" * 80)
 
-                # Prepend style reference instructions to prompt if style image provided
+                # Prepend style reference instructions to prompt if style image provided.
                 if style_image_index:
                     from app.prompts.ai_designer import STYLE_REFERENCE_PROMPT_PREFIX
 
-                    # Build additional images description
-                    additional_desc = ""
-                    for i in range(additional_count):
-                        additional_desc += f"- Image {2 + i}: Additional product photo {i + 1}\n"
+                    prompt = self._strip_style_reference_prefix(prompt)
 
-                    # Build logo description
+                    additional_desc = ""
+                    for additional_number, image_idx in enumerate(additional_indices, start=1):
+                        additional_desc += f"- Image {image_idx}: Additional product photo {additional_number}\n"
+
                     logo_desc = ""
                     if logo_image_index:
                         logo_desc = f"- Image {logo_image_index}: Brand logo\n"
@@ -778,9 +935,8 @@ class GenerationService:
                     )
                     prompt = style_prefix + prompt
                     logger.info(f"[{template_key.upper()}] Added style reference prefix (style is Image #{style_image_index})")
-
-                # Append lighting override (prevents amateur lighting bleed from reference photos)
-                prompt = prompt + LIGHTING_OVERRIDE
+                # Append lighting override once (prevents duplicate override blocks on regenerations)
+                prompt = append_lighting_override_once(prompt)
 
                 # Generate image with reference(s)
                 generated_image = await self.gemini.generate_image(
@@ -799,15 +955,26 @@ class GenerationService:
                     try:
                         # Build reference image metadata for prompt history
                         ref_meta = []
-                        for i, rp in enumerate(reference_paths):
-                            label = "primary_product" if i == 0 else "reference"
-                            if style_image_index and i + 1 == style_image_index:
-                                label = "style_reference"
-                            elif logo_image_index and i + 1 == logo_image_index:
-                                label = "logo"
-                            elif i > 0 and i < 1 + additional_count:
-                                label = f"additional_product_{i}"
-                            ref_meta.append({"type": label, "path": rp})
+                        additional_counter = 0
+                        for idx, rp in enumerate(reference_paths, start=1):
+                            role = reference_role_by_index.get(idx, "reference")
+                            if role == "primary_product":
+                                ref_type = "primary_product"
+                                label = "PRODUCT_PHOTO"
+                            elif role == "style_reference":
+                                ref_type = "style_reference"
+                                label = "STYLE_REFERENCE"
+                            elif role == "logo":
+                                ref_type = "logo"
+                                label = "BRAND_LOGO"
+                            elif role == "additional_product":
+                                additional_counter += 1
+                                ref_type = f"additional_product_{additional_counter}"
+                                label = f"ADDITIONAL_PRODUCT_{additional_counter}"
+                            else:
+                                ref_type = "reference"
+                                label = f"REFERENCE_IMAGE_{idx}"
+                            ref_meta.append({"type": ref_type, "path": rp, "label": label})
 
                         ph = self.store_prompt_in_history(
                             context=design_context,
@@ -931,6 +1098,11 @@ class GenerationService:
         """Internal implementation of edit_single_image."""
         template_key = image_type.value
         is_aplus = template_key.startswith("aplus_")
+        if session.design_framework_json:
+            try:
+                self._current_framework = DesignFramework(**session.design_framework_json)
+            except Exception as e:
+                logger.warning(f"[EDIT] Failed to load framework for context: {e}")
 
         # For A+ images: no ImageRecord, look up storage path directly
         # For listing images: use ImageRecord
@@ -975,56 +1147,79 @@ class GenerationService:
             # A+ modules use wider aspect ratio (1464x600 ≈ 21:9)
             aspect_ratio = "21:9" if is_aplus else "1:1"
 
-            # Use AI Designer to enhance edit instructions with context
+            # Use AI Designer to rewrite the previous prompt with edit feedback.
             design_context = self.get_design_context(session.id)
-            enhanced_instructions = edit_instructions
+            if not design_context:
+                design_context = self.create_design_context(session)
+
             change_summary = "Image edit"
 
-            if design_context:
-                try:
-                    latest_prompt = self.get_latest_prompt(design_context, image_type)
-                    original_prompt = latest_prompt.prompt_text if latest_prompt else None
+            latest_prompt = self.get_latest_prompt(
+                design_context,
+                image_type,
+                include_mobile=not is_aplus,
+            )
+            original_prompt = latest_prompt.prompt_text if latest_prompt else None
+            if not original_prompt:
+                if is_aplus:
+                    original_prompt = (
+                        "Revise the existing A+ module image while preserving product identity, "
+                        "brand style, and readability."
+                    )
+                elif self._current_framework:
+                    original_prompt = self._build_framework_prompt(session, image_type)
+                else:
+                    context = self._build_product_context(session)
+                    original_prompt = self.prompt_engine.build_prompt(template_key, context)
+            original_prompt = self._sanitize_prompt_for_rewrite(original_prompt)
 
-                    if original_prompt:
-                        from app.services.openai_vision_service import get_openai_vision_service
-                        vision_service = get_openai_vision_service()
+            try:
+                from app.services.vision_service import get_vision_service
+                vision_service = get_vision_service()
 
-                        framework_dict = None
-                        if self._current_framework:
-                            framework_dict = self._current_framework.model_dump()
-                        elif session.design_framework_json:
-                            framework_dict = session.design_framework_json
+                framework_dict = None
+                if self._current_framework:
+                    framework_dict = self._current_framework.model_dump()
+                elif session.design_framework_json:
+                    framework_dict = session.design_framework_json
 
-                        product_analysis_text = None
-                        if design_context.product_analysis:
-                            analysis = design_context.product_analysis
-                            if isinstance(analysis, dict):
-                                parts = []
-                                if analysis.get('what_i_see'):
-                                    parts.append(f"What I see: {analysis['what_i_see']}")
-                                if analysis.get('visual_characteristics'):
-                                    parts.append(f"Visual characteristics: {analysis['visual_characteristics']}")
-                                if analysis.get('product_category'):
-                                    parts.append(f"Category: {analysis['product_category']}")
-                                product_analysis_text = "\n".join(parts) if parts else str(analysis)
-                            else:
-                                product_analysis_text = str(analysis)
+                product_analysis_text = None
+                if design_context.product_analysis:
+                    analysis = design_context.product_analysis
+                    if isinstance(analysis, dict):
+                        parts = []
+                        if analysis.get('what_i_see'):
+                            parts.append(f"What I see: {analysis['what_i_see']}")
+                        if analysis.get('visual_characteristics'):
+                            parts.append(f"Visual characteristics: {analysis['visual_characteristics']}")
+                        if analysis.get('product_category'):
+                            parts.append(f"Category: {analysis['product_category']}")
+                        product_analysis_text = "\n".join(parts) if parts else str(analysis)
+                    else:
+                        product_analysis_text = str(analysis)
 
-                        logger.info(f"[EDIT] Using AI Designer to enhance edit instructions for {template_key}")
-                        from app.services.prompt_builder import get_structural_context
-                        enhancement = await vision_service.enhance_prompt_with_feedback(
-                            original_prompt=original_prompt,
-                            user_feedback=edit_instructions,
-                            image_type=template_key,
-                            framework=framework_dict,
-                            product_analysis=product_analysis_text,
-                            structural_context=get_structural_context(template_key),
-                        )
-                        enhanced_instructions = enhancement["enhanced_prompt"]
-                        change_summary = enhancement.get("interpretation", "AI-enhanced edit")
-                        logger.info(f"[EDIT] AI Designer interpretation: {change_summary}")
-                except Exception as e:
-                    logger.warning(f"[EDIT] AI enhancement failed, using raw instructions: {e}")
+                logger.info(f"[EDIT] Using AI Designer to plan edit instructions for {template_key}")
+                from app.services.prompt_builder import get_structural_context
+                edit_plan = await vision_service.plan_edit_instructions(
+                    source_image_path=existing_image_path,
+                    user_feedback=edit_instructions,
+                    image_type=template_key,
+                    original_prompt=original_prompt,
+                    framework=framework_dict,
+                    product_analysis=product_analysis_text,
+                    reference_image_paths=reference_image_paths,
+                    structural_context=get_structural_context(template_key),
+                )
+                enhanced_instructions = (edit_plan.get("edit_instructions") or "").strip()
+                if not enhanced_instructions:
+                    raise ValueError("AI Designer returned empty edit_instructions")
+                change_summary = edit_plan.get("interpretation", "AI-guided edit")
+                logger.info(f"[EDIT] AI Designer interpretation: {change_summary}")
+            except Exception as e:
+                logger.error(f"[EDIT] AI edit planning failed for {template_key}: {e}")
+                raise RuntimeError(
+                    "AI Designer could not plan edit instructions. Please retry."
+                ) from e
 
             # Call Gemini to edit the image with enhanced instructions
             edited_image = await self.gemini.edit_image(
@@ -1043,10 +1238,37 @@ class GenerationService:
             if design_context:
                 try:
                     # Build reference image metadata for edit prompt history
-                    edit_ref_meta = [{"type": "source_image", "path": existing_image_path}]
+                    edit_ref_meta = [{
+                        "type": "source_image",
+                        "path": existing_image_path,
+                        "label": "SOURCE_IMAGE",
+                    }]
                     if reference_image_paths:
-                        for rp in reference_image_paths:
-                            edit_ref_meta.append({"type": "focus_reference", "path": rp})
+                        for idx, rp in enumerate(reference_image_paths):
+                            if session.upload_path and rp == session.upload_path:
+                                edit_ref_meta.append({
+                                    "type": "primary",
+                                    "path": rp,
+                                    "label": "PRODUCT_PHOTO",
+                                })
+                            elif session.style_reference_path and rp == session.style_reference_path:
+                                edit_ref_meta.append({
+                                    "type": "style_reference",
+                                    "path": rp,
+                                    "label": "STYLE_REFERENCE",
+                                })
+                            elif session.logo_path and rp == session.logo_path:
+                                edit_ref_meta.append({
+                                    "type": "logo",
+                                    "path": rp,
+                                    "label": "BRAND_LOGO",
+                                })
+                            else:
+                                edit_ref_meta.append({
+                                    "type": "focus_reference",
+                                    "path": rp,
+                                    "label": f"FOCUS_REFERENCE_{idx + 1}",
+                                })
 
                     ph = self.store_prompt_in_history(
                         context=design_context,
@@ -1647,7 +1869,7 @@ class GenerationService:
                     img_type_enum = ImageTypeEnum(ctx.image_type) if not ctx.image_type.startswith("aplus_hero") else ImageTypeEnum("aplus_0")
                     prompt_prefix = ""
                     if ctx.operation == "edit":
-                        prompt_prefix = "[EDIT] "
+                        prompt_prefix = "[MOBILE EDIT] " if self._is_mobile_storage_key(ctx.storage_key) else "[EDIT] "
                     elif ctx.operation == "mobile_transform":
                         prompt_prefix = "[MOBILE RECOMPOSE] "
 
@@ -1709,4 +1931,5 @@ class GenerationResult:
     @property
     def primary_version(self) -> int:
         return self.saved[self.primary_key][2]
+
 

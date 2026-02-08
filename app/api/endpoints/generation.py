@@ -15,9 +15,14 @@ from sqlalchemy.orm.attributes import flag_modified
 from typing import List, Optional
 from PIL import Image
 
-from app.core.auth import User, get_optional_user, get_current_user
+from app.core.auth import User, get_current_user
 from app.db.session import get_db
-from app.services.gemini_service import GeminiService, get_gemini_service, _load_image_from_path, LIGHTING_OVERRIDE
+from app.services.gemini_service import (
+    GeminiService,
+    _load_image_from_path,
+    append_lighting_override_once,
+    get_gemini_service,
+)
 from app.services.supabase_storage_service import SupabaseStorageService
 from app.services.generation_service import GenerationService
 from app.services.vision_service import VisionService, get_vision_service as get_unified_vision_service
@@ -29,7 +34,6 @@ from app.services.generation_utils import (
     build_reference_images_for_history, get_enhancement_context,
 )
 from app.services.prompt_builder import get_structural_context
-from app.services.openai_vision_service import get_openai_vision_service
 from app.services.image_utils import resize_for_aplus_module, APLUS_DIMENSIONS
 from app.config import settings
 
@@ -53,6 +57,7 @@ from app.prompts.templates.aplus_modules import (
     get_aplus_prompt, build_aplus_module_prompt,
     build_canvas_inpainting_prompt, build_hero_pair_prompt,
     get_visual_script_prompt, strip_aplus_banner_boilerplate,
+    APLUS_MODULE_HEADER, APLUS_HERO_HEADER,
 )
 
 logger = logging.getLogger(__name__)
@@ -143,7 +148,13 @@ def _resolve_effective_brand_name(
     2) UserSettings.default_brand_name (if available)
     """
     session_brand = (session.brand_name or "").strip()
-    if session_brand:
+    product_title = (session.product_title or "").strip()
+    session_brand_matches_title = (
+        bool(session_brand)
+        and bool(product_title)
+        and session_brand.casefold() == product_title.casefold()
+    )
+    if session_brand and not session_brand_matches_title:
         return session_brand
 
     lookup_user_id = user_id or getattr(session, "user_id", None)
@@ -153,6 +164,15 @@ def _resolve_effective_brand_name(
         ).first()
         if settings and settings.default_brand_name:
             return settings.default_brand_name.strip()
+
+    # If brand appears to be just the product title, treat as unspecified.
+    # In that case prompts should prefer logo rendering instead of typing
+    # product title as a fake brand name.
+    if session_brand_matches_title:
+        return ""
+
+    if session_brand:
+        return session_brand
 
     return ""
 
@@ -170,6 +190,38 @@ def _has_legacy_aplus_boilerplate(text: str) -> bool:
     )
 
 
+def _build_aplus_reference_images_desc(
+    *,
+    has_product_ref: bool,
+    has_style_ref: bool,
+    has_logo: bool,
+) -> str:
+    """Build A+ reference image description header lines."""
+    lines = []
+    if has_product_ref:
+        lines.append("- PRODUCT_PHOTO: The actual product - honor its materials, proportions, character")
+    if has_style_ref:
+        lines.append("- STYLE_REFERENCE: Match this visual style, mood, and color treatment")
+    if has_logo:
+        lines.append("- BRAND_LOGO: Reproduce this logo where appropriate")
+    if not lines:
+        lines.append("- Use the supplied reference images exactly as provided")
+    return "\n".join(lines)
+
+
+def _ensure_reference_images_header(prompt: str, header_template: str) -> str:
+    """
+    Ensure prompt includes the leading '=== REFERENCE IMAGES ===' block.
+
+    AI rewrites can sometimes drop this block on regeneration. We force it back
+    to keep named image ingestion consistent between first generation and regen.
+    """
+    prompt_text = (prompt or "").lstrip()
+    if prompt_text.startswith("=== REFERENCE IMAGES ==="):
+        return prompt_text
+    return f"{header_template}{prompt_text}"
+
+
 def get_generation_service(
     db: Session = Depends(get_db),
     gemini: GeminiService = Depends(get_gemini_service),
@@ -183,17 +235,26 @@ def get_vision_service() -> VisionService:
     """
     Dependency injection for Vision Service (Principal Designer AI).
 
-    Uses Gemini by default (10x cheaper than GPT-4o).
-    Set VISION_PROVIDER=openai in .env to use OpenAI instead.
+    Uses Gemini by default.
+    OpenAI vision is deprecated and disabled unless
+    ALLOW_OPENAI_VISION=true is explicitly set for emergency use.
     """
     return get_unified_vision_service()
+
+
+def _get_owned_session(service: GenerationService, session_id: str, user: User) -> GenerationSession:
+    """Resolve a session only if it belongs to the authenticated user."""
+    session = service.get_session_status(session_id)
+    if not session or session.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @router.post("/", response_model=GenerationResponse)
 async def start_generation(
     request: GenerationRequest,
     service: GenerationService = Depends(get_generation_service),
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
 ):
     """
     Start a new image generation session.
@@ -209,8 +270,7 @@ async def start_generation(
     """
     try:
         # Create session
-        user_id = user.id if user else None
-        session = service.create_session(request, user_id=user_id)
+        session = service.create_session(request, user_id=user.id)
 
         # Generate all images
         results = await service.generate_all_images(session)
@@ -232,7 +292,7 @@ async def start_generation_async(
     request: GenerationRequest,
     background_tasks: BackgroundTasks,
     service: GenerationService = Depends(get_generation_service),
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
 ):
     """
     Start an async image generation session.
@@ -242,8 +302,7 @@ async def start_generation_async(
     """
     try:
         # Create session
-        user_id = user.id if user else None
-        session = service.create_session(request, user_id=user_id)
+        session = service.create_session(request, user_id=user.id)
 
         # Queue background generation
         background_tasks.add_task(
@@ -270,16 +329,14 @@ async def start_generation_async(
 async def get_session_status(
     session_id: str,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Get status of a generation session.
 
     Returns current status and results for all images.
     """
-    session = service.get_session_status(session_id)
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, session_id, user)
 
     results = service.get_session_results(session)
 
@@ -297,7 +354,7 @@ async def get_session_status(
 async def generate_single_image(
     request: SingleImageRequest,
     service: GenerationService = Depends(get_generation_service),
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
     credits: CreditsService = Depends(get_credits_service),
 ):
     """
@@ -306,10 +363,7 @@ async def generate_single_image(
     Useful for retrying failed generations or regenerating specific images.
     Accepts an optional note/instructions to customize the regeneration.
     """
-    session = service.get_session_status(request.session_id)
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, request.session_id, user)
 
     # === CREDIT CHECK ===
     if user:
@@ -364,7 +418,7 @@ async def edit_single_image(
     request: EditImageRequest,
     service: GenerationService = Depends(get_generation_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
     credits: CreditsService = Depends(get_credits_service),
 ):
     """
@@ -389,10 +443,7 @@ async def edit_single_image(
     - For A+ modules 0/1, edits the hero mobile image
     - For A+ modules 2+, edits the individual mobile image
     """
-    session = service.get_session_status(request.session_id)
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, request.session_id, user)
 
     # === CREDIT CHECK ===
     if user:
@@ -497,16 +548,14 @@ async def edit_single_image(
 async def generate_main_image(
     session_id: str,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Generate just the main product image.
 
     Convenience endpoint for generating only the main image.
     """
-    session = service.get_session_status(session_id)
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, session_id, user)
 
     try:
         result = await service.generate_single_image(
@@ -530,16 +579,14 @@ async def generate_main_image(
 async def retry_failed_images(
     session_id: str,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Retry generation of all failed images in a session.
 
     Only retries images with status='failed'. Returns updated results.
     """
-    session = service.get_session_status(session_id)
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, session_id, user)
 
     try:
         results = await service.retry_failed_images(session)
@@ -561,16 +608,14 @@ async def retry_failed_images(
 async def get_generation_stats(
     session_id: str,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Get generation statistics for a session.
 
     Returns retry counts and status breakdown.
     """
-    session = service.get_session_status(session_id)
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, session_id, user)
 
     return service.get_generation_stats(session)
 
@@ -582,6 +627,7 @@ async def get_session_prompts(
     session_id: str,
     response: Response,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Get all prompts used for image generation in this session.
@@ -592,9 +638,7 @@ async def get_session_prompts(
     - User feedback that triggered regeneration (if any)
     - AI's interpretation of changes made
     """
-    session = service.get_session_status(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, session_id, user)
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -606,7 +650,7 @@ async def get_session_prompts(
     # Get all prompt history entries for all image types (listing + A+)
     all_types = list(service.IMAGE_TYPES) + [
         DBImageType.APLUS_0, DBImageType.APLUS_1, DBImageType.APLUS_2,
-        DBImageType.APLUS_3, DBImageType.APLUS_4,
+        DBImageType.APLUS_3, DBImageType.APLUS_4, DBImageType.APLUS_5,
     ]
 
     results = []
@@ -632,7 +676,9 @@ async def get_image_prompt(
     image_type: str,
     response: Response,
     version: Optional[int] = None,
+    track: Optional[str] = None,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Get a prompt for a specific image type.
@@ -643,9 +689,7 @@ async def get_image_prompt(
     Returns the prompt used to generate this image version,
     including any user feedback and AI's interpretation of changes.
     """
-    session = service.get_session_status(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, session_id, user)
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -659,12 +703,53 @@ async def get_image_prompt(
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid image type: {image_type}")
 
-    if version is not None:
-        latest = service.get_prompt_by_version(context, db_image_type, version)
+    requested_track = (track or "").strip().lower()
+    if requested_track and requested_track not in ("desktop", "mobile", "all"):
+        raise HTTPException(status_code=400, detail=f"Invalid prompt track: {track}")
+    prompt_track = requested_track or ("desktop" if image_type.startswith("aplus_") else "all")
+
+    filtered_history: List[PromptHistoryModel]
+    if prompt_track == "desktop":
+        filtered_history = service.get_prompt_history(
+            context,
+            db_image_type,
+            include_mobile=False,
+        )
+        if version is not None:
+            latest = filtered_history[version - 1] if 1 <= version <= len(filtered_history) else None
+        else:
+            latest = filtered_history[-1] if filtered_history else None
+    elif prompt_track == "mobile":
+        filtered_history = service.get_prompt_history(
+            context,
+            db_image_type,
+            include_mobile=True,
+            mobile_only=True,
+        )
+        if version is not None:
+            latest = filtered_history[version - 1] if 1 <= version <= len(filtered_history) else None
+        else:
+            latest = filtered_history[-1] if filtered_history else None
     else:
-        latest = service.get_latest_prompt(context, db_image_type)
+        filtered_history = service.get_prompt_history(context, db_image_type)
+        if version is not None:
+            latest = service.get_prompt_by_version(context, db_image_type, version)
+        else:
+            latest = service.get_latest_prompt(context, db_image_type)
+
     if not latest:
-        raise HTTPException(status_code=404, detail=f"No prompt found for image type: {image_type}" + (f" version {version}" if version else ""))
+        track_detail = f" ({prompt_track})" if prompt_track != "all" else ""
+        raise HTTPException(
+            status_code=404,
+            detail=f"No prompt found for image type: {image_type}{track_detail}" + (f" version {version}" if version else ""),
+        )
+
+    resolved_version = latest.version
+    if prompt_track in ("desktop", "mobile"):
+        for idx, item in enumerate(filtered_history, start=1):
+            if item.id == latest.id:
+                resolved_version = idx
+                break
 
     # Build reference images list
     # If the prompt has stored reference_image_paths (A+ modules), use those
@@ -674,15 +759,31 @@ async def get_image_prompt(
     else:
         reference_images = []
         if session.upload_path:
-            reference_images.append({"type": "primary", "path": session.upload_path})
+            reference_images.append({
+                "type": "primary",
+                "path": session.upload_path,
+                "label": "PRODUCT_PHOTO",
+            })
         if session.additional_upload_paths:
             for i, path in enumerate(session.additional_upload_paths):
-                reference_images.append({"type": f"additional_{i+1}", "path": path})
+                reference_images.append({
+                    "type": f"additional_{i+1}",
+                    "path": path,
+                    "label": f"ADDITIONAL_PRODUCT_{i+1}",
+                })
         if session.style_reference_path:
-            reference_images.append({"type": "style_reference", "path": session.style_reference_path})
+            reference_images.append({
+                "type": "style_reference",
+                "path": session.style_reference_path,
+                "label": "STYLE_REFERENCE",
+            })
         # Logo only for non-main images
         if session.logo_path and image_type != "main":
-            reference_images.append({"type": "logo", "path": session.logo_path})
+            reference_images.append({
+                "type": "logo",
+                "path": session.logo_path,
+                "label": "BRAND_LOGO",
+            })
 
     # Build designer context - everything that was fed to the AI Designer
     effective_brand_name = _resolve_effective_brand_name(session, service.db)
@@ -731,7 +832,7 @@ async def get_image_prompt(
 
     return PromptHistoryResponse(
         image_type=latest.image_type.value,
-        version=latest.version,
+        version=resolved_version,
         prompt_text=latest.prompt_text,
         user_feedback=latest.user_feedback,
         change_summary=latest.change_summary,
@@ -820,6 +921,7 @@ async def generate_random_style(
 async def generate_style_previews(
     request: StylePreviewRequest,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Generate preview images for multiple styles.
@@ -829,7 +931,7 @@ async def generate_style_previews(
     """
     try:
         # Create preview session
-        session = service.create_preview_session(request)
+        session = service.create_preview_session(request, user_id=user.id)
 
         # Generate all style previews
         results = await service.generate_all_style_previews(
@@ -852,6 +954,7 @@ async def generate_style_previews(
 async def select_style(
     request: SelectStyleRequest,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Select a style for the session.
@@ -859,8 +962,8 @@ async def select_style(
     After user reviews style previews, they select one style
     that will be applied to all 5 listing images.
     """
+    _get_owned_session(service, request.session_id, user)
     session = service.select_style(request.session_id, request.style_id)
-
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -875,6 +978,7 @@ async def select_style(
 async def generate_with_style(
     request: GenerationRequest,
     service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Generate all 5 listing images with the selected style.
@@ -889,7 +993,7 @@ async def generate_with_style(
         )
 
     try:
-        session = service.create_session(request)
+        session = service.create_session(request, user_id=user.id)
         results = await service.generate_all_images(session)
 
         return GenerationResponse(
@@ -913,7 +1017,7 @@ async def analyze_and_generate_frameworks(
     request: FrameworkGenerationWithImageRequest,
     vision: VisionService = Depends(get_vision_service),
     service: GenerationService = Depends(get_generation_service),
-    user: User = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
     credits: CreditsService = Depends(get_credits_service),
 ):
     """
@@ -959,18 +1063,17 @@ async def analyze_and_generate_frameworks(
 
         # === CREDIT CHECK ===
         # Framework analysis: 2 credits (analysis) + 1 credit per preview
-        if user:
-            num_previews = 0 if request.skip_preview_generation else request.framework_count
-            analysis_cost = credits.get_credit_cost("framework_analysis", count=1)
-            preview_cost = credits.get_credit_cost("framework_preview", count=num_previews)
-            total_cost = analysis_cost + preview_cost
+        num_previews = 0 if request.skip_preview_generation else request.framework_count
+        analysis_cost = credits.get_credit_cost("framework_analysis", count=1)
+        preview_cost = credits.get_credit_cost("framework_preview", count=num_previews)
+        total_cost = analysis_cost + preview_cost
 
-            has_credits, balance, msg = credits.check_credits(user.id, total_cost, user.email)
-            if not has_credits:
-                raise HTTPException(
-                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail=f"Insufficient credits. Need {total_cost}, have {balance}. Please upgrade your plan."
-                )
+        has_credits, balance, msg = credits.check_credits(user.id, total_cost, user.email)
+        if not has_credits:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Insufficient credits. Need {total_cost}, have {balance}. Please upgrade your plan."
+            )
 
         # Step 1: AI Vision analyzes product and generates framework(s)
         # - Without style reference: 4 different framework options
@@ -1005,17 +1108,16 @@ async def analyze_and_generate_frameworks(
         )
         session = service.create_preview_session(
             preview_request,
-            user_id=user.id if user else None,
+            user_id=user.id,
         )
         # Store additional form data on the session so it appears in projects
-        if user:
-            session.brand_name = request.brand_name
-            session.feature_2 = request.features[1] if request.features and len(request.features) > 1 else None
-            session.feature_3 = request.features[2] if request.features and len(request.features) > 2 else None
-            session.target_audience = request.target_audience
-            session.additional_upload_paths = request.additional_upload_paths or []
-            session.style_reference_path = request.style_reference_path
-            service.db.commit()
+        session.brand_name = request.brand_name
+        session.feature_2 = request.features[1] if request.features and len(request.features) > 1 else None
+        session.feature_3 = request.features[2] if request.features and len(request.features) > 2 else None
+        session.target_audience = request.target_audience
+        session.additional_upload_paths = request.additional_upload_paths or []
+        session.style_reference_path = request.style_reference_path
+        service.db.commit()
 
         # Store original style reference in DesignContext AND copy to generated bucket with versioning
         if request.style_reference_path:
@@ -1104,12 +1206,11 @@ async def analyze_and_generate_frameworks(
             product_analysis_raw = None
 
         # === DEDUCT CREDITS ===
-        if user:
-            num_previews = len(frameworks_with_previews)
-            analysis_cost = credits.get_credit_cost("framework_analysis", count=1)
-            preview_cost = credits.get_credit_cost("framework_preview", count=num_previews)
-            total_cost = analysis_cost + preview_cost
-            credits.deduct_credits(user.id, total_cost, "framework_analysis", email=user.email)
+        num_previews = len(frameworks_with_previews)
+        analysis_cost = credits.get_credit_cost("framework_analysis", count=1)
+        preview_cost = credits.get_credit_cost("framework_preview", count=num_previews)
+        total_cost = analysis_cost + preview_cost
+        credits.deduct_credits(user.id, total_cost, "framework_analysis", email=user.email)
 
         return FrameworkGenerationResponse(
             session_id=session.id,
@@ -1135,7 +1236,7 @@ async def generate_with_framework(
     request: GenerateWithFrameworkRequest,
     vision: VisionService = Depends(get_vision_service),
     service: GenerationService = Depends(get_generation_service),
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
     credits: CreditsService = Depends(get_credits_service),
 ):
     """
@@ -1163,24 +1264,23 @@ async def generate_with_framework(
         framework = request.framework
 
         # === CREDIT CHECK ===
-        if user:
-            # Determine how many images will be generated
-            model = request.image_model or "gemini-3-pro-image-preview"
-            if request.create_only:
-                num_images = 0
-            elif request.single_image_type:
-                num_images = 1
-            else:
-                num_images = 6  # 6 listing images (main + 5 variants)
+        # Determine how many images will be generated
+        model = request.image_model or "gemini-3-pro-image-preview"
+        if request.create_only:
+            num_images = 0
+        elif request.single_image_type:
+            num_images = 1
+        else:
+            num_images = 6  # 6 listing images (main + 5 variants)
 
-            if num_images > 0:
-                cost = credits.get_credit_cost("listing_image", model, num_images)
-                has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
-                if not has_credits:
-                    raise HTTPException(
-                        status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                        detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
-                    )
+        if num_images > 0:
+            cost = credits.get_credit_cost("listing_image", model, num_images)
+            has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+            if not has_credits:
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+                )
 
         # STEP 1: Generate 5 detailed image prompts for this framework
         logger.info(f"Generating 5 image prompts for framework: {framework.get('framework_name')}")
@@ -1258,8 +1358,7 @@ async def generate_with_framework(
         )
 
         # STEP 3: Generate images (all 5 or just 1 if single_image_type specified)
-        user_id = user.id if user else None
-        session = service.create_session(gen_request, user_id=user_id)
+        session = service.create_session(gen_request, user_id=user.id)
 
         # Create DesignContext with product_analysis and/or original_style_reference for restoration support
         if request.product_analysis or request.original_style_reference_path:
@@ -1293,7 +1392,7 @@ async def generate_with_framework(
             results = await service.generate_all_images(session, model_override=request.image_model)
 
         # === DEDUCT CREDITS ===
-        if user and not request.create_only:
+        if not request.create_only:
             model = request.image_model or "gemini-3-pro-image-preview"
             # Count how many images were actually generated (complete status)
             completed_count = sum(1 for r in results if r.status == "complete")
@@ -1320,7 +1419,8 @@ async def generate_with_framework(
 async def generate_aplus_hero_pair(
     request: HeroPairRequest,
     service: GenerationService = Depends(get_generation_service),
-    user: Optional[User] = Depends(get_optional_user),
+    vision: VisionService = Depends(get_vision_service),
+    user: User = Depends(get_current_user),
     gemini: GeminiService = Depends(get_gemini_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
     db: Session = Depends(get_db),
@@ -1336,25 +1436,19 @@ async def generate_aplus_hero_pair(
 
     # === CREDIT CHECK ===
     # Hero pair = 1 image generation (results in 2 modules)
-    if user:
-        model = request.image_model or "gemini-3-pro-image-preview"
-        cost = credits.get_credit_cost("aplus_module", model, 1)
-        has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
-        if not has_credits:
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
-            )
+    model = request.image_model or "gemini-3-pro-image-preview"
+    cost = credits.get_credit_cost("aplus_module", model, 1)
+    has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+    if not has_credits:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+        )
 
     try:
-        # Get session
-        session = db.query(GenerationSession).filter(
-            GenerationSession.id == request.session_id
-        ).first()
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+        session = _get_owned_session(service, request.session_id, user)
         effective_brand_name = _resolve_effective_brand_name(
-            session, db, user.id if user else None
+            session, db, user.id
         )
         has_product_ref = bool(session.upload_path)
         has_style_ref = bool(session.style_reference_path)
@@ -1415,8 +1509,7 @@ async def generate_aplus_hero_pair(
             structural_ctx = get_structural_context("aplus_hero")
             fw_dict, analysis_text = get_enhancement_context(session, design_context)
             try:
-                vision_service = get_openai_vision_service()
-                enhancement = await vision_service.enhance_prompt_with_feedback(
+                enhancement = await vision.enhance_prompt_with_feedback(
                     original_prompt=prompt,
                     user_feedback=request.custom_instructions,
                     image_type="aplus_hero",
@@ -1428,9 +1521,20 @@ async def generate_aplus_hero_pair(
                 hero_change_summary = enhancement.get("interpretation", "AI-enhanced based on feedback")
                 logger.info(f"AI Designer enhanced hero pair prompt: {hero_change_summary[:100]}")
             except Exception as e:
-                logger.warning(f"AI enhancement failed for hero pair, prepending note: {e}")
-                prompt = f"CLIENT DIRECTION:\n{request.custom_instructions}\n\n{prompt}"
-                hero_change_summary = "Direct prepend (AI enhancement unavailable)"
+                logger.error(f"AI enhancement failed for hero pair rewrite: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="AI Designer could not rewrite hero feedback into a valid prompt. Please retry.",
+                )
+
+        hero_header = APLUS_HERO_HEADER.format(
+            reference_images_desc=_build_aplus_reference_images_desc(
+                has_product_ref=has_product_ref,
+                has_style_ref=has_style_ref,
+                has_logo=has_logo_ref,
+            )
+        )
+        prompt = _ensure_reference_images_header(prompt, hero_header)
 
         # Final guardrail: strip known A+ boilerplate before sending to Gemini
         prompt = strip_aplus_banner_boilerplate(prompt)
@@ -1443,7 +1547,7 @@ async def generate_aplus_hero_pair(
             )
 
         # Append lighting override (prevents amateur lighting bleed from reference photos)
-        prompt = prompt + LIGHTING_OVERRIDE
+        prompt = append_lighting_override_once(prompt)
 
         # Assemble reference images and execute via unified pipeline
         ref_images = assemble_reference_images(
@@ -1476,7 +1580,7 @@ async def generate_aplus_hero_pair(
         bottom_path, bottom_url, _ = result.saved.get("aplus_full_image_1", ("", "", 1))
 
         # === DEDUCT CREDITS ===
-        if user and top_path and bottom_path:
+        if top_path and bottom_path:
             model = request.image_model or "gemini-3-pro-image-preview"
             cost = credits.get_credit_cost("aplus_module", model, 1)
             credits.deduct_credits(user.id, cost, "aplus_hero", email=user.email)
@@ -1507,7 +1611,8 @@ async def generate_aplus_hero_pair(
 async def generate_aplus_module(
     request: AplusModuleRequest,
     service: GenerationService = Depends(get_generation_service),
-    user: Optional[User] = Depends(get_optional_user),
+    vision: VisionService = Depends(get_vision_service),
+    user: User = Depends(get_current_user),
     gemini: GeminiService = Depends(get_gemini_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
     db: Session = Depends(get_db),
@@ -1522,22 +1627,17 @@ async def generate_aplus_module(
     start_time = time.time()
 
     # === CREDIT CHECK ===
-    if user:
-        model = request.image_model or "gemini-3-pro-image-preview"
-        cost = credits.get_credit_cost("aplus_module", model, 1)
-        has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
-        if not has_credits:
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
-            )
+    model = request.image_model or "gemini-3-pro-image-preview"
+    cost = credits.get_credit_cost("aplus_module", model, 1)
+    has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+    if not has_credits:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan."
+        )
 
     try:
-        session = db.query(GenerationSession).filter(
-            GenerationSession.id == request.session_id
-        ).first()
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+        session = _get_owned_session(service, request.session_id, user)
 
         design_context = db.query(DesignContext).filter(
             DesignContext.session_id == request.session_id
@@ -1545,13 +1645,14 @@ async def generate_aplus_module(
 
         features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
         effective_brand_name = _resolve_effective_brand_name(
-            session, db, user.id if user else None
+            session, db, user.id
         )
         framework = session.design_framework_json or {}
         visual_script = session.aplus_visual_script
         has_product_ref = bool(session.upload_path)
         has_style_ref = bool(session.style_reference_path)
         has_logo_ref = bool(session.logo_path)
+        module_count = len(visual_script.get("modules", [])) if visual_script else 6
 
         # === Build prompt ===
         prompt = None
@@ -1640,8 +1741,7 @@ async def generate_aplus_module(
             structural_ctx = get_structural_context(image_type_key, has_canvas=use_canvas_extension)
             fw_dict, analysis_text = get_enhancement_context(session, design_context)
             try:
-                vision_service = get_openai_vision_service()
-                enhancement = await vision_service.enhance_prompt_with_feedback(
+                enhancement = await vision.enhance_prompt_with_feedback(
                     original_prompt=prompt,
                     user_feedback=request.custom_instructions,
                     image_type=image_type_key,
@@ -1653,9 +1753,21 @@ async def generate_aplus_module(
                 ai_change_summary = enhancement.get("interpretation", "AI-enhanced based on feedback")
                 logger.info(f"AI Designer enhanced module {request.module_index} prompt: {ai_change_summary[:100]}")
             except Exception as e:
-                logger.warning(f"AI enhancement failed for module {request.module_index}, prepending note: {e}")
-                prompt = f"CLIENT DIRECTION:\n{request.custom_instructions}\n\n{prompt}"
-                ai_change_summary = "Direct prepend (AI enhancement unavailable)"
+                logger.error(f"AI enhancement failed for module {request.module_index} rewrite: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="AI Designer could not rewrite module feedback into a valid prompt. Please retry.",
+                )
+
+        is_middle_module = 2 <= request.module_index < module_count - 1
+        module_header = APLUS_MODULE_HEADER.format(
+            reference_images_desc=_build_aplus_reference_images_desc(
+                has_product_ref=has_product_ref,
+                has_style_ref=has_style_ref,
+                has_logo=(has_logo_ref and not is_middle_module),
+            )
+        )
+        prompt = _ensure_reference_images_header(prompt, module_header)
 
         # Final guardrail: strip known A+ boilerplate before sending to Gemini
         prompt = strip_aplus_banner_boilerplate(prompt)
@@ -1668,10 +1780,9 @@ async def generate_aplus_module(
             )
 
         # Append lighting override (prevents amateur lighting bleed from reference photos)
-        prompt = prompt + LIGHTING_OVERRIDE
+        prompt = append_lighting_override_once(prompt)
 
         # === Build GenerationContext and execute ===
-        module_count = len(visual_script.get("modules", [])) if visual_script else 6
         logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, canvas_ext={use_canvas_extension})")
 
         if use_canvas_extension:
@@ -1727,7 +1838,7 @@ async def generate_aplus_module(
         logger.info(f"A+ module generated in {generation_time_ms}ms: {result.primary_path}")
 
         # === DEDUCT CREDITS ===
-        if user and result.primary_path:
+        if result.primary_path:
             model = request.image_model or "gemini-3-pro-image-preview"
             cost = credits.get_credit_cost("aplus_module", model, 1)
             credits.deduct_credits(user.id, cost, "aplus_module", email=user.email)
@@ -1758,7 +1869,7 @@ async def generate_aplus_module(
 @router.post("/aplus/visual-script", response_model=AplusVisualScriptResponse)
 async def generate_aplus_visual_script(
     request: AplusVisualScriptRequest,
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
     gemini: GeminiService = Depends(get_gemini_service),
     db: Session = Depends(get_db),
 ):
@@ -1769,13 +1880,14 @@ async def generate_aplus_visual_script(
 
     try:
         session = db.query(GenerationSession).filter(
-            GenerationSession.id == request.session_id
+            GenerationSession.id == request.session_id,
+            GenerationSession.user_id == user.id,
         ).first()
 
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
         effective_brand_name = _resolve_effective_brand_name(
-            session, db, user.id if user else None
+            session, db, user.id
         )
 
         # Build framework dict from session
@@ -1840,12 +1952,14 @@ async def generate_aplus_visual_script(
 @router.get("/aplus/{session_id}/visual-script", response_model=AplusVisualScriptResponse)
 async def get_aplus_visual_script(
     session_id: str,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Get the stored visual script for a session."""
 
     session = db.query(GenerationSession).filter(
-        GenerationSession.id == session_id
+        GenerationSession.id == session_id,
+        GenerationSession.user_id == user.id,
     ).first()
 
     if not session:
@@ -1872,7 +1986,7 @@ async def replan_all_prompts(
     request: ReplanRequest,
     vision: VisionService = Depends(get_unified_vision_service),
     gemini: GeminiService = Depends(get_gemini_service),
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
@@ -1884,7 +1998,8 @@ async def replan_all_prompts(
     """
     try:
         session = db.query(GenerationSession).filter(
-            GenerationSession.id == request.session_id
+            GenerationSession.id == request.session_id,
+            GenerationSession.user_id == user.id,
         ).first()
 
         if not session:
@@ -1897,7 +2012,7 @@ async def replan_all_prompts(
 
         features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
         effective_brand_name = _resolve_effective_brand_name(
-            session, db, user.id if user else None
+            session, db, user.id
         )
 
         # === STEP 1: Regenerate listing prompts ===
@@ -1987,7 +2102,8 @@ async def replan_all_prompts(
 async def generate_aplus_mobile(
     request: AplusMobileRequest,
     service: GenerationService = Depends(get_generation_service),
-    user: Optional[User] = Depends(get_optional_user),
+    vision: VisionService = Depends(get_vision_service),
+    user: User = Depends(get_current_user),
     gemini: GeminiService = Depends(get_gemini_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
     db: Session = Depends(get_db),
@@ -2005,7 +2121,7 @@ async def generate_aplus_mobile(
 
     # === CREDIT CHECK ===
     # Mobile transforms cost 1 credit each (skip for module 1 which just returns existing)
-    if user and request.module_index != 1:
+    if request.module_index != 1:
         cost = credits.get_credit_cost("aplus_mobile", count=1)
         has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
         if not has_credits:
@@ -2015,11 +2131,7 @@ async def generate_aplus_mobile(
             )
 
     try:
-        session = db.query(GenerationSession).filter(
-            GenerationSession.id == request.session_id
-        ).first()
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
+        session = _get_owned_session(service, request.session_id, user)
 
         # Special handling for module 1: return existing hero mobile
         if request.module_index == 1:
@@ -2095,7 +2207,26 @@ async def generate_aplus_mobile(
                 "- Preserve the seamless brand experience from the desktop hero "
             )
             if request.custom_instructions:
-                recompose_prompt += f"\nAdditional instructions: {request.custom_instructions}"
+                feedback_context = service.get_design_context(request.session_id)
+                image_type_key = "aplus_hero"
+                structural_ctx = get_structural_context(image_type_key)
+                fw_dict, analysis_text = get_enhancement_context(session, feedback_context)
+                try:
+                    enhancement = await vision.enhance_prompt_with_feedback(
+                        original_prompt=recompose_prompt,
+                        user_feedback=request.custom_instructions,
+                        image_type=image_type_key,
+                        framework=fw_dict,
+                        product_analysis=analysis_text,
+                        structural_context=structural_ctx,
+                    )
+                    recompose_prompt = enhancement["enhanced_prompt"]
+                except Exception as e:
+                    logger.error(f"AI enhancement failed for hero mobile rewrite: {e}")
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="AI Designer could not rewrite mobile hero feedback into a valid prompt. Please retry.",
+                    )
 
             logger.info("Generating hero mobile from combined desktop images via edit API")
 
@@ -2149,9 +2280,8 @@ async def generate_aplus_mobile(
             logger.info(f"Hero mobile image generated: {image_path}")
 
             # === DEDUCT CREDITS ===
-            if user:
-                cost = credits.get_credit_cost("aplus_mobile", count=1)
-                credits.deduct_credits(user.id, cost, "aplus_mobile", email=user.email)
+            cost = credits.get_credit_cost("aplus_mobile", count=1)
+            credits.deduct_credits(user.id, cost, "aplus_mobile", email=user.email)
 
             return AplusMobileResponse(
                 session_id=request.session_id,
@@ -2182,7 +2312,26 @@ async def generate_aplus_mobile(
             "- Ensure text remains readable at mobile scale "
         )
         if request.custom_instructions:
-            recompose_prompt += f"\nAdditional instructions: {request.custom_instructions}"
+            feedback_context = service.get_design_context(request.session_id)
+            image_type_key = f"aplus_{request.module_index}"
+            structural_ctx = get_structural_context(image_type_key)
+            fw_dict, analysis_text = get_enhancement_context(session, feedback_context)
+            try:
+                enhancement = await vision.enhance_prompt_with_feedback(
+                    original_prompt=recompose_prompt,
+                    user_feedback=request.custom_instructions,
+                    image_type=image_type_key,
+                    framework=fw_dict,
+                    product_analysis=analysis_text,
+                    structural_context=structural_ctx,
+                )
+                recompose_prompt = enhancement["enhanced_prompt"]
+            except Exception as e:
+                logger.error(f"AI enhancement failed for mobile module {request.module_index} rewrite: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="AI Designer could not rewrite mobile feedback into a valid prompt. Please retry.",
+                )
 
         logger.info(f"Generating mobile A+ module {request.module_index} via edit API")
 
@@ -2202,7 +2351,7 @@ async def generate_aplus_mobile(
         logger.info(f"Mobile A+ module {request.module_index} generated: {result.primary_path}")
 
         # === DEDUCT CREDITS ===
-        if user and result.primary_path:
+        if result.primary_path:
             cost = credits.get_credit_cost("aplus_mobile", count=1)
             credits.deduct_credits(user.id, cost, "aplus_mobile", email=user.email)
 
@@ -2223,7 +2372,7 @@ async def generate_aplus_mobile(
 @router.post("/aplus/generate-all-mobile")
 async def generate_all_aplus_mobile(
     request: AplusAllMobileRequest,
-    user: Optional[User] = Depends(get_optional_user),
+    user: User = Depends(get_current_user),
     gemini: GeminiService = Depends(get_gemini_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
     db: Session = Depends(get_db),
@@ -2236,7 +2385,8 @@ async def generate_all_aplus_mobile(
     """
 
     session = db.query(GenerationSession).filter(
-        GenerationSession.id == request.session_id
+        GenerationSession.id == request.session_id,
+        GenerationSession.user_id == user.id,
     ).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -2254,7 +2404,7 @@ async def generate_all_aplus_mobile(
             continue
 
     # === CREDIT CHECK ===
-    if user and modules_to_generate:
+    if modules_to_generate:
         cost = credits.get_credit_cost("aplus_mobile", count=len(modules_to_generate))
         has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
         if not has_credits:
@@ -2314,6 +2464,7 @@ async def generate_alt_text(
     request: AltTextRequest,
     service: GenerationService = Depends(get_generation_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Generate SEO-optimized alt text for a listing image.
@@ -2323,9 +2474,7 @@ async def generate_alt_text(
     """
     from app.services.gemini_vision_service import get_gemini_vision_service
 
-    session = service.get_session_status(request.session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, request.session_id, user)
 
     # Get the image storage path
     storage_key = request.image_type
@@ -2381,6 +2530,7 @@ async def generate_alt_text_batch(
     session_id: str,
     service: GenerationService = Depends(get_generation_service),
     storage: SupabaseStorageService = Depends(get_storage_service),
+    user: User = Depends(get_current_user),
 ):
     """
     Generate alt text for all listing images in a session.
@@ -2389,9 +2539,7 @@ async def generate_alt_text_batch(
     """
     from app.services.gemini_vision_service import get_gemini_vision_service
 
-    session = service.get_session_status(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+    session = _get_owned_session(service, session_id, user)
 
     # Get product info
     product_name = session.product_name or "Product"

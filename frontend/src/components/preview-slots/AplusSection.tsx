@@ -11,8 +11,6 @@ import FocusImagePicker, { useFocusImages } from '@/components/FocusImagePicker'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import type { SlotStatus } from './ImageSlot';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
 /** @deprecated Use ImageVersion from api/types instead */
 export type AplusModuleVersion = ImageVersion;
 
@@ -172,7 +170,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
   const handleImageError = useCallback((moduleId: string, imagePath: string | undefined) => {
     if (!imagePath) return;
     // Use the backend proxy to get a fresh signed URL
-    const proxyUrl = `${API_BASE}/api/images/file?path=${encodeURIComponent(imagePath)}&t=${Date.now()}`;
+    const proxyUrl = apiClient.withCacheBust(apiClient.getFileUrl(imagePath));
     setRefreshedUrls((prev) => ({ ...prev, [moduleId]: proxyUrl }));
   }, []);
 
@@ -579,6 +577,7 @@ export const AplusSection: React.FC<AplusSectionProps> = ({
         <PromptModal
           sessionId={sessionId}
           imageType={`aplus_${promptModalIndex}`}
+          promptTrack={isMobile ? 'mobile' : 'desktop'}
           version={modules[promptModalIndex] ? getModuleActiveIndex(modules[promptModalIndex]) + 1 : undefined}
           title={`Module ${promptModalIndex + 1} Prompt${
             visualScript?.modules?.[promptModalIndex]?.role

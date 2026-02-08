@@ -12,6 +12,8 @@ import type { ProjectListItem, GenerationStatus } from '../api/types';
 interface ProjectCardProps {
   project: ProjectListItem;
   onClick: () => void;
+  onView?: () => void;
+  continueHref: string;
   onContinue: () => void;
   onRename: () => void;
   onDelete: () => void;
@@ -25,9 +27,18 @@ const statusConfig: Record<GenerationStatus, { label: string; variant: 'default'
   failed: { label: 'Failed', variant: 'destructive', className: 'bg-red-500/20 text-red-400 border-red-500/30' },
 };
 
+const isPlainLeftClick = (event: React.MouseEvent<HTMLAnchorElement>) =>
+  event.button === 0 &&
+  !event.metaKey &&
+  !event.ctrlKey &&
+  !event.shiftKey &&
+  !event.altKey;
+
 export const ProjectCard: React.FC<ProjectCardProps> = ({
   project,
   onClick,
+  onView,
+  continueHref,
   onContinue,
   onRename,
   onDelete,
@@ -90,9 +101,34 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
           </Badge>
         </div>
 
+        {/* Hover Quick Actions */}
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 z-10">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              (onView || onClick)();
+            }}
+            className="px-3 py-1.5 text-sm rounded-md border border-white/50 text-white hover:bg-white/10 transition-colors"
+          >
+            View
+          </button>
+          <a
+            href={continueHref}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isPlainLeftClick(e)) return;
+              e.preventDefault();
+              onContinue();
+            }}
+            className="px-3 py-1.5 text-sm rounded-md border border-redd-500/60 text-redd-300 hover:bg-redd-500/10 transition-colors"
+          >
+            Open Project
+          </a>
+        </div>
+
         {/* Dropdown Menu */}
         <div
-          className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20"
           onClick={handleMenuClick}
         >
           <DropdownMenu>

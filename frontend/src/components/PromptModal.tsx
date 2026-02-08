@@ -9,6 +9,8 @@ interface PromptModalProps {
   sessionId: string;
   /** Image type key: 'main', 'infographic_1', 'aplus_0', etc. */
   imageType: string;
+  /** Optional prompt track for A+ prompt history */
+  promptTrack?: 'desktop' | 'mobile';
   /** Human-readable title shown in the header, e.g. "Main Image" or "Module 1 — Hero" */
   title: string;
   /** Optional version number (1-based). If omitted, fetches the latest version. */
@@ -28,6 +30,7 @@ interface PromptModalProps {
 export const PromptModal: React.FC<PromptModalProps> = ({
   sessionId,
   imageType,
+  promptTrack,
   title,
   version,
   onClose,
@@ -37,6 +40,19 @@ export const PromptModal: React.FC<PromptModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [zoomedImage, setZoomedImage] = useState<{ src: string; label: string } | null>(null);
 
+  const getSemanticReferenceLabel = (type: string, label?: string) => {
+    const normalized = (type || '').toLowerCase();
+    if (normalized === 'primary') return 'PRODUCT_PHOTO';
+    if (normalized === 'style_reference') return 'STYLE_REFERENCE';
+    if (normalized === 'logo') return 'BRAND_LOGO';
+    if (normalized === 'source_image') return 'SOURCE_IMAGE';
+    if (normalized.startsWith('additional_product_')) return normalized.toUpperCase();
+    if (normalized.startsWith('previous_module_')) return 'PREVIOUS_MODULE';
+    if (normalized === 'gradient_canvas') return 'CANVAS_TO_COMPLETE';
+    if (normalized === 'focus_reference' && label) return label.toUpperCase().replace(/\s+/g, '_');
+    return null;
+  };
+
   // Fetch prompt data on mount
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +60,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const data = await apiClient.getImagePrompt(sessionId, imageType, version);
+        const data = await apiClient.getImagePrompt(sessionId, imageType, version, promptTrack);
         if (!cancelled) setPrompt(data);
       } catch {
         if (!cancelled) setError('No prompt found for this image.');
@@ -53,7 +69,7 @@ export const PromptModal: React.FC<PromptModalProps> = ({
       }
     })();
     return () => { cancelled = true; };
-  }, [sessionId, imageType, version]);
+  }, [sessionId, imageType, version, promptTrack]);
 
   // Close on Escape
   useEffect(() => {
@@ -234,7 +250,10 @@ export const PromptModal: React.FC<PromptModalProps> = ({
                       {prompt.reference_images.map((ref, idx) => {
                         const imgSrc = apiClient.getFileUrl(ref.path);
                         const isStyleRef = ref.type === 'style_reference';
-                        const label = isStyleRef ? 'Style Reference' : ref.type.replace(/_/g, ' ');
+                        const semanticLabel = getSemanticReferenceLabel(ref.type, ref.label);
+                        const fallbackLabel = ref.type ? ref.type.replace(/_/g, ' ').toUpperCase() : 'REFERENCE_IMAGE';
+                        const label = semanticLabel || ref.label || fallbackLabel;
+                        const sourceLabel = ref.label && ref.label !== label ? ref.label : null;
                         return (
                           <button
                             key={idx}
@@ -261,11 +280,16 @@ export const PromptModal: React.FC<PromptModalProps> = ({
                                 </svg>
                               </div>
                             </div>
-                            <span className={`text-xs mt-1 capitalize ${
+                            <span className={`text-xs mt-1 ${
                               isStyleRef ? 'text-blue-300 font-semibold' : 'text-green-300'
                             }`}>
                               {label}
                             </span>
+                            {sourceLabel && (
+                              <span className="text-[10px] text-slate-400">
+                                source: {sourceLabel}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -365,3 +389,4 @@ export const PromptModal: React.FC<PromptModalProps> = ({
     </>
   );
 };
+

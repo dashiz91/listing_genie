@@ -6,9 +6,11 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock, patch
 from PIL import Image
+from urllib.parse import quote
 
 from app.dependencies import get_storage_service
 from app.main import app
+from app.core.auth import User, get_current_user
 from app.schemas.generation import (
     GenerationRequest,
     KeywordInput,
@@ -83,10 +85,16 @@ def client():
     """Create test client with fresh database"""
     Base.metadata.create_all(bind=engine)
     app.dependency_overrides[get_storage_service] = lambda: DummyStorageService()
+    app.dependency_overrides[get_current_user] = lambda: User(
+        id="user-test-123",
+        email="test@example.com",
+        role="authenticated",
+    )
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_storage_service, None)
+        app.dependency_overrides.pop(get_current_user, None)
         Base.metadata.drop_all(bind=engine)
 
 
@@ -203,6 +211,47 @@ class TestGenerationEndpoints:
         )
         assert response.status_code == 404
 
+    def test_get_image_prompt_supports_desktop_mobile_tracks(self, client, sample_request):
+        """A+ prompt endpoint should return track-scoped versions for desktop/mobile."""
+        from app.services.generation_service import GenerationService
+        from app.schemas.generation import GenerationRequest
+        from app.models.database import ImageTypeEnum as DBImageTypeEnum
+
+        db = SessionLocal()
+        try:
+            gemini = MagicMock()
+            gemini.model = "gemini-test-model"
+            storage = DummyStorageService()
+            service = GenerationService(db=db, gemini=gemini, storage=storage)
+
+            request = GenerationRequest(**sample_request)
+            session = service.create_session(request, user_id="user-test-123")
+            context = service.create_design_context(session)
+
+            service.store_prompt_in_history(context, DBImageTypeEnum.APLUS_3, "Desktop prompt v1")
+            service.store_prompt_in_history(context, DBImageTypeEnum.APLUS_3, "[MOBILE RECOMPOSE] Mobile prompt v1")
+            service.store_prompt_in_history(context, DBImageTypeEnum.APLUS_3, "Desktop prompt v2")
+
+            desktop_resp = client.get(
+                f"/api/generate/{session.id}/prompts/aplus_3",
+                params={"track": "desktop", "version": 2},
+            )
+            assert desktop_resp.status_code == 200
+            desktop_data = desktop_resp.json()
+            assert desktop_data["prompt_text"] == "Desktop prompt v2"
+            assert desktop_data["version"] == 2
+
+            mobile_resp = client.get(
+                f"/api/generate/{session.id}/prompts/aplus_3",
+                params={"track": "mobile", "version": 1},
+            )
+            assert mobile_resp.status_code == 200
+            mobile_data = mobile_resp.json()
+            assert mobile_data["prompt_text"] == "[MOBILE RECOMPOSE] Mobile prompt v1"
+            assert mobile_data["version"] == 1
+        finally:
+            db.close()
+
 
 class TestGenerationService:
     """Tests for GenerationService business logic"""
@@ -282,11 +331,27 @@ class TestGenerationService:
         finally:
             db.close()
 
-    def test_edit_aplus_uses_versioned_fallback_when_canonical_missing(self, client, sample_request):
+    @patch("app.services.vision_service.get_vision_service")
+    def test_edit_aplus_uses_versioned_fallback_when_canonical_missing(
+        self,
+        mock_get_vision_service,
+        client,
+        sample_request,
+    ):
         """Test A+ edit fallback to latest versioned image when canonical key is missing."""
         from app.services.generation_service import GenerationService
         from app.schemas.generation import GenerationRequest
         from app.models.database import ImageTypeEnum as DBImageTypeEnum
+
+        vision = MagicMock()
+        vision.plan_edit_instructions = AsyncMock(
+            return_value={
+                "interpretation": "Increase headline emphasis while preserving layout",
+                "changes_made": ["Text emphasis update"],
+                "edit_instructions": "Increase headline size and weight; keep all other elements unchanged.",
+            }
+        )
+        mock_get_vision_service.return_value = vision
 
         db = SessionLocal()
         try:
@@ -314,10 +379,329 @@ class TestGenerationService:
             assert result.storage_path.endswith("/aplus_full_image_0.png")
             assert gemini.edit_image.await_count == 1
             source_path = gemini.edit_image.await_args.kwargs["source_image_path"]
+            applied_edit_instructions = gemini.edit_image.await_args.kwargs["edit_instructions"]
             assert source_path.endswith("/aplus_full_image_0_v3.png")
+            assert "Increase headline size and weight" in applied_edit_instructions
+            vision.plan_edit_instructions.assert_awaited_once()
             assert storage.saved_calls[0]["image_type"] == "aplus_full_image_0"
         finally:
             db.close()
+
+    @patch("app.services.vision_service.get_vision_service")
+    def test_regenerate_with_note_fails_when_ai_designer_unavailable(
+        self,
+        mock_get_vision_service,
+        client,
+        sample_request,
+        mock_pil_image,
+    ):
+        """Regen with note must fail if AI Designer rewrite is unavailable."""
+        from app.services.generation_service import GenerationService
+        from app.schemas.generation import GenerationRequest
+        from app.models.database import ImageTypeEnum as DBImageTypeEnum
+
+        failing_vision = MagicMock()
+        failing_vision.enhance_prompt_with_feedback = AsyncMock(
+            side_effect=ValueError("Vision client not initialized")
+        )
+        mock_get_vision_service.return_value = failing_vision
+
+        db = SessionLocal()
+        try:
+            gemini = MagicMock()
+            gemini.model = "gemini-test-model"
+            gemini.generate_image = AsyncMock(return_value=mock_pil_image)
+            storage = DummyStorageService()
+            prompt_engine = MagicMock()
+            prompt_engine.build_prompt.return_value = "Focus reference stress-test prompt."
+            service = GenerationService(
+                db=db,
+                gemini=gemini,
+                storage=storage,
+                prompt_engine=prompt_engine,
+            )
+
+            request = GenerationRequest(**sample_request)
+            session = service.create_session(request)
+
+            with pytest.raises(RuntimeError, match="AI Designer could not rewrite"):
+                asyncio.run(
+                    service.generate_single_image(
+                        session=session,
+                        image_type=DBImageTypeEnum.MAIN,
+                        note="Make the scene brighter and cleaner.",
+                    )
+                )
+            assert gemini.generate_image.await_count == 0
+        finally:
+            db.close()
+
+    @patch("app.services.vision_service.get_vision_service")
+    def test_regenerate_with_note_uses_ai_rewrite_without_raw_injection(
+        self,
+        mock_get_vision_service,
+        client,
+        sample_request,
+        mock_pil_image,
+    ):
+        """Regen with feedback should use AI rewrite and avoid raw feedback injection."""
+        from app.services.generation_service import GenerationService
+        from app.schemas.generation import GenerationRequest
+        from app.models.database import ImageTypeEnum as DBImageTypeEnum
+
+        vision = MagicMock()
+        vision.enhance_prompt_with_feedback = AsyncMock(
+            return_value={
+                "interpretation": "Removed banned wording and cleaned copy",
+                "changes_made": ["Adjusted headline copy"],
+                "enhanced_prompt": (
+                    "A refined scene prompt without banned terms.\n\n"
+                    "LIGHTING OVERRIDE: Old duplicate block from prior run."
+                ),
+            }
+        )
+        mock_get_vision_service.return_value = vision
+
+        db = SessionLocal()
+        try:
+            gemini = MagicMock()
+            gemini.model = "gemini-test-model"
+            gemini.generate_image = AsyncMock(return_value=mock_pil_image)
+            storage = DummyStorageService()
+            prompt_engine = MagicMock()
+            prompt_engine.build_prompt.return_value = "Focus reference stress-test prompt."
+            service = GenerationService(
+                db=db,
+                gemini=gemini,
+                storage=storage,
+                prompt_engine=prompt_engine,
+            )
+
+            request = GenerationRequest(**sample_request)
+            session = service.create_session(request)
+
+            result = asyncio.run(
+                service.generate_single_image(
+                    session=session,
+                    image_type=DBImageTypeEnum.MAIN,
+                    note='Do not use the word "dopamine".',
+                )
+            )
+
+            assert result.status.value == "complete"
+            assert gemini.generate_image.await_count == 1
+            sent_prompt = gemini.generate_image.await_args.kwargs["prompt"]
+            assert "USER FEEDBACK TO APPLY" not in sent_prompt
+            assert sent_prompt.lower().count("lighting override:") == 1
+
+            rewrite_input = vision.enhance_prompt_with_feedback.await_args.kwargs["original_prompt"]
+            assert "USER FEEDBACK TO APPLY" not in rewrite_input
+            assert "lighting override:" not in rewrite_input.lower()
+        finally:
+            db.close()
+
+    def test_generate_single_preflight_failure_does_not_mark_processing(self, client, sample_request):
+        """If preflight prompt construction fails, image status must not get stuck in processing."""
+        from app.services.generation_service import GenerationService
+        from app.schemas.generation import GenerationRequest
+        from app.models.database import ImageTypeEnum as DBImageTypeEnum
+
+        db = SessionLocal()
+        try:
+            gemini = MagicMock()
+            gemini.model = "gemini-test-model"
+            storage = DummyStorageService()
+            service = GenerationService(db=db, gemini=gemini, storage=storage)
+
+            request = GenerationRequest(**sample_request)
+            session = service.create_session(request)
+
+            # Force a preflight failure before processing state is set.
+            service.prompt_engine.build_prompt = MagicMock(side_effect=ValueError("preflight prompt failure"))
+
+            with pytest.raises(ValueError, match="preflight prompt failure"):
+                asyncio.run(
+                    service.generate_single_image(
+                        session=session,
+                        image_type=DBImageTypeEnum.MAIN,
+                        note=None,
+                    )
+                )
+
+            main_record = next(img for img in session.images if img.image_type == DBImageTypeEnum.MAIN)
+            assert main_record.status.value == "pending"
+        finally:
+            db.close()
+
+    def test_paths_match_handles_encoded_proxy_urls(self):
+        """Path matcher should align proxy URLs with raw storage paths."""
+        from app.services.generation_service import GenerationService
+
+        raw_path = "supabase://uploads/style-ref-123.png"
+        proxy_path = f"/api/images/file?path={quote(raw_path, safe='')}"
+        assert GenerationService._paths_match(raw_path, proxy_path)
+
+    def test_generate_single_focus_refs_restores_style_prefix_and_semantic_labels(
+        self,
+        client,
+        sample_request,
+        mock_pil_image,
+    ):
+        """Focus-image generation should still identify style refs and additional product refs."""
+        from app.services.generation_service import GenerationService
+        from app.schemas.generation import GenerationRequest
+        from app.models.database import ImageTypeEnum as DBImageTypeEnum
+
+        db = SessionLocal()
+        try:
+            gemini = MagicMock()
+            gemini.model = "gemini-test-model"
+            gemini.generate_image = AsyncMock(return_value=mock_pil_image)
+            storage = DummyStorageService()
+            prompt_engine = MagicMock()
+            prompt_engine.build_prompt.return_value = "Focus reference stress-test prompt."
+            service = GenerationService(
+                db=db,
+                gemini=gemini,
+                storage=storage,
+                prompt_engine=prompt_engine,
+            )
+
+            payload = dict(sample_request)
+            payload["additional_upload_paths"] = [
+                "supabase://uploads/additional-a.png",
+                "supabase://uploads/additional-b.png",
+            ]
+            payload["style_reference_path"] = "supabase://uploads/style-reference-main.png"
+            payload["logo_path"] = "supabase://uploads/logo.png"
+            request = GenerationRequest(**payload)
+            session = service.create_session(request, user_id="user-test-123")
+            service.create_design_context(session)
+
+            style_proxy = f"/api/images/file?path={quote(session.style_reference_path, safe='')}"
+            focus_refs = [
+                session.upload_path,
+                style_proxy,
+                session.additional_upload_paths[0],
+            ]
+
+            result = asyncio.run(
+                service.generate_single_image(
+                    session=session,
+                    image_type=DBImageTypeEnum.INFOGRAPHIC_1,
+                    reference_image_paths=focus_refs,
+                )
+            )
+            assert result.status.value == "complete"
+
+            context = service.get_design_context(session.id)
+            latest = service.get_latest_prompt(context, DBImageTypeEnum.INFOGRAPHIC_1)
+            assert latest is not None
+            assert "=== STYLE REFERENCE ===" in latest.prompt_text
+
+            labels = [item.get("label") for item in (latest.reference_image_paths or [])]
+            assert "STYLE_REFERENCE" in labels
+            assert any((label or "").startswith("ADDITIONAL_PRODUCT_") for label in labels)
+        finally:
+            db.close()
+
+    def test_aplus_prompt_history_can_filter_out_mobile_entries(self, client, sample_request):
+        """Desktop prompt track should ignore mobile recomposition entries."""
+        from app.services.generation_service import GenerationService
+        from app.schemas.generation import GenerationRequest
+        from app.models.database import ImageTypeEnum as DBImageTypeEnum
+
+        db = SessionLocal()
+        try:
+            gemini = MagicMock()
+            gemini.model = "gemini-test-model"
+            storage = DummyStorageService()
+            service = GenerationService(db=db, gemini=gemini, storage=storage)
+
+            request = GenerationRequest(**sample_request)
+            session = service.create_session(request, user_id="user-test-123")
+            context = service.create_design_context(session)
+
+            service.store_prompt_in_history(context, DBImageTypeEnum.APLUS_3, "Desktop prompt v1")
+            service.store_prompt_in_history(context, DBImageTypeEnum.APLUS_3, "[MOBILE RECOMPOSE] Mobile prompt v1")
+            service.store_prompt_in_history(context, DBImageTypeEnum.APLUS_3, "Desktop prompt v2")
+
+            desktop_history = service.get_prompt_history(
+                context,
+                DBImageTypeEnum.APLUS_3,
+                include_mobile=False,
+            )
+            assert [item.prompt_text for item in desktop_history] == [
+                "Desktop prompt v1",
+                "Desktop prompt v2",
+            ]
+
+            latest_desktop = service.get_latest_prompt(
+                context,
+                DBImageTypeEnum.APLUS_3,
+                include_mobile=False,
+            )
+            assert latest_desktop is not None
+            assert latest_desktop.prompt_text == "Desktop prompt v2"
+
+            version_two_desktop = service.get_prompt_by_version(
+                context,
+                DBImageTypeEnum.APLUS_3,
+                2,
+                include_mobile=False,
+            )
+            assert version_two_desktop is not None
+            assert version_two_desktop.prompt_text == "Desktop prompt v2"
+        finally:
+            db.close()
+
+
+class TestEffectiveBrandResolution:
+    """Tests for effective brand name resolution in A+ prompt generation."""
+
+    def test_prefers_explicit_session_brand_when_not_product_title(self):
+        from app.api.endpoints.generation import _resolve_effective_brand_name
+
+        session = MagicMock()
+        session.brand_name = "Nebula Colors"
+        session.product_title = "Hanging Moon Planter"
+        session.user_id = "user-1"
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = None
+
+        resolved = _resolve_effective_brand_name(session, db, "user-1")
+        assert resolved == "Nebula Colors"
+
+    def test_uses_default_brand_when_session_brand_matches_product_title(self):
+        from app.api.endpoints.generation import _resolve_effective_brand_name
+
+        session = MagicMock()
+        session.brand_name = "Hanging Moon Planter"
+        session.product_title = "Hanging Moon Planter"
+        session.user_id = "user-1"
+
+        settings = MagicMock()
+        settings.default_brand_name = "Nebula Colors"
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = settings
+
+        resolved = _resolve_effective_brand_name(session, db, "user-1")
+        assert resolved == "Nebula Colors"
+
+    def test_treats_brand_as_unspecified_when_it_only_repeats_product_title(self):
+        from app.api.endpoints.generation import _resolve_effective_brand_name
+
+        session = MagicMock()
+        session.brand_name = "Hanging Moon Planter"
+        session.product_title = "Hanging Moon Planter"
+        session.user_id = "user-1"
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = None
+
+        resolved = _resolve_effective_brand_name(session, db, "user-1")
+        assert resolved == ""
 
 
 class TestAsyncGeneration:

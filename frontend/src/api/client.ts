@@ -30,9 +30,9 @@ import type {
 } from './types';
 
 // In production, use VITE_API_URL; in development, use relative /api (proxied by Vite)
-const API_BASE = import.meta.env.VITE_API_URL
-  ? `${import.meta.env.VITE_API_URL}/api`
-  : '/api';
+const API_ORIGIN = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api` : '/api';
+const API_AUTH_COOKIE = 'listing_genie_access_token';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -53,6 +53,9 @@ class ApiClient {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.access_token) {
             config.headers.Authorization = `Bearer ${session.access_token}`;
+            this.syncImageAuthCookie(session.access_token);
+          } else {
+            this.syncImageAuthCookie(null);
           }
         } catch (error) {
           console.warn('Failed to get auth session:', error);
@@ -181,34 +184,60 @@ class ApiClient {
   // Get all prompts for a session
   async getSessionPrompts(sessionId: string): Promise<PromptHistory[]> {
     const response = await this.client.get<PromptHistory[]>(
-      `/generate/${sessionId}/prompts`
+      `/generate/${sessionId}/prompts`,
+      {
+        params: { _t: Date.now() },
+        headers: { 'Cache-Control': 'no-cache' },
+      }
     );
     return response.data;
   }
 
   // Get a prompt for a specific image type, optionally by version number (1-based)
-  async getImagePrompt(sessionId: string, imageType: string, version?: number): Promise<PromptHistory> {
-    const params = version != null ? { version } : {};
+  async getImagePrompt(
+    sessionId: string,
+    imageType: string,
+    version?: number,
+    track?: 'desktop' | 'mobile'
+  ): Promise<PromptHistory> {
+    const params: Record<string, string | number> = { _t: Date.now() };
+    if (version != null) params.version = version;
+    if (track) params.track = track;
     const response = await this.client.get<PromptHistory>(
       `/generate/${sessionId}/prompts/${imageType}`,
-      { params }
+      {
+        params,
+        headers: { 'Cache-Control': 'no-cache' },
+      }
     );
     return response.data;
   }
 
   // Get image URL
   getImageUrl(sessionId: string, imageType: string): string {
-    return `${API_BASE}/images/${sessionId}/${imageType}`;
+    return this.withImageAuth(`${API_BASE}/images/${sessionId}/${imageType}`);
   }
 
   // Get upload preview URL
   getUploadPreviewUrl(uploadId: string): string {
-    return `${API_BASE}/images/upload/${uploadId}`;
+    return this.withImageAuth(`${API_BASE}/images/upload/${uploadId}`);
   }
 
   // Get signed URL for a storage path (supabase:// or upload path)
   getFileUrl(storagePath: string): string {
-    return `${API_BASE}/images/file?path=${encodeURIComponent(storagePath)}`;
+    return this.withImageAuth(`${API_BASE}/images/file?path=${encodeURIComponent(storagePath)}`);
+  }
+
+  // Normalize arbitrary image URL and append auth for <img> requests.
+  decorateImageUrl(url: string): string {
+    if (!url) return url;
+    return this.withImageAuth(this.toAbsoluteImageUrl(url));
+  }
+
+  // Append/replace cache-bust query param in a URL without breaking existing params.
+  withCacheBust(url: string, cacheKey: number = Date.now()): string {
+    if (!url) return url;
+    return this.setQueryParam(url, 't', String(cacheKey));
   }
 
   // Get available style presets
@@ -349,7 +378,15 @@ class ApiClient {
     const response = await this.client.get<ProjectListResponse>(
       `/projects/?${params.toString()}`
     );
-    return response.data;
+    return {
+      ...response.data,
+      projects: response.data.projects.map((project) => ({
+        ...project,
+        thumbnail_url: project.thumbnail_url
+          ? this.decorateImageUrl(project.thumbnail_url)
+          : project.thumbnail_url,
+      })),
+    };
   }
 
   // Get project detail with all images
@@ -357,7 +394,38 @@ class ApiClient {
     const response = await this.client.get<ProjectDetailResponse>(
       `/projects/${sessionId}`
     );
-    return response.data;
+    const project = response.data;
+    return {
+      ...project,
+      style_reference_url: project.style_reference_url
+        ? this.decorateImageUrl(project.style_reference_url)
+        : project.style_reference_url,
+      style_reference_versions: project.style_reference_versions?.map((v) => ({
+        ...v,
+        image_url: this.decorateImageUrl(v.image_url),
+      })),
+      images: project.images.map((img) => ({
+        ...img,
+        image_url: img.image_url ? this.decorateImageUrl(img.image_url) : img.image_url,
+        versions: img.versions?.map((v) => ({
+          ...v,
+          image_url: this.decorateImageUrl(v.image_url),
+        })),
+      })),
+      aplus_modules: project.aplus_modules?.map((m) => ({
+        ...m,
+        image_url: m.image_url ? this.decorateImageUrl(m.image_url) : m.image_url,
+        mobile_image_url: m.mobile_image_url ? this.decorateImageUrl(m.mobile_image_url) : m.mobile_image_url,
+        versions: m.versions?.map((v) => ({
+          ...v,
+          image_url: this.decorateImageUrl(v.image_url),
+        })),
+        mobile_versions: m.mobile_versions?.map((v) => ({
+          ...v,
+          image_url: this.decorateImageUrl(v.image_url),
+        })),
+      })),
+    };
   }
 
   // Rename a project
@@ -517,7 +585,7 @@ class ApiClient {
     return {
       image_path: response.data.storage_path,
       image_url: response.data.storage_path
-        ? `/api/images/file?path=${encodeURIComponent(response.data.storage_path)}`
+        ? this.getFileUrl(response.data.storage_path)
         : '',
       module_index: moduleIndex,
     };
@@ -536,7 +604,13 @@ class ApiClient {
     const response = await this.client.get<{ assets: AssetItem[]; total: number }>(
       `/assets/?asset_type=${assetType}`
     );
-    return response.data;
+    return {
+      ...response.data,
+      assets: response.data.assets.map((asset) => ({
+        ...asset,
+        url: this.decorateImageUrl(asset.url),
+      })),
+    };
   }
 
   // ============================================================================
@@ -704,9 +778,10 @@ class ApiClient {
   /**
    * Get the Amazon OAuth authorization URL to redirect the seller to.
    */
-  async getAmazonAuthUrl(marketplaceId?: string): Promise<AmazonAuthUrlResponse> {
+  async getAmazonAuthUrl(marketplaceId?: string, returnTo?: string): Promise<AmazonAuthUrlResponse> {
     const response = await this.client.post<AmazonAuthUrlResponse>('/amazon/auth/url', {
       marketplace_id: marketplaceId,
+      return_to: returnTo,
     });
     return response.data;
   }
@@ -778,6 +853,109 @@ class ApiClient {
     );
     return response.data;
   }
+
+  private getImageAccessToken(): string | null {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return null;
+
+    const cookieNeedle = `${API_AUTH_COOKIE}=`;
+    const cookieParts = document.cookie.split(';');
+    for (const rawPart of cookieParts) {
+      const part = rawPart.trim();
+      if (part.startsWith(cookieNeedle)) {
+        const rawValue = part.slice(cookieNeedle.length);
+        if (!rawValue) break;
+        try {
+          return decodeURIComponent(rawValue);
+        } catch {
+          return rawValue;
+        }
+      }
+    }
+
+    // Fallback: read token directly from Supabase localStorage cache.
+    // This covers first-render races before AuthContext cookie sync runs.
+    try {
+      for (let i = 0; i < window.localStorage.length; i += 1) {
+        const key = window.localStorage.key(i);
+        if (!key || !key.startsWith('sb-') || !key.endsWith('-auth-token')) continue;
+
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+
+        const parsed = JSON.parse(raw);
+        const token =
+          parsed?.currentSession?.access_token ||
+          parsed?.session?.access_token ||
+          parsed?.access_token;
+
+        if (typeof token === 'string' && token.length > 0) {
+          return token;
+        }
+      }
+    } catch {
+      // Ignore parsing/storage errors; cookie path remains primary.
+    }
+
+    return null;
+  }
+
+  private withImageAuth(url: string): string {
+    if (!url || !this.isBackendImageUrl(url)) return url;
+    const token = this.getImageAccessToken();
+    if (!token) return url;
+    return this.setQueryParam(url, 'access_token', token);
+  }
+
+  private syncImageAuthCookie(accessToken: string | null): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    if (!accessToken) {
+      document.cookie = `${API_AUTH_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+      return;
+    }
+    document.cookie = `${API_AUTH_COOKIE}=${encodeURIComponent(accessToken)}; Path=/; SameSite=Lax${secure}`;
+  }
+
+  private isBackendImageUrl(url: string): boolean {
+    if (!url) return false;
+    if (url.startsWith('/api/images/')) return true;
+    if (API_ORIGIN && url.startsWith(`${API_ORIGIN}/api/images/`)) return true;
+
+    // Backend responses may include absolute image URLs from settings.backend_url.
+    // Detect by path so token injection still works even if origin differs.
+    if (/^https?:\/\//i.test(url)) {
+      try {
+        return new URL(url).pathname.startsWith('/api/images/');
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  private toAbsoluteImageUrl(url: string): string {
+    if (!url || /^https?:\/\//i.test(url)) return url;
+    if (!url.startsWith('/')) return url;
+    if (!API_ORIGIN) return url;
+    return `${API_ORIGIN}${url}`;
+  }
+
+  private setQueryParam(url: string, key: string, value: string): string {
+    const hashIndex = url.indexOf('#');
+    const withoutHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+    const hash = hashIndex >= 0 ? url.slice(hashIndex) : '';
+
+    const queryIndex = withoutHash.indexOf('?');
+    const base = queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
+    const query = queryIndex >= 0 ? withoutHash.slice(queryIndex + 1) : '';
+
+    const params = new URLSearchParams(query);
+    params.set(key, value);
+    const serialized = params.toString();
+
+    return `${base}${serialized ? `?${serialized}` : ''}${hash}`;
+  }
 }
 
 // ASIN Import types
@@ -802,6 +980,8 @@ export interface AssetItem {
   created_at: string;
   session_id?: string;
   image_type?: string;
+  generated_category?: 'listing' | 'aplus' | 'other';
+  storage_path?: string;
 }
 
 // Settings types
