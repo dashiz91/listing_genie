@@ -30,6 +30,23 @@ LIGHTING_OVERRIDE = (
     "contrast carried from the source photo. Light the product as if it were "
     "photographed in a top-tier studio, not an amateur setting."
 )
+LIGHTING_OVERRIDE_MARKER = "LIGHTING OVERRIDE:"
+
+
+def strip_lighting_override(prompt: str) -> str:
+    """Remove trailing lighting override section, if present."""
+    if not prompt:
+        return prompt
+    marker_idx = prompt.lower().find(LIGHTING_OVERRIDE_MARKER.lower())
+    if marker_idx == -1:
+        return prompt
+    return prompt[:marker_idx].rstrip()
+
+
+def append_lighting_override_once(prompt: str) -> str:
+    """Append the lighting override exactly once."""
+    clean_prompt = strip_lighting_override(prompt or "")
+    return f"{clean_prompt.rstrip()}{LIGHTING_OVERRIDE}"
 
 # Storage service singleton for loading images
 _storage_service: Optional["SupabaseStorageService"] = None
