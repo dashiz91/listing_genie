@@ -128,7 +128,7 @@ export const CreatorView: React.FC<CreatorViewProps> = ({
           file_path: img.file_path,
           filename: `amazon_${result.asin}_${idx + 1}.png`,
           size: 0,
-          preview_url: apiClient.getFileUrl(img.file_path),
+          preview_url: img.preview_url || apiClient.getFileUrl(img.file_path),
         }));
         onUploadsChange([...uploads, ...newUploads].slice(0, maxImages));
       }

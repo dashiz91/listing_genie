@@ -981,7 +981,7 @@ export interface ASINImportResponse {
   feature_2: string | null;
   feature_3: string | null;
   category: string | null;
-  image_uploads: Array<{ upload_id: string; file_path: string }>;
+  image_uploads: Array<{ upload_id: string; file_path: string; preview_url?: string }>;
   source_image_urls: string[];
 }
 

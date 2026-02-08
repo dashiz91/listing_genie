@@ -122,9 +122,17 @@ async def import_from_asin(
                     f"asin_{product.asin}_img{idx + 1}.png"
                 )
 
+                # Generate a signed preview URL so the frontend can display
+                # the image immediately (before any session references it).
+                try:
+                    preview_url = storage.get_upload_url(upload_id, expires_in=3600)
+                except Exception:
+                    preview_url = None
+
                 image_uploads.append({
                     "upload_id": upload_id,
                     "file_path": file_path,
+                    "preview_url": preview_url,
                 })
 
                 logger.info(f"[ASIN] Saved image: {upload_id}")
