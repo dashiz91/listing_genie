@@ -19,9 +19,10 @@ Raw ideas and feature requests. Pick one → refine into `ready/` → implement.
 ## New Features
 
 - **Push to Amazon Seller Central (011)** — SP-API integration to push listing images (7) and A+ Content modules (6) directly to live Amazon listings. OAuth seller auth, S3 temporary hosting, Listings Items API + A+ Content API. Phase 1 = listing images, Phase 2 = A+ Content. **Blocked by:** SP-API app approval (prod_nebula submitted with "Product Listing" role). Story in `ready/011-seller-central-push.md`
-  - **Frontend UI complete**: Settings page Amazon Connection card (connect/disconnect via OAuth), ResultsView "Push to Amazon" button with ASIN/SKU form + job status polling, API client types + methods for 5 endpoints
-  - **Backend in progress**: Amazon auth service, push service, SP-API client (parallel reviewer)
-  - **Pending**: End-to-end test once backend endpoints are deployed to staging
+  - **Frontend UI complete + deployed**: Settings page Amazon Connection card (connect/disconnect via OAuth), ResultsView "Push to Amazon" button with ASIN/SKU form + job status polling, API client types + methods for 5 endpoints. Aligned with live backend contract.
+  - **Backend deployed on staging**: Amazon auth service (`/api/amazon/auth/status`, `/auth/url`, `/auth/disconnect`), push service (`/push/listing-images`, `/push/status/{job_id}`). Connection modes: env, oauth, manual, none.
+  - **E2E integration tested**: Auth status call returns correct shape (200 OK), push button → not-connected dialog → Go to Settings flow works. Full push flow ready to test once SP-API credentials (refresh token) are configured in Railway env vars.
+  - **Pending**: Configure SP-API refresh token in staging env → test actual push to Amazon
 
 ---
 

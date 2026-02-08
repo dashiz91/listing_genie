@@ -35,12 +35,18 @@ have import automatically retry if captcha, user shoud click only ONCE ever.
 PENDING
 -------
 z - Push to Amazon Seller Central (story 011) - SP-API listing images + A+ Content push. BLOCKED on SP-API app approval.
-    z.1 - Frontend UI DONE: Settings page Amazon Connection card, ResultsView Push button, API client/types wired
-    z.2 - Backend in progress (parallel reviewer): Amazon auth service, push service, SP-API integration
-    z.3 - Pending: End-to-end test once backend is deployed
+    z.1 - DONE: Frontend UI — Settings Amazon card, ResultsView Push button, API client/types, aligned with live backend contract
+    z.2 - DONE: Backend deployed on staging — auth status, auth URL, disconnect, push listing-images, push status endpoints
+    z.3 - DONE: E2E integration tested — auth status 200 OK, push button → not-connected dialog → Go to Settings flow works
+    z.4 - Pending: Configure SP-API refresh token in Railway env vars → test actual push to Amazon listing
 
 COMPLETED
 ---------
+t4 - Fix VisionService missing methods - added enhance_prompt_with_feedback and plan_edit_instructions to both VisionService wrapper and GeminiVisionService (was causing 500 on all regen/edit with feedback)
+t5 - Fix main image prompt - enforce pure white background (#FFFFFF), product fills 95%+ of frame, zero text/typography/decorative elements (Amazon Image 1 compliance)
+t6 - Fix infinite loading spinner bug - transport error polling now marks images as 'failed' after timeout instead of staying 'processing' forever (affected all 3 generate/regen/edit paths)
+t2 - Fix "Image unavailable" after listing image regen - added auto-retry (3x, 1.5s delay) in MainImageViewer to handle transient Supabase storage propagation delay
+t3 - A+ Prompt Architecture Refactor - ModuleConfig dataclass, brand bookend rules centralized, _build_aplus_reference_images_desc duplicate deleted
 y - A+ Prompt System Rebuild - rewrote VISUAL_SCRIPT_PROMPT with listing-quality instructions, replaced per-module and hero pair prompt delivery, updated TypeScript types for new script structure
 v - Premium A+ Content Quality Overhaul - text rendering in images, module archetypes (exploded, trust, lifestyle, dramatic), cinematic hero lighting, logo in A+ refs
 w - 3-color maximum enforcement - framework JSON schemas reduced from 5→3 colors, frontend limits updated, truncation safety nets

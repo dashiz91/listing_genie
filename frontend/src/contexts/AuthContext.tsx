@@ -2,6 +2,17 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+const API_AUTH_COOKIE = 'listing_genie_access_token';
+
+function syncApiAuthCookie(accessToken: string | null): void {
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  if (!accessToken) {
+    document.cookie = `${API_AUTH_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+    return;
+  }
+  document.cookie = `${API_AUTH_COOKIE}=${encodeURIComponent(accessToken)}; Path=/; SameSite=Lax${secure}`;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -21,6 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      syncApiAuthCookie(session?.access_token ?? null);
       setLoading(false);
     });
 
@@ -29,6 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        syncApiAuthCookie(session?.access_token ?? null);
         setLoading(false);
       }
     );

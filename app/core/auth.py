@@ -9,7 +9,7 @@ from typing import Optional
 from functools import lru_cache
 import time
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from jwt import PyJWKClient
@@ -69,7 +69,6 @@ def verify_supabase_token(token: str) -> Optional[dict]:
     Verification order:
     1. Try JWKS verification (ES256/RS256) - modern Supabase default
     2. Fall back to HS256 with JWT secret if configured
-    3. Development only: decode without verification if nothing configured
     """
     # First, try JWKS verification (modern approach)
     jwks_client = get_jwks_client()
@@ -113,17 +112,7 @@ def verify_supabase_token(token: str) -> Optional[dict]:
             logger.warning(f"HS256 token validation failed: {e}")
             return None
 
-    # Development fallback: decode without verification
-    if settings.app_env == "development":
-        logger.warning("No JWKS or JWT secret - decoding without verification (dev only)")
-        try:
-            payload = jwt.decode(token, options={"verify_signature": False})
-            return payload
-        except jwt.InvalidTokenError as e:
-            logger.warning(f"Token decode failed: {e}")
-            return None
-
-    logger.error("No verification method available and not in development mode")
+    logger.error("No token verification method configured (missing Supabase JWKS and JWT secret)")
     return None
 
 
@@ -146,6 +135,53 @@ async def get_current_user(
         )
 
     token = credentials.credentials
+    return _validate_token_and_build_user(token)
+
+
+async def get_current_user_from_header_or_cookie(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> User:
+    """
+    Authenticate using Bearer header first, then fallback to cookie token.
+
+    This is used by image routes where browser `<img>` requests may not attach
+    explicit Authorization headers.
+    """
+    token = credentials.credentials if credentials else None
+    if not token:
+        token = request.cookies.get("listing_genie_access_token")
+    if not token:
+        # Support image requests from cross-origin frontend domains where browser
+        # cannot send Authorization headers on <img> tags.
+        token = request.query_params.get("access_token")
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return _validate_token_and_build_user(token)
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> Optional[User]:
+    """
+    FastAPI dependency to get the current user if authenticated, None otherwise.
+
+    Use this for endpoints that work for both authenticated and anonymous users.
+    """
+    if not credentials:
+        return None
+
+    try:
+        return await get_current_user(credentials)
+    except HTTPException:
+        return None
+
+
+def _validate_token_and_build_user(token: str) -> User:
     payload = verify_supabase_token(token)
 
     if not payload:
@@ -179,20 +215,3 @@ async def get_current_user(
             )
 
     return User(id=user_id, email=email, role=role)
-
-
-async def get_optional_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> Optional[User]:
-    """
-    FastAPI dependency to get the current user if authenticated, None otherwise.
-
-    Use this for endpoints that work for both authenticated and anonymous users.
-    """
-    if not credentials:
-        return None
-
-    try:
-        return await get_current_user(credentials)
-    except HTTPException:
-        return None

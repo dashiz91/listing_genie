@@ -37,12 +37,15 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
   const [asin, setAsin] = useState(prefillAsin || '');
   const [sku, setSku] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [connectMessage, setConnectMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isConnectingAmazon, setIsConnectingAmazon] = useState(false);
   const [skuOptions, setSkuOptions] = useState<AmazonSellerSku[]>([]);
   const [skuSearch, setSkuSearch] = useState('');
   const [selectedSkuOption, setSelectedSkuOption] = useState('');
   const [isLoadingSkus, setIsLoadingSkus] = useState(false);
   const [skuLookupError, setSkuLookupError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Update ASIN when prefill changes
@@ -62,8 +65,44 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (connectPollRef.current) clearInterval(connectPollRef.current);
     };
   }, []);
+
+  const stopConnectPolling = useCallback(() => {
+    if (connectPollRef.current) {
+      clearInterval(connectPollRef.current);
+      connectPollRef.current = null;
+    }
+  }, []);
+
+  const startConnectPolling = useCallback(() => {
+    stopConnectPolling();
+    const startedAt = Date.now();
+    connectPollRef.current = setInterval(async () => {
+      try {
+        const authStatus: AmazonAuthStatus = await apiClient.getAmazonAuthStatus();
+        if (authStatus.connected) {
+          stopConnectPolling();
+          setIsConnectingAmazon(false);
+          setConnectMessage({ type: 'success', text: 'Amazon account connected. Choose SKU and publish now.' });
+          setState({ phase: 'form' });
+          return;
+        }
+
+        if (Date.now() - startedAt > 3 * 60 * 1000) {
+          stopConnectPolling();
+          setIsConnectingAmazon(false);
+          setConnectMessage({
+            type: 'error',
+            text: 'Connection still pending. Finish authorization in the new tab, then click Connect Now again.',
+          });
+        }
+      } catch {
+        // Keep polling on transient network errors.
+      }
+    }, 3000);
+  }, [stopConnectPolling]);
 
   // Close dialog on outside click
   useEffect(() => {
@@ -73,6 +112,8 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
       if (dialogRef.current && !dialogRef.current.contains(e.target as Node)) {
         // Only allow closing if not actively pushing
         if (state.phase !== 'pushing') {
+          stopConnectPolling();
+          setIsConnectingAmazon(false);
           setState({ phase: 'idle' });
           if (pollRef.current) clearInterval(pollRef.current);
         }
@@ -81,7 +122,76 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
 
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [state.phase]);
+  }, [state.phase, stopConnectPolling]);
+
+  const checkAuthAndOpen = useCallback(async () => {
+    setState({ phase: 'checking' });
+    try {
+      const authStatus: AmazonAuthStatus = await apiClient.getAmazonAuthStatus();
+      if (authStatus.connected) {
+        setState({ phase: 'form' });
+      } else {
+        setState({ phase: 'not_connected' });
+      }
+    } catch {
+      setState({ phase: 'not_connected' });
+    }
+  }, []);
+
+  const handleConnectAmazon = useCallback(async () => {
+    setIsConnectingAmazon(true);
+    setConnectMessage(null);
+    try {
+      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const { auth_url } = await apiClient.getAmazonAuthUrl(undefined, returnTo);
+      const authTab = window.open(auth_url, '_blank', 'noopener,noreferrer');
+      if (!authTab) {
+        setConnectMessage({
+          type: 'error',
+          text: 'Popup blocked. Allow popups for this site, then try Connect Now again.',
+        });
+        setIsConnectingAmazon(false);
+        return;
+      }
+      setConnectMessage({
+        type: 'success',
+        text: 'Seller Central opened in a new tab. Complete authorization there; this dialog will update automatically.',
+      });
+      startConnectPolling();
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      setConnectMessage({
+        type: 'error',
+        text: error.response?.data?.detail || 'Failed to start Amazon connection. Please try again.',
+      });
+      setIsConnectingAmazon(false);
+    }
+  }, [startConnectPolling]);
+
+  // Parse OAuth callback params when returning from Amazon.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const amazonConnect = params.get('amazon_connect');
+    if (!amazonConnect) return;
+
+    if (amazonConnect === 'success') {
+      setConnectMessage({ type: 'success', text: 'Amazon account connected. Choose SKU and publish now.' });
+      stopConnectPolling();
+      setIsConnectingAmazon(false);
+      void checkAuthAndOpen();
+    } else if (amazonConnect === 'error') {
+      const reason = params.get('reason') || 'Failed to connect Amazon account. Please try again.';
+      stopConnectPolling();
+      setIsConnectingAmazon(false);
+      setConnectMessage({ type: 'error', text: reason });
+      setState({ phase: 'not_connected' });
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('amazon_connect');
+    url.searchParams.delete('reason');
+    window.history.replaceState({}, '', url.toString());
+  }, [checkAuthAndOpen, stopConnectPolling]);
 
   const loadSkuOptions = useCallback(async (query?: string, showError: boolean = true) => {
     setIsLoadingSkus(true);
@@ -90,14 +200,17 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
       const result = await apiClient.getAmazonSellerSkus(query, 20);
       setSkuOptions(result.skus || []);
     } catch (err: unknown) {
+      const error = err as { response?: { data?: { detail?: string } } };
+      const detail = error.response?.data?.detail;
+      if (typeof detail === 'string' && detail.toLowerCase().includes('not connected')) {
+        setConnectMessage({ type: 'error', text: 'Amazon connection is missing or expired. Reconnect to load SKUs.' });
+        setState({ phase: 'not_connected' });
+        setSkuOptions([]);
+        setIsLoadingSkus(false);
+        return;
+      }
       if (showError) {
-        const error = err as { response?: { data?: { detail?: string } } };
-        const detail = error.response?.data?.detail;
-        if (typeof detail === 'string' && detail.toLowerCase().includes('not connected')) {
-          setSkuLookupError('Amazon account is not connected for this user. Connect it in Settings.');
-        } else {
-          setSkuLookupError("Couldn't fetch SKUs right now. You can still type your SKU manually.");
-        }
+        setSkuLookupError("Couldn't fetch SKUs right now. You can still type your SKU manually.");
       }
       setSkuOptions([]);
     } finally {
@@ -148,17 +261,7 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
   }, []);
 
   const handleButtonClick = async () => {
-    setState({ phase: 'checking' });
-    try {
-      const authStatus: AmazonAuthStatus = await apiClient.getAmazonAuthStatus();
-      if (authStatus.connected) {
-        setState({ phase: 'form' });
-      } else {
-        setState({ phase: 'not_connected' });
-      }
-    } catch {
-      setState({ phase: 'not_connected' });
-    }
+    void checkAuthAndOpen();
   };
 
   const handleSubmit = async () => {
@@ -235,27 +338,49 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
                     </svg>
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-white">Amazon Not Connected</h3>
-                    <p className="text-sm text-slate-400">Connect your Seller Central account in Settings first.</p>
+                    <h3 className="text-base font-semibold text-white">Connect Amazon Seller Central</h3>
+                    <p className="text-sm text-slate-400">Link your account here and return to this same project automatically.</p>
                   </div>
                 </div>
+                {connectMessage && (
+                  <div className={`rounded-lg p-2.5 text-sm border ${
+                    connectMessage.type === 'success'
+                      ? 'bg-green-500/10 border-green-500/40 text-green-300'
+                      : 'bg-red-500/10 border-red-500/40 text-red-300'
+                  }`}>
+                    {connectMessage.text}
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <Button
                     className="flex-1 bg-[#FF9900] hover:bg-[#e68a00] text-slate-900 font-medium"
-                    onClick={() => {
-                      window.location.href = '/app/settings';
-                    }}
+                    onClick={handleConnectAmazon}
+                    disabled={isConnectingAmazon}
                   >
-                    Go to Settings
+                    {isConnectingAmazon ? (
+                      <>
+                        <Spinner size="sm" className="text-current mr-2" />
+                        Connecting...
+                      </>
+                    ) : (
+                      'Connect Now'
+                    )}
                   </Button>
                   <Button
                     variant="outline"
                     className="border-slate-600 text-slate-300"
-                    onClick={() => setState({ phase: 'idle' })}
+                    onClick={() => {
+                      stopConnectPolling();
+                      setIsConnectingAmazon(false);
+                      setState({ phase: 'idle' });
+                    }}
                   >
                     Cancel
                   </Button>
                 </div>
+                <p className="text-xs text-slate-500">
+                  You will be redirected to Amazon, then returned here to finish publishing.
+                </p>
               </div>
             )}
 
@@ -266,6 +391,15 @@ const PushToAmazonButton: React.FC<PushToAmazonButtonProps> = ({
                   <h3 className="text-base font-semibold text-white">Push to Amazon</h3>
                   <p className="text-sm text-slate-400 mt-1">Use SKU to push this listing. ASIN is optional.</p>
                 </div>
+                {connectMessage && (
+                  <div className={`rounded-lg p-2.5 text-sm border ${
+                    connectMessage.type === 'success'
+                      ? 'bg-green-500/10 border-green-500/40 text-green-300'
+                      : 'bg-red-500/10 border-red-500/40 text-red-300'
+                  }`}>
+                    {connectMessage.text}
+                  </div>
+                )}
 
                 {formError && (
                   <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-2.5 text-red-400 text-sm">

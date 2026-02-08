@@ -354,6 +354,7 @@ export const HomePage: React.FC = () => {
     const loadProject = async () => {
       const sessionToLoad = projectParam || sessionParam;
       if (!sessionToLoad) return;
+      if (isGenerating) return;  // Never reload during active generation
       // Skip if this session is already loaded (ensureSession sets ?session= which would
       // otherwise trigger a full project reload, killing the active generation state)
       if (sessionToLoad === sessionIdRef.current) return;
@@ -540,7 +541,7 @@ export const HomePage: React.FC = () => {
     };
 
     loadProject();
-  }, [projectParam, sessionParam, setSearchParams, updateGenerationStatus, updateSessionId]);
+  }, [projectParam, sessionParam, setSearchParams, updateGenerationStatus, updateSessionId, isGenerating]);
 
   // Health check on mount
   useEffect(() => {
@@ -607,6 +608,7 @@ export const HomePage: React.FC = () => {
       }
     };
 
+    pollStatus();  // Immediate first poll — no 2s wait
     const interval = setInterval(pollStatus, 2000);
     return () => clearInterval(interval);
   }, [sessionId, isGenerating, updateGenerationStatus]);
@@ -871,16 +873,6 @@ export const HomePage: React.FC = () => {
       updateGenerationStatus(response.status);
       // Persist session to URL for refresh resilience
       setSearchParams({ session: response.session_id }, { replace: true });
-
-      // Set initial images (all pending)
-      const sessionImages: SessionImage[] = response.images.map((img) => ({
-        type: img.image_type,
-        status: img.status,
-        label: getImageLabel(img.image_type),
-        url: img.storage_path,
-        error: img.error_message,
-      }));
-      setImages(sessionImages);
 
       return response.session_id;
     })();

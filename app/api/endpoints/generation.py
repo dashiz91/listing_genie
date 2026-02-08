@@ -371,72 +371,93 @@ async def generate_single_image(
 
 
 async def _batch_generate_worker(
-    service: GenerationService,
-    credits: CreditsService,
-    session: GenerationSession,
+    session_id: str,
     image_types: list,
     image_model: str | None,
     user_id: str,
     user_email: str | None,
 ):
-    """Background worker: generate multiple listing images with bounded concurrency."""
-    from app.models.database import GenerationStatusEnum as DBStatus
-    logger.info(f"[BATCH] Starting worker for session {session.id} — {len(image_types)} images, model={image_model}")
+    """Background worker: generate multiple listing images with bounded concurrency.
+
+    Creates its own DB session to avoid relying on the request-scoped session
+    which gets closed after the HTTP response is sent.
+    """
+    from app.db.session import SessionLocal
+    from app.models.database import GenerationStatusEnum as DBStatus, GenerationSession
+
+    db = SessionLocal()
+    logger.info(f"[BATCH] Starting worker for session {session_id} — {len(image_types)} images, model={image_model}")
 
     try:
-        MAX_CONCURRENT = 3
-        semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+        # Build fresh services with our own DB session
+        gemini = GeminiService()
+        storage = get_storage_service()
+        service = GenerationService(db=db, gemini=gemini, storage=storage)
+        credits = CreditsService(db)
 
-        async def gen_one(image_type):
-            async with semaphore:
-                logger.info(f"[BATCH] Generating {image_type.value} for session {session.id}")
+        # Re-query session from our own DB session
+        session = db.query(GenerationSession).filter(
+            GenerationSession.id == session_id
+        ).first()
+        if not session:
+            logger.error(f"[BATCH] Session {session_id} not found in DB")
+            return
+
+        # Generate images SEQUENTIALLY to avoid blocking the event loop.
+        # _load_image_from_path (Supabase download) is synchronous — running
+        # 3+ concurrent tasks blocks the event loop for 25s+, causing Railway
+        # health checks to fail and kill the worker process.
+        results = []
+        for image_type in image_types:
+            logger.info(f"[BATCH] Generating {image_type.value} for session {session_id}")
+            try:
+                # Keepalive ping — reconnect if Supabase pooler reclaimed the connection
                 try:
-                    # Keepalive ping — reconnect if Supabase pooler reclaimed the connection
-                    try:
-                        service.db.execute(sa_text("SELECT 1"))
-                    except Exception:
-                        pass  # SQLAlchemy pool will reconnect on next real query
-                    result = await service.generate_single_image(
-                        session, image_type, model_override=image_model,
-                    )
-                    logger.info(f"[BATCH] {image_type.value} completed: {getattr(result, 'status', 'unknown')}")
-                    return result
-                except Exception as e:
-                    logger.error(f"[BATCH] {image_type.value} failed: {e}", exc_info=True)
-                    for img in session.images:
-                        if img.image_type == image_type:
-                            img.status = DBStatus.FAILED
-                            img.error_message = str(e)[:500]
-                            break
-                    try:
-                        service.db.commit()
-                    except Exception:
-                        logger.error(f"[BATCH] Failed to commit error status for {image_type.value}")
-                    return ImageResult(
-                        image_type=image_type.value,
-                        status="failed",
-                        error_message=str(e),
-                    )
+                    db.execute(sa_text("SELECT 1"))
+                except Exception:
+                    pass  # SQLAlchemy pool will reconnect on next real query
+                result = await service.generate_single_image(
+                    session, image_type, model_override=image_model,
+                )
+                logger.info(f"[BATCH] {image_type.value} completed: {getattr(result, 'status', 'unknown')}")
+                results.append(result)
+            except Exception as e:
+                logger.error(f"[BATCH] {image_type.value} failed: {e}", exc_info=True)
+                for img in session.images:
+                    if img.image_type == image_type:
+                        img.status = DBStatus.FAILED
+                        img.error_message = str(e)[:500]
+                        break
+                try:
+                    db.commit()
+                except Exception:
+                    logger.error(f"[BATCH] Failed to commit error status for {image_type.value}")
+                results.append(ImageResult(
+                    image_type=image_type.value,
+                    status="failed",
+                    error_message=str(e),
+                ))
 
-        results = await asyncio.gather(*[gen_one(it) for it in image_types])
         service._update_session_status(session)
 
         completed = sum(1 for r in results if getattr(r, 'status', '') == 'complete')
-        logger.info(f"[BATCH] Session {session.id} finished: {completed}/{len(image_types)} completed")
+        logger.info(f"[BATCH] Session {session_id} finished: {completed}/{len(image_types)} completed")
         if completed > 0:
             model = image_model or "gemini-3-pro-image-preview"
             cost = credits.get_credit_cost("listing_image", model, completed)
             credits.deduct_credits(user_id, cost, "listing_image", email=user_email)
         if completed < len(image_types):
-            logger.warning(f"[BATCH] {completed}/{len(image_types)} images completed for session {session.id}")
+            logger.warning(f"[BATCH] {completed}/{len(image_types)} images completed for session {session_id}")
     except Exception as e:
-        logger.error(f"[BATCH] Worker crashed for session {session.id}: {e}", exc_info=True)
+        logger.error(f"[BATCH] Worker crashed for session {session_id}: {e}", exc_info=True)
         # Mark session as failed so polling can detect it
         try:
             session.status = DBStatus.FAILED
-            service.db.commit()
+            db.commit()
         except Exception:
             logger.error(f"[BATCH] Could not mark session as failed")
+    finally:
+        db.close()
 
 
 @router.post("/batch", response_model=BatchGenerateResponse)
@@ -473,19 +494,19 @@ async def generate_batch(
             detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan.",
         )
 
-    # Reset requested images to PENDING
+    # Reset requested images to PROCESSING (not PENDING — first poll must show spinners)
     from app.models.database import GenerationStatusEnum as DBStatus
     for img in session.images:
         if img.image_type in db_image_types:
-            img.status = DBStatus.PENDING
+            img.status = DBStatus.PROCESSING
             img.error_message = None
     session.status = DBStatus.PROCESSING
     service.db.commit()
 
-    # Queue background generation
+    # Queue background generation (pass primitives — worker creates its own DB session)
     background_tasks.add_task(
         _batch_generate_worker,
-        service, credits, session, db_image_types, request.image_model,
+        session.id, db_image_types, request.image_model,
         user.id, user.email,
     )
 

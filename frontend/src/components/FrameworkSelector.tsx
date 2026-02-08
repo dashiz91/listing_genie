@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { DesignFramework } from '../api/types';
+import { apiClient } from '../api/client';
 import { normalizeColors } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -122,7 +123,7 @@ export const FrameworkSelector: React.FC<FrameworkSelectorProps> = ({
               <div className="aspect-square bg-slate-700 relative">
                 {framework.preview_url ? (
                   <img
-                    src={framework.preview_url.startsWith('http') ? framework.preview_url : `${import.meta.env.VITE_API_URL || ''}${framework.preview_url}`}
+                    src={apiClient.decorateImageUrl(framework.preview_url)}
                     alt={framework.framework_name}
                     className="w-full h-full object-cover"
                   />

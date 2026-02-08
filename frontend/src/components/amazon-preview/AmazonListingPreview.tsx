@@ -185,7 +185,7 @@ export const AmazonListingPreview: React.FC<AmazonListingPreviewProps> = ({
       if (!sessionId) return '';
       const baseUrl = apiClient.getImageUrl(sessionId, imageType);
       const cacheKey = imageCacheKey[imageType];
-      return cacheKey ? `${baseUrl}?t=${cacheKey}` : baseUrl;
+      return cacheKey ? apiClient.withCacheBust(baseUrl, cacheKey) : baseUrl;
     },
     [sessionId, imageCacheKey, listingVersions]
   );

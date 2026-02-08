@@ -4,12 +4,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { apiClient, AssetItem } from '../api/client';
 import { Spinner } from '@/components/ui/spinner';
 
-type AssetType = 'logos' | 'style-refs' | 'products' | 'generated';
+type AssetTab = 'generated' | 'listing' | 'aplus' | 'logos' | 'style-refs' | 'products';
 
 export const AssetsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<AssetType>('products');
+  const [activeTab, setActiveTab] = useState<AssetTab>('generated');
   const [assets, setAssets] = useState<AssetItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [downloadingAssetId, setDownloadingAssetId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAssets = useCallback(async () => {
@@ -30,7 +31,59 @@ export const AssetsPage: React.FC = () => {
     fetchAssets();
   }, [fetchAssets]);
 
-  const EmptyState = ({ type }: { type: AssetType }) => {
+  const getAssetsForTab = useCallback((tab: AssetTab) => {
+    if (tab === 'generated') {
+      return assets.filter((asset) => asset.type === 'generated');
+    }
+    if (tab === 'listing') {
+      return assets.filter(
+        (asset) => asset.type === 'generated' && asset.generated_category === 'listing'
+      );
+    }
+    if (tab === 'aplus') {
+      return assets.filter(
+        (asset) => asset.type === 'generated' && asset.generated_category === 'aplus'
+      );
+    }
+    return assets.filter((asset) => asset.type === tab);
+  }, [assets]);
+
+  const downloadAsset = useCallback(async (asset: AssetItem) => {
+    try {
+      setDownloadingAssetId(asset.id);
+      const response = await fetch(asset.url);
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const safeBase = asset.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 90) || asset.id;
+
+      let ext = 'png';
+      if (blob.type.includes('jpeg')) ext = 'jpg';
+      if (blob.type.includes('webp')) ext = 'webp';
+
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = `${safeBase}.${ext}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Failed to download asset:', err);
+      setError('Failed to download this asset. Please try again.');
+    } finally {
+      setDownloadingAssetId(null);
+    }
+  }, []);
+
+  const EmptyState = ({ type }: { type: AssetTab }) => {
     const config = {
       logos: {
         title: 'No logos yet',
@@ -61,16 +114,34 @@ export const AssetsPage: React.FC = () => {
       },
       generated: {
         title: 'No generated images yet',
-        description: 'AI-generated listing images from your projects will appear here.',
+        description: 'All generated images and regenerations will appear here.',
         icon: (
           <svg className="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
           </svg>
         ),
       },
+      listing: {
+        title: 'No listing images yet',
+        description: 'Generated listing images and all their versions will appear here.',
+        icon: (
+          <svg className="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.75 3h10.5a1.5 1.5 0 011.5 1.5v15a1.5 1.5 0 01-1.5 1.5H6.75a1.5 1.5 0 01-1.5-1.5v-15A1.5 1.5 0 016.75 3zm2.25 4.5h6m-6 4.5h6m-6 4.5h3" />
+          </svg>
+        ),
+      },
+      aplus: {
+        title: 'No A+ images yet',
+        description: 'Generated A+ desktop/mobile modules and regenerations will appear here.',
+        icon: (
+          <svg className="w-12 h-12 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 5.25h16.5v4.5H3.75v-4.5zm0 9h16.5v4.5H3.75v-4.5zm6.75-6.75v9" />
+          </svg>
+        ),
+      },
     };
 
-    const { title, description, icon } = config[type];
+    const { title, description, icon } = config[type] || config.generated;
 
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
@@ -90,8 +161,8 @@ export const AssetsPage: React.FC = () => {
     </div>
   );
 
-  const AssetGrid = ({ type }: { type: AssetType }) => {
-    const filteredAssets = assets.filter(a => a.type === type);
+  const AssetGrid = ({ type }: { type: AssetTab }) => {
+    const filteredAssets = getAssetsForTab(type);
 
     if (isLoading) {
       return <LoadingState />;
@@ -128,7 +199,7 @@ export const AssetsPage: React.FC = () => {
               </p>
             </div>
             {/* Hover overlay */}
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 flex-wrap p-3">
               <Button
                 size="sm"
                 variant="outline"
@@ -139,6 +210,15 @@ export const AssetsPage: React.FC = () => {
                 }}
               >
                 View
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-emerald-500/60 text-emerald-300 hover:bg-emerald-500/10"
+                onClick={() => downloadAsset(asset)}
+                disabled={downloadingAssetId === asset.id}
+              >
+                {downloadingAssetId === asset.id ? 'Downloading...' : 'Download'}
               </Button>
               {asset.session_id && (
                 <Button
@@ -161,10 +241,16 @@ export const AssetsPage: React.FC = () => {
   };
 
   // Count assets per category
-  const logosCount = assets.filter(a => a.type === 'logos').length;
-  const styleRefsCount = assets.filter(a => a.type === 'style-refs').length;
-  const productsCount = assets.filter(a => a.type === 'products').length;
-  const generatedCount = assets.filter(a => a.type === 'generated').length;
+  const logosCount = assets.filter((asset) => asset.type === 'logos').length;
+  const styleRefsCount = assets.filter((asset) => asset.type === 'style-refs').length;
+  const productsCount = assets.filter((asset) => asset.type === 'products').length;
+  const generatedCount = assets.filter((asset) => asset.type === 'generated').length;
+  const listingCount = assets.filter(
+    (asset) => asset.type === 'generated' && asset.generated_category === 'listing'
+  ).length;
+  const aplusCount = assets.filter(
+    (asset) => asset.type === 'generated' && asset.generated_category === 'aplus'
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -196,8 +282,35 @@ export const AssetsPage: React.FC = () => {
       )}
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AssetType)} className="w-full">
-        <TabsList className="bg-slate-800 border border-slate-700">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as AssetTab)} className="w-full">
+        <TabsList className="bg-slate-800 border border-slate-700 h-auto flex-wrap justify-start">
+          <TabsTrigger
+            value="generated"
+            className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+            </svg>
+            All Generated {generatedCount > 0 && <span className="ml-1.5 text-xs bg-slate-600 px-1.5 py-0.5 rounded-full">{generatedCount}</span>}
+          </TabsTrigger>
+          <TabsTrigger
+            value="listing"
+            className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.75 3h10.5a1.5 1.5 0 011.5 1.5v15a1.5 1.5 0 01-1.5 1.5H6.75a1.5 1.5 0 01-1.5-1.5v-15A1.5 1.5 0 016.75 3zm2.25 4.5h6m-6 4.5h6m-6 4.5h3" />
+            </svg>
+            Listing {listingCount > 0 && <span className="ml-1.5 text-xs bg-slate-600 px-1.5 py-0.5 rounded-full">{listingCount}</span>}
+          </TabsTrigger>
+          <TabsTrigger
+            value="aplus"
+            className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 5.25h16.5v4.5H3.75v-4.5zm0 9h16.5v4.5H3.75v-4.5zm6.75-6.75v9" />
+            </svg>
+            A+ {aplusCount > 0 && <span className="ml-1.5 text-xs bg-slate-600 px-1.5 py-0.5 rounded-full">{aplusCount}</span>}
+          </TabsTrigger>
           <TabsTrigger
             value="products"
             className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"
@@ -206,15 +319,6 @@ export const AssetsPage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
             </svg>
             Products {productsCount > 0 && <span className="ml-1.5 text-xs bg-slate-600 px-1.5 py-0.5 rounded-full">{productsCount}</span>}
-          </TabsTrigger>
-          <TabsTrigger
-            value="generated"
-            className="data-[state=active]:bg-slate-700 data-[state=active]:text-white"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-            </svg>
-            Generated {generatedCount > 0 && <span className="ml-1.5 text-xs bg-slate-600 px-1.5 py-0.5 rounded-full">{generatedCount}</span>}
           </TabsTrigger>
           <TabsTrigger
             value="logos"
@@ -236,11 +340,17 @@ export const AssetsPage: React.FC = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="products" className="mt-6">
-          <AssetGrid type="products" />
-        </TabsContent>
         <TabsContent value="generated" className="mt-6">
           <AssetGrid type="generated" />
+        </TabsContent>
+        <TabsContent value="listing" className="mt-6">
+          <AssetGrid type="listing" />
+        </TabsContent>
+        <TabsContent value="aplus" className="mt-6">
+          <AssetGrid type="aplus" />
+        </TabsContent>
+        <TabsContent value="products" className="mt-6">
+          <AssetGrid type="products" />
         </TabsContent>
         <TabsContent value="logos" className="mt-6">
           <AssetGrid type="logos" />

@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.auth import User, get_current_user
 from app.db.session import get_db, SessionLocal
+from app.models.database import GenerationSession
 from app.services.amazon_auth_service import AmazonAuthService
 from app.services.amazon_push_service import AmazonPushService
 
@@ -270,6 +271,15 @@ async def push_listing_images(
     connection = service.auth.get_connection(user.id)
     if not connection:
         raise HTTPException(status_code=400, detail="Amazon account is not connected")
+
+    # Enforce ownership of the source generation session.
+    session = (
+        db.query(GenerationSession)
+        .filter(GenerationSession.id == request.session_id, GenerationSession.user_id == user.id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
 
     job = service.create_listing_images_job(
         user_id=user.id,

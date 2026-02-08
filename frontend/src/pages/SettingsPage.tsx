@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { apiClient, UserSettings, AssetItem, PlanInfo, CreditsInfo, CreditAdjustmentResponse } from '../api/client';
@@ -48,6 +48,7 @@ export const SettingsPage: React.FC = () => {
   const [amazonConnecting, setAmazonConnecting] = useState(false);
   const [amazonDisconnecting, setAmazonDisconnecting] = useState(false);
   const [amazonMessage, setAmazonMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const amazonPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchSettings = useCallback(async () => {
     setIsLoading(true);
@@ -109,6 +110,37 @@ export const SettingsPage: React.FC = () => {
     }
   }, []);
 
+  const stopAmazonAuthPolling = useCallback(() => {
+    if (amazonPollRef.current) {
+      clearInterval(amazonPollRef.current);
+      amazonPollRef.current = null;
+    }
+  }, []);
+
+  const startAmazonAuthPolling = useCallback(() => {
+    stopAmazonAuthPolling();
+    const startedAt = Date.now();
+    amazonPollRef.current = setInterval(async () => {
+      try {
+        const data = await apiClient.getAmazonAuthStatus();
+        setAmazonAuth(data);
+        if (data.connected) {
+          stopAmazonAuthPolling();
+          setAmazonConnecting(false);
+          setAmazonMessage({ type: 'success', text: 'Amazon Seller Central connected successfully!' });
+          return;
+        }
+        if (Date.now() - startedAt > 3 * 60 * 1000) {
+          stopAmazonAuthPolling();
+          setAmazonConnecting(false);
+          setAmazonMessage({ type: 'error', text: 'Still waiting for authorization. Complete it in the new tab and try again.' });
+        }
+      } catch {
+        // Keep polling on transient errors.
+      }
+    }, 3000);
+  }, [stopAmazonAuthPolling]);
+
   useEffect(() => {
     fetchSettings();
     fetchAssets();
@@ -117,11 +149,19 @@ export const SettingsPage: React.FC = () => {
     fetchAmazonAuth();
   }, [fetchSettings, fetchAssets, fetchPlans, fetchCredits, fetchAmazonAuth]);
 
+  useEffect(() => {
+    return () => {
+      stopAmazonAuthPolling();
+    };
+  }, [stopAmazonAuthPolling]);
+
   // Parse Amazon OAuth callback query params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const amazonConnect = params.get('amazon_connect');
     if (amazonConnect === 'success') {
+      stopAmazonAuthPolling();
+      setAmazonConnecting(false);
       setAmazonMessage({ type: 'success', text: 'Amazon Seller Central connected successfully!' });
       fetchAmazonAuth();
       // Clean URL
@@ -129,6 +169,8 @@ export const SettingsPage: React.FC = () => {
       url.searchParams.delete('amazon_connect');
       window.history.replaceState({}, '', url.toString());
     } else if (amazonConnect === 'error') {
+      stopAmazonAuthPolling();
+      setAmazonConnecting(false);
       const errorMsg = params.get('reason') || 'Failed to connect Amazon account. Please try again.';
       setAmazonMessage({ type: 'error', text: errorMsg });
       const url = new URL(window.location.href);
@@ -136,7 +178,7 @@ export const SettingsPage: React.FC = () => {
       url.searchParams.delete('reason');
       window.history.replaceState({}, '', url.toString());
     }
-  }, [fetchAmazonAuth]);
+  }, [fetchAmazonAuth, stopAmazonAuthPolling]);
 
   const handleSaveBrandPresets = async () => {
     setIsSaving(true);
@@ -527,6 +569,8 @@ export const SettingsPage: React.FC = () => {
               disabled={amazonDisconnecting}
               onClick={async () => {
                 if (!window.confirm('Disconnect your Amazon Seller Central account? You can reconnect anytime.')) return;
+                stopAmazonAuthPolling();
+                setAmazonConnecting(false);
                 setAmazonDisconnecting(true);
                 setAmazonMessage(null);
                 try {
@@ -572,8 +616,19 @@ export const SettingsPage: React.FC = () => {
                 setAmazonConnecting(true);
                 setAmazonMessage(null);
                 try {
-                  const { auth_url } = await apiClient.getAmazonAuthUrl();
-                  window.location.href = auth_url;
+                  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+                  const { auth_url } = await apiClient.getAmazonAuthUrl(undefined, returnTo);
+                  const authTab = window.open(auth_url, '_blank', 'noopener,noreferrer');
+                  if (!authTab) {
+                    setAmazonMessage({ type: 'error', text: 'Popup blocked. Allow popups for this site and try again.' });
+                    setAmazonConnecting(false);
+                    return;
+                  }
+                  setAmazonMessage({
+                    type: 'success',
+                    text: 'Seller Central opened in a new tab. Finish authorization there and this page will update automatically.',
+                  });
+                  startAmazonAuthPolling();
                 } catch (err) {
                   console.error('Failed to get auth URL:', err);
                   setAmazonMessage({ type: 'error', text: 'Failed to start Amazon connection. Please try again.' });

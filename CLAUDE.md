@@ -819,7 +819,7 @@ GEMINI_API_KEY=xxx
 SUPABASE_URL=https://swdahopauesvigugsuby.supabase.co
 SUPABASE_ANON_KEY=xxx
 SUPABASE_SERVICE_ROLE_KEY=xxx
-ALLOWED_EMAILS=robertoxma@hotmail.com  # Whitelist (empty = allow all)
+ALLOWED_EMAILS=admin@example.com  # Whitelist (empty = allow all)
 APP_ENV=production
 
 # Vercel (frontend)
@@ -859,12 +859,7 @@ curl https://reddstudio-staging-backend-staging.up.railway.app/api/health
 
 ### Test Accounts (Staging & Production)
 
-| Role | Email | Password |
-|------|-------|----------|
-| **Admin** (unlimited credits) | `robertoxma@hotmail.com` | `S1lver951!` |
-| **Regular user** | `relojeriakairoscr@gmail.com` | `S1lver951!` |
-
-Both accounts work on staging and production (same Supabase auth).
+Credentials are managed outside this repository. Do not store plaintext passwords in docs or scripts.
 
 ### Database Notes
 
@@ -881,7 +876,7 @@ postgresql://postgres.PROJECT_ID:PASSWORD@aws-1-us-east-1.pooler.supabase.com:54
 ### Access Control (Email Whitelist)
 
 The `ALLOWED_EMAILS` environment variable restricts access:
-- **Set** (e.g., `robertoxma@hotmail.com`) → Only those emails can use the app
+- **Set** (e.g., `admin@example.com`) → Only those emails can use the app
 - **Empty** → All authenticated users allowed
 
 Configured in `app/config.py`, enforced in `app/core/auth.py`.
@@ -1014,7 +1009,7 @@ Credits are the internal currency for image generation. Users purchase/earn cred
 
 Admin users (configured in `ADMIN_EMAILS` env var) have unlimited credits and bypass all credit checks.
 
-Default admin: `robertoxma@hotmail.com`
+Default admin: set via `ADMIN_EMAILS` environment variable.
 
 ### Credit UI Components
 

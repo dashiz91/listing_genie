@@ -36,17 +36,21 @@ class Settings(BaseSettings):
 
     # Admin emails - comma-separated list of emails with unlimited credits
     # These users bypass all credit checks
-    admin_emails: str = "robertoxma@hotmail.com"
+    admin_emails: str = ""
 
     # Gemini (Story 2.1)
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-pro-image-preview"  # For image GENERATION
     gemini_vision_model: str = "gemini-3-flash-preview"  # For vision ANALYSIS (Principal Designer)
 
-    # Vision Provider Selection: "gemini" (recommended - 10x cheaper) or "openai"
+    # Vision Provider Selection:
+    # - "gemini" (default and recommended)
+    # - "openai" (deprecated; requires allow_openai_vision=true)
     vision_provider: str = "gemini"
+    # Emergency override: enable deprecated OpenAI vision provider only when needed
+    allow_openai_vision: bool = False
 
-    # OpenAI (Fallback for Vision Analysis)
+    # OpenAI Vision (deprecated emergency backup only)
     openai_api_key: str = ""
     openai_vision_model: str = "gpt-4o"  # Latest vision model
 

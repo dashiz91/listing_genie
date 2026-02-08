@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 from app.main import app
 from app.core.auth import User, get_current_user
 from app.db.session import engine, SessionLocal
-from app.models.database import Base, UserSettings
+from app.models.database import Base, GenerationSession, UserSettings
 from app.services.amazon_auth_service import AmazonAuthService, AmazonConnection
 from app.services.amazon_sp_api_service import AmazonSPAPIService
 from app.config import settings
@@ -114,6 +114,20 @@ def test_listing_push_creates_job_and_status_available(client, monkeypatch):
 
     monkeypatch.setattr(AmazonAuthService, "get_connection", fake_get_connection)
 
+    db = SessionLocal()
+    try:
+        db.add(
+            GenerationSession(
+                id="session-123",
+                user_id=TEST_USER.id,
+                upload_path="supabase://uploads/sample.png",
+                product_title="Test Product",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
     response = client.post(
         "/api/amazon/push/listing-images",
         json={
@@ -151,6 +165,20 @@ def test_listing_push_accepts_sku_without_asin(client, monkeypatch):
         )
 
     monkeypatch.setattr(AmazonAuthService, "get_connection", fake_get_connection)
+
+    db = SessionLocal()
+    try:
+        db.add(
+            GenerationSession(
+                id="session-123",
+                user_id=TEST_USER.id,
+                upload_path="supabase://uploads/sample.png",
+                product_title="Test Product",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
 
     response = client.post(
         "/api/amazon/push/listing-images",

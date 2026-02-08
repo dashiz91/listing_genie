@@ -41,7 +41,7 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
   const getImageUrlWithCache = (imageType: string) => {
     const baseUrl = apiClient.getImageUrl(sessionId, imageType);
     const cacheKey = imageCacheKey[imageType];
-    return cacheKey ? `${baseUrl}?t=${cacheKey}` : baseUrl;
+    return cacheKey ? apiClient.withCacheBust(baseUrl, cacheKey) : baseUrl;
   };
 
   const handleQuickRegenerate = (imageType: string) => {
@@ -415,14 +415,16 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                       <div className="flex flex-wrap gap-3">
                         {currentPrompt.reference_images.map((ref, idx) => {
                           const isStyleRef = ref.type === 'style_reference';
+                          const fallbackLabel = isStyleRef ? 'Style Reference' : ref.type.replace(/_/g, ' ');
+                          const label = ref.label || fallbackLabel;
                           return (
                             <div
                               key={idx}
                               className={`flex flex-col items-center ${isStyleRef ? 'p-2 bg-blue-900/30 rounded-lg' : ''}`}
                             >
                               <img
-                                src={`/api/images/file?path=${encodeURIComponent(ref.path)}`}
-                                alt={ref.type}
+                                src={apiClient.getFileUrl(ref.path)}
+                                alt={label}
                                 className={`object-cover rounded border ${
                                   isStyleRef
                                     ? 'w-24 h-24 border-blue-500 border-2'
@@ -433,10 +435,10 @@ export const ImageGallery: React.FC<ImageGalleryProps> = ({
                                   (e.target as HTMLImageElement).style.display = 'none';
                                 }}
                               />
-                              <span className={`text-xs mt-1 capitalize ${
+                              <span className={`text-xs mt-1 ${
                                 isStyleRef ? 'text-blue-300 font-semibold' : 'text-green-300'
                               }`}>
-                                {isStyleRef ? '⭐ Style Reference' : ref.type.replace('_', ' ')}
+                                {isStyleRef ? '⭐ Style Reference' : label}
                               </span>
                               {isStyleRef && (
                                 <span className="text-[10px] text-blue-400">
