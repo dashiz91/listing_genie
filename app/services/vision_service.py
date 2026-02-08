@@ -1,20 +1,9 @@
 """
-Unified Vision Service - Principal Designer AI
+Unified Vision Service - Principal Designer AI.
 
-Automatically selects the best vision provider based on configuration.
-Supports both Gemini (recommended - 10x cheaper) and OpenAI (fallback).
-
-COST COMPARISON (December 2025):
-┌─────────────────┬────────────┬─────────────┬───────────────┐
-│ Provider        │ Input/1M   │ Output/1M   │ vs GPT-4o     │
-├─────────────────┼────────────┼─────────────┼───────────────┤
-│ GPT-4o          │ $5.00      │ $15.00      │ baseline      │
-│ Gemini 3 Flash  │ $0.50      │ $3.00       │ 10x/5x cheaper│
-│ Gemini 2.0 Flash│ $0.10      │ $0.40       │ 50x/37x cheaper│
-└─────────────────┴────────────┴─────────────┴───────────────┘
-
-Set VISION_PROVIDER=gemini in .env to use Gemini (default)
-Set VISION_PROVIDER=openai to use OpenAI
+Runtime default and recommendation: Gemini.
+OpenAI vision remains in codebase only as a deprecated emergency path and is
+ignored unless explicitly enabled with ALLOW_OPENAI_VISION=true.
 """
 
 import logging
@@ -27,30 +16,39 @@ logger = logging.getLogger(__name__)
 
 class VisionService:
     """
-    Unified Vision Service that delegates to Gemini or OpenAI.
+    Unified Vision Service with Gemini-first provider selection.
 
-    This is the recommended way to use the Principal Designer AI.
-    It automatically selects the best provider based on configuration.
+    OpenAI vision is deprecated and opt-in only.
     """
 
     def __init__(self):
-        """Initialize the appropriate vision provider"""
-        self.provider = settings.vision_provider.lower()
+        """Initialize vision provider (Gemini by default)."""
+        requested_provider = (settings.vision_provider or "gemini").strip().lower()
+        self.requested_provider = requested_provider
+        self.provider = "gemini"
 
-        if self.provider == "gemini":
-            from app.services.gemini_vision_service import GeminiVisionService
-            self._service = GeminiVisionService()
-            logger.info("Vision Service initialized with Gemini (10x cost savings)")
-        elif self.provider == "openai":
-            from app.services.openai_vision_service import OpenAIVisionService
-            self._service = OpenAIVisionService()
-            logger.info("Vision Service initialized with OpenAI")
+        from app.services.gemini_vision_service import GeminiVisionService
+        self._service = GeminiVisionService()
+
+        if requested_provider == "openai":
+            if settings.allow_openai_vision:
+                from app.services.openai_vision_service import OpenAIVisionService
+                self._service = OpenAIVisionService()
+                self.provider = "openai"
+                logger.warning(
+                    "VISION_PROVIDER=openai is deprecated and enabled only for emergency use."
+                )
+            else:
+                logger.warning(
+                    "VISION_PROVIDER=openai requested but OpenAI vision is disabled. "
+                    "Using Gemini. Set ALLOW_OPENAI_VISION=true only for emergency opt-in."
+                )
+        elif requested_provider != "gemini":
+            logger.warning(
+                f"Unknown VISION_PROVIDER '{requested_provider}'. Using Gemini."
+            )
         else:
-            # Default to Gemini for cost savings
-            from app.services.gemini_vision_service import GeminiVisionService
-            self._service = GeminiVisionService()
-            logger.warning(f"Unknown provider '{self.provider}', defaulting to Gemini")
-            self.provider = "gemini"
+            logger.info("Vision Service initialized with Gemini")
 
     async def generate_frameworks(
         self,
@@ -66,22 +64,16 @@ class VisionService:
         style_reference_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Generate 4 unique design frameworks by ANALYZING the product image(s).
+        Generate frameworks by analyzing product image(s).
 
-        Delegates to the configured provider (Gemini or OpenAI).
-        Now supports multiple images so AI Designer can see the product from all angles.
-
-        Color Mode Options:
-        - ai_decides: AI picks all colors based on product (default)
-        - suggest_primary: User suggests primary, AI builds rest of palette
-        - locked_palette: User locks exact colors, AI must use them in ALL 4 frameworks
-
-        Style Reference:
-        - If provided, AI sees the style image and extracts colors/style from it
+        Delegates to the active provider (Gemini by default).
         """
         image_count = 1 + (len(additional_image_paths) if additional_image_paths else 0)
-        style_info = f", style_ref=YES" if style_reference_path else ""
-        logger.info(f"[{self.provider.upper()}] Generating frameworks for: {product_name} ({image_count} images, color_mode={color_mode or 'ai_decides'}{style_info})")
+        style_info = ", style_ref=YES" if style_reference_path else ""
+        logger.info(
+            f"[{self.provider.upper()}] Generating frameworks for: {product_name} "
+            f"({image_count} images, color_mode={color_mode or 'ai_decides'}{style_info})"
+        )
 
         result = await self._service.generate_frameworks(
             product_image_path=product_image_path,
@@ -96,9 +88,7 @@ class VisionService:
             style_reference_path=style_reference_path,
         )
 
-        # Add provider info to result
-        result['_vision_provider'] = self.provider
-
+        result["_vision_provider"] = self.provider
         return result
 
     async def generate_image_prompts(
@@ -113,21 +103,19 @@ class VisionService:
         brand_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
-        STEP 2: Generate 5 detailed image prompts for the SELECTED framework.
+        Generate detailed image prompts for a selected framework.
 
-        Delegates to the configured provider (Gemini or OpenAI).
-
-        Args:
-            global_note: User's global instructions - AI Designer interprets
-                         these differently for each of the 5 image types.
-            has_style_reference: Whether user provided a style reference image.
-            brand_name: The brand name for the product.
+        Delegates to the active provider (Gemini by default).
         """
-        logger.info(f"[{self.provider.upper()}] Generating image prompts for: {framework.get('framework_name')}")
+        logger.info(
+            f"[{self.provider.upper()}] Generating image prompts for: {framework.get('framework_name')}"
+        )
         if global_note:
             logger.info(f"[{self.provider.upper()}] Including global note for AI interpretation")
         if has_style_reference:
-            logger.info(f"[{self.provider.upper()}] User provided style reference - prompts will include style match instructions")
+            logger.info(
+                f"[{self.provider.upper()}] User provided style reference - prompts include style-match instructions"
+            )
 
         return await self._service.generate_image_prompts(
             framework=framework,
@@ -140,25 +128,79 @@ class VisionService:
             brand_name=brand_name,
         )
 
+    async def enhance_prompt_with_feedback(
+        self,
+        original_prompt: str,
+        user_feedback: str,
+        image_type: str,
+        framework: Optional[Dict[str, Any]] = None,
+        product_analysis: Optional[str] = None,
+        structural_context: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Rewrite a prompt based on user feedback while preserving context.
+
+        Delegates to the active provider (Gemini by default).
+        """
+        logger.info(
+            f"[{self.provider.upper()}] Enhancing prompt for {image_type} based on user feedback"
+        )
+        return await self._service.enhance_prompt_with_feedback(
+            original_prompt=original_prompt,
+            user_feedback=user_feedback,
+            image_type=image_type,
+            framework=framework,
+            product_analysis=product_analysis,
+            structural_context=structural_context,
+        )
+
+    async def plan_edit_instructions(
+        self,
+        source_image_path: str,
+        user_feedback: str,
+        image_type: str,
+        original_prompt: Optional[str] = None,
+        framework: Optional[Dict[str, Any]] = None,
+        product_analysis: Optional[str] = None,
+        reference_image_paths: Optional[List[str]] = None,
+        structural_context: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate concise edit instructions for image-edit API calls.
+
+        Delegates to the active provider (Gemini by default).
+        """
+        logger.info(
+            f"[{self.provider.upper()}] Planning edit instructions for {image_type}"
+        )
+        return await self._service.plan_edit_instructions(
+            source_image_path=source_image_path,
+            user_feedback=user_feedback,
+            image_type=image_type,
+            original_prompt=original_prompt,
+            framework=framework,
+            product_analysis=product_analysis,
+            reference_image_paths=reference_image_paths,
+            structural_context=structural_context,
+        )
+
     def framework_to_prompt(self, framework: Dict[str, Any], image_type: str) -> str:
         """
         Convert a design framework to a complete prompt for image generation.
 
         This method is model-agnostic - it just builds the prompt string.
-        Uses the OpenAI service's implementation since it's shared logic.
         """
-        # Import the method from OpenAI service (it's model-agnostic)
-        from app.services.openai_vision_service import OpenAIVisionService
-        temp_service = OpenAIVisionService.__new__(OpenAIVisionService)
-        return temp_service.framework_to_prompt(framework, image_type)
+        return self._service.framework_to_prompt(framework, image_type)
 
     def health_check(self) -> dict:
-        """Check health of the vision service"""
+        """Check health of the vision service."""
         base_health = self._service.health_check()
-        base_health['active_provider'] = self.provider
+        base_health["active_provider"] = self.provider
+        base_health["requested_provider"] = self.requested_provider
+        base_health["openai_vision_allowed"] = settings.allow_openai_vision
         return base_health
 
 
 def get_vision_service() -> VisionService:
-    """Dependency injection helper - returns unified vision service"""
+    """Dependency injection helper - returns unified vision service."""
     return VisionService()
