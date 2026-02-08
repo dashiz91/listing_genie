@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import { GenerationLoader } from '../generation-loader';
@@ -51,7 +51,12 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
   const [isImageError, setIsImageError] = useState(false);
   const [previousUrl, setPreviousUrl] = useState<string | null>(null);
   const [showStuckHint, setShowStuckHint] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1500;
 
   const hasActions = !!(onRegenerate || onEdit || onDownload || onViewPrompt);
   const hasVersions = versionInfo && versionInfo.total > 1;
@@ -76,19 +81,41 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
     if (imageUrl !== previousUrl) {
       setIsImageLoaded(false);
       setIsImageError(false);
+      setRetryCount(0);
       setPreviousUrl(imageUrl);
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
     }
   }, [imageUrl, previousUrl]);
 
-  const handleImageLoad = () => {
+  // Cleanup retry timer on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+  }, []);
+
+  const handleImageLoad = useCallback(() => {
     setIsImageLoaded(true);
     setIsImageError(false);
-  };
+    // Successful load after retries — no need to reset retryCount here,
+    // it'll be reset when imageUrl changes next time.
+  }, []);
 
-  const handleImageError = () => {
-    setIsImageError(true);
-    setIsImageLoaded(false);
-  };
+  const handleImageError = useCallback(() => {
+    if (retryCount < MAX_RETRIES) {
+      // Auto-retry after delay (handles transient storage propagation delays)
+      retryTimerRef.current = setTimeout(() => {
+        retryTimerRef.current = null;
+        setRetryCount(prev => prev + 1);
+      }, RETRY_DELAY_MS);
+    } else {
+      setIsImageError(true);
+      setIsImageLoaded(false);
+    }
+  }, [retryCount]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
@@ -197,7 +224,7 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
 
         {/* Main Image with crossfade */}
         <img
-          src={imageUrl}
+          src={retryCount > 0 ? imageUrl + (imageUrl.includes('?') ? '&' : '?') + `_r=${retryCount}` : imageUrl}
           alt={imageLabel}
           className={cn(
             'w-full h-full object-contain transition-opacity duration-300',
@@ -348,7 +375,7 @@ export const MainImageViewer: React.FC<MainImageViewerProps> = ({
           <div
             className="w-full h-full"
             style={{
-              backgroundImage: `url(${imageUrl})`,
+              backgroundImage: `url(${retryCount > 0 ? imageUrl + (imageUrl.includes('?') ? '&' : '?') + `_r=${retryCount}` : imageUrl})`,
               backgroundSize: '300%',
               backgroundPosition: `${mousePosition.x}% ${mousePosition.y}%`,
               backgroundRepeat: 'no-repeat',
