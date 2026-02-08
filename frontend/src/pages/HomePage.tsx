@@ -1020,7 +1020,8 @@ export const HomePage: React.FC = () => {
     generationStartRef.current = Date.now();
 
     const imageTypes: ImageType[] = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
-    setImages(imageTypes.map(type => ({ type, status: 'pending' as const, label: getImageLabel(type) })));
+    // Set to 'processing' immediately so UI shows loading spinners — don't wait for backend
+    setImages(imageTypes.map(type => ({ type, status: 'processing' as const, label: getImageLabel(type) })));
 
     try {
       console.log('[handleGenerate] Creating session (ensureSession)...');
