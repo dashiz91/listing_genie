@@ -8,7 +8,7 @@ import logging
 from io import BytesIO
 from pathlib import Path
 from typing import Tuple, Optional
-from PIL import Image
+from PIL import Image, ImageOps
 
 from supabase import create_client, Client
 
@@ -90,7 +90,21 @@ class SupabaseStorageService:
             storage_path = f"supabase://{self.uploads_bucket}/{safe_filename_raw}"
             return file_id, storage_path
 
+        # Apply EXIF orientation so vertical/rotated photos display correctly.
+        # Phone cameras store raw pixels in landscape with an EXIF rotation tag;
+        # without this, portrait photos appear rotated 90°.
+        image = ImageOps.exif_transpose(image)
+
         image = image.convert('RGB')  # Remove alpha channel if present
+
+        # Resize large images to prevent slow Gemini API calls and timeouts.
+        # 2048px longest side is plenty for AI analysis and generation reference.
+        # thumbnail() preserves aspect ratio — a 3000×4000 portrait → 1536×2048.
+        MAX_UPLOAD_DIM = 2048
+        orig_size = image.size
+        image.thumbnail((MAX_UPLOAD_DIM, MAX_UPLOAD_DIM), Image.Resampling.LANCZOS)
+        if image.size != orig_size:
+            logger.info(f"[UPLOAD] Resized {orig_size} → {image.size} (max {MAX_UPLOAD_DIM}px)")
 
         # Convert to bytes
         output_buffer = BytesIO()
