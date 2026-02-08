@@ -11,6 +11,7 @@ import type {
   DesignFramework,
   AplusVisualScript,
   ImageVersion,
+  ImageType,
 } from '../api/types';
 import type { AplusModule, AplusViewportMode } from '../components/preview-slots/AplusSection';
 import type { SlotStatus } from '../components/preview-slots/ImageSlot';
@@ -166,6 +167,8 @@ export const HomePage: React.FC = () => {
   const [, setGenerationStatus] = useState<GenerationStatus>('pending');
   const generationStatusRef = useRef<GenerationStatus>('pending');
   const [images, setImages] = useState<SessionImage[]>([]);
+  const formDataRef = useRef<WorkshopFormData>(initialFormData);
+  const generationStartRef = useRef<number>(0);
 
   // Keep ref in sync with state
   const updateSessionId = useCallback((id: string | null) => {
@@ -178,6 +181,9 @@ export const HomePage: React.FC = () => {
     generationStatusRef.current = status;
     setGenerationStatus(status);
   }, []);
+
+  // Keep formData ref in sync for use inside closures (credit toast, etc.)
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
 
   // UI state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -222,7 +228,7 @@ export const HomePage: React.FC = () => {
   const [showGenerationCelebration, setShowGenerationCelebration] = useState(false);
   const prevIsGeneratingRef = useRef(false);
 
-  // Detect generation completion and trigger celebration
+  // Detect generation completion → trigger celebration + credit toast
   useEffect(() => {
     const wasGenerating = prevIsGeneratingRef.current;
     prevIsGeneratingRef.current = isGenerating;
@@ -232,8 +238,23 @@ export const HomePage: React.FC = () => {
       if (completedCount >= 3) {
         setShowGenerationCelebration(true);
       }
+      // Credit usage toast (runs once when generation finishes)
+      if (completedCount > 0) {
+        const fd = formDataRef.current;
+        const modelCost = fd.imageModel?.includes('flash') ? 1 : 3;
+        const creditsUsed = completedCount * modelCost;
+        const newBalance = isAdmin ? balance : Math.max(0, balance - creditsUsed);
+        recordUsage({
+          operation: `${completedCount} listing image${completedCount > 1 ? 's' : ''} generated`,
+          creditsUsed,
+          newBalance,
+          isAdmin,
+          timestamp: Date.now(),
+        });
+        refetchCredits();
+      }
     }
-  }, [isGenerating, images]);
+  }, [isGenerating, images, isAdmin, balance, recordUsage, refetchCredits]);
 
   // Out of credits modal state
   const [outOfCreditsOpen, setOutOfCreditsOpen] = useState(false);
@@ -565,10 +586,16 @@ export const HomePage: React.FC = () => {
           }
         });
 
-        // Only stop polling on terminal states.
-        // 'partial' is NOT terminal — handleGenerate may still be running remaining batches.
-        if (response.status === 'complete' || response.status === 'failed') {
+        // Stop polling on terminal states.
+        // With batch endpoint, 'partial' IS terminal (backend handles all concurrency).
+        if (response.status === 'complete' || response.status === 'failed' || response.status === 'partial') {
           setIsGenerating(false);
+        }
+
+        // Safety net: if generation has been running for >5 minutes, stop polling
+        if (generationStartRef.current && Date.now() - generationStartRef.current > 5 * 60 * 1000) {
+          setIsGenerating(false);
+          setError('Generation timed out — some images may still be processing. Refresh to check.');
         }
       } catch (err) {
         console.error('Failed to poll status:', err);
@@ -981,68 +1008,29 @@ export const HomePage: React.FC = () => {
     [uploads, selectedFramework, ensureSession, formData.imageModel, waitForSingleImageTerminalState]
   );
 
-  // Generate all 5 images - triggers 5 individual generations (same code path as clicking slots)
+  // Generate all 6 listing images via backend batch endpoint.
+  // Returns immediately; polling is the sole source of truth for progress.
   const handleGenerate = useCallback(async () => {
     if (uploads.length === 0 || !selectedFramework) return;
 
     setError(null);
     setIsGenerating(true);
     updateGenerationStatus('processing');
+    generationStartRef.current = Date.now();
 
-    // Initialize all 6 images as pending (will be set to processing by handleGenerateSingle)
-    setImages([
-      { type: 'main', status: 'pending', label: 'Main Image' },
-      { type: 'infographic_1', status: 'pending', label: 'Infographic 1' },
-      { type: 'infographic_2', status: 'pending', label: 'Infographic 2' },
-      { type: 'lifestyle', status: 'pending', label: 'Lifestyle' },
-      { type: 'transformation', status: 'pending', label: 'Transformation' },
-      { type: 'comparison', status: 'pending', label: 'Comparison' },
-    ]);
+    const imageTypes: ImageType[] = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
+    setImages(imageTypes.map(type => ({ type, status: 'pending' as const, label: getImageLabel(type) })));
 
-    // Generate images in batches of 2 to avoid overwhelming the backend.
-    // 6 concurrent Gemini API calls (~60s each) saturate the server and cause
-    // timeouts on all other requests (polling, image loading, project loading).
-    const imageTypes = ['main', 'infographic_1', 'infographic_2', 'lifestyle', 'transformation', 'comparison'];
-    const BATCH_SIZE = 2;
-    const results: PromiseSettledResult<void>[] = [];
-
-    for (let i = 0; i < imageTypes.length; i += BATCH_SIZE) {
-      const batch = imageTypes.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.allSettled(
-        batch.map((type) => handleGenerateSingle(type))
-      );
-      results.push(...batchResults);
+    try {
+      const sid = await ensureSession();
+      await apiClient.generateBatch(sid, imageTypes, formData.imageModel);
+      // Polling handles everything from here — no direct state updates needed
+    } catch (err: any) {
+      handleError(err, 'Failed to start generation');
+      setIsGenerating(false);
+      updateGenerationStatus('failed');
     }
-
-    // Check if any failed
-    const anyFailed = results.some((r) => r.status === 'rejected');
-    const successCount = results.filter((r) => r.status === 'fulfilled').length;
-
-    if (anyFailed) {
-      updateGenerationStatus('partial');
-    } else {
-      updateGenerationStatus('complete');
-    }
-    setIsGenerating(false);
-
-    // Record credit usage for toast notification
-    if (successCount > 0) {
-      const modelCost = formData.imageModel.includes('flash') ? 1 : 3;
-      const creditsUsed = successCount * modelCost;
-      const newBalance = isAdmin ? balance : Math.max(0, balance - creditsUsed);
-
-      recordUsage({
-        operation: `${successCount} listing image${successCount > 1 ? 's' : ''} generated`,
-        creditsUsed,
-        newBalance,
-        isAdmin,
-        timestamp: Date.now(),
-      });
-
-      // Refetch credits to sync with server
-      refetchCredits();
-    }
-  }, [uploads, selectedFramework, handleGenerateSingle, formData.imageModel, isAdmin, balance, recordUsage, refetchCredits]);
+  }, [uploads, selectedFramework, ensureSession, formData.imageModel, handleError, updateGenerationStatus]);
 
   // Handle retry
   const handleRetry = useCallback(async () => {

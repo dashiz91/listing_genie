@@ -10,6 +10,7 @@ import logging
 import re
 import time
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Response, status
+from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 from typing import List, Optional
@@ -98,6 +99,8 @@ from app.schemas.generation import (
     AplusAllMobileRequest,
     ImageGenerationPrompt,
     DesignFramework,
+    BatchGenerateRequest,
+    BatchGenerateResponse,
 )
 from app.prompts import get_all_styles, generate_random_framework, get_all_presets
 
@@ -365,6 +368,114 @@ async def generate_single_image(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+
+async def _batch_generate_worker(
+    service: GenerationService,
+    credits: CreditsService,
+    session: GenerationSession,
+    image_types: list,
+    image_model: str | None,
+    user_id: str,
+    user_email: str | None,
+):
+    """Background worker: generate multiple listing images with bounded concurrency."""
+    from app.models.database import GenerationStatusEnum as DBStatus
+    MAX_CONCURRENT = 3
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+
+    async def gen_one(image_type):
+        async with semaphore:
+            try:
+                # Keepalive ping — reconnect if Supabase pooler reclaimed the connection
+                try:
+                    service.db.execute(sa_text("SELECT 1"))
+                except Exception:
+                    pass  # SQLAlchemy pool will reconnect on next real query
+                return await service.generate_single_image(
+                    session, image_type, model_override=image_model,
+                )
+            except Exception as e:
+                logger.error(f"[BATCH] {image_type.value} failed: {e}")
+                for img in session.images:
+                    if img.image_type == image_type:
+                        img.status = DBStatus.FAILED
+                        img.error_message = str(e)[:500]
+                        break
+                service.db.commit()
+                return ImageResult(
+                    image_type=image_type.value,
+                    status="failed",
+                    error_message=str(e),
+                )
+
+    results = await asyncio.gather(*[gen_one(it) for it in image_types])
+    service._update_session_status(session)
+
+    completed = sum(1 for r in results if getattr(r, 'status', '') == 'complete')
+    if completed > 0:
+        model = image_model or "gemini-3-pro-image-preview"
+        cost = credits.get_credit_cost("listing_image", model, completed)
+        credits.deduct_credits(user_id, cost, "listing_image", email=user_email)
+    if completed < len(image_types):
+        logger.warning(f"[BATCH] {completed}/{len(image_types)} images completed for session {session.id}")
+
+
+@router.post("/batch", response_model=BatchGenerateResponse)
+async def generate_batch(
+    request: BatchGenerateRequest,
+    background_tasks: BackgroundTasks,
+    service: GenerationService = Depends(get_generation_service),
+    user: User = Depends(get_current_user),
+    credits: CreditsService = Depends(get_credits_service),
+):
+    """
+    Queue multiple listing images for background generation.
+
+    Returns immediately. Use polling (GET /generate/{session_id}) to track progress.
+    Backend runs up to 3 images concurrently via asyncio.Semaphore.
+    """
+    session = _get_owned_session(service, request.session_id, user)
+
+    # Validate and convert image types
+    db_image_types = []
+    for it in request.image_types:
+        try:
+            db_image_types.append(DBImageType(it))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid image type: {it}")
+
+    # Credit check upfront for ALL images
+    model = request.image_model or "gemini-3-pro-image-preview"
+    cost = credits.get_credit_cost("listing_image", model, len(db_image_types))
+    has_credits, balance, msg = credits.check_credits(user.id, cost, user.email)
+    if not has_credits:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient credits. Need {cost}, have {balance}. Please upgrade your plan.",
+        )
+
+    # Reset requested images to PENDING
+    from app.models.database import GenerationStatusEnum as DBStatus
+    for img in session.images:
+        if img.image_type in db_image_types:
+            img.status = DBStatus.PENDING
+            img.error_message = None
+    session.status = DBStatus.PROCESSING
+    service.db.commit()
+
+    # Queue background generation
+    background_tasks.add_task(
+        _batch_generate_worker,
+        service, credits, session, db_image_types, request.image_model,
+        user.id, user.email,
+    )
+
+    return BatchGenerateResponse(
+        session_id=session.id,
+        status="processing",
+        queued=request.image_types,
+    )
 
 
 @router.post("/edit", response_model=SingleImageResponse)

@@ -294,6 +294,7 @@ export interface PromptHistory {
   reference_images: Array<{
     type: string;  // "primary", "additional_1", "style_reference", "logo"
     path: string;
+    label?: string;  // Optional backend-provided display label
   }>;
   // Full context injected into AI Designer (for transparency)
   designer_context?: {

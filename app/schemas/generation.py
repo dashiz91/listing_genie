@@ -679,3 +679,26 @@ class AltTextResponse(BaseModel):
     image_type: str
     alt_text: str
     character_count: int
+
+
+# ============================================================================
+# Batch Generation
+# ============================================================================
+
+class BatchGenerateRequest(BaseModel):
+    """Request to generate multiple listing images in one call (backend concurrency)"""
+    session_id: str = Field(..., description="Session ID from create_only session")
+    image_types: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=6,
+        description="Image types to generate (e.g. ['main', 'infographic_1', ...])"
+    )
+    image_model: Optional[str] = Field(None, description="Override Gemini model for all images")
+
+
+class BatchGenerateResponse(BaseModel):
+    """Response from batch generation (returns immediately, polling handles progress)"""
+    session_id: str
+    status: str = "processing"
+    queued: List[str] = Field(default_factory=list, description="Image types queued for generation")

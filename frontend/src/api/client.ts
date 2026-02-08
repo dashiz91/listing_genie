@@ -137,6 +137,20 @@ class ApiClient {
     return response.data;
   }
 
+  // Queue multiple listing images for backend-concurrent generation (returns immediately)
+  async generateBatch(
+    sessionId: string,
+    imageTypes: string[],
+    imageModel?: string
+  ): Promise<{ session_id: string; status: string; queued: string[] }> {
+    const response = await this.client.post('/generate/batch', {
+      session_id: sessionId,
+      image_types: imageTypes,
+      image_model: imageModel || null,
+    }, { timeout: 30000 }); // Short timeout — returns immediately
+    return response.data;
+  }
+
   // Regenerate a single image with optional note
   async regenerateSingleImage(
     sessionId: string,
