@@ -250,10 +250,11 @@ export const PromptModal: React.FC<PromptModalProps> = ({
                       {prompt.reference_images.map((ref, idx) => {
                         const imgSrc = apiClient.getFileUrl(ref.path);
                         const isStyleRef = ref.type === 'style_reference';
-                        const semanticLabel = getSemanticReferenceLabel(ref.type, ref.label);
+                        const refLabel = (ref as { label?: string }).label;
+                        const semanticLabel = getSemanticReferenceLabel(ref.type, refLabel);
                         const fallbackLabel = ref.type ? ref.type.replace(/_/g, ' ').toUpperCase() : 'REFERENCE_IMAGE';
-                        const label = semanticLabel || ref.label || fallbackLabel;
-                        const sourceLabel = ref.label && ref.label !== label ? ref.label : null;
+                        const label = semanticLabel || refLabel || fallbackLabel;
+                        const sourceLabel = refLabel && refLabel !== label ? refLabel : null;
                         return (
                           <button
                             key={idx}
