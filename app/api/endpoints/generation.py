@@ -381,44 +381,62 @@ async def _batch_generate_worker(
 ):
     """Background worker: generate multiple listing images with bounded concurrency."""
     from app.models.database import GenerationStatusEnum as DBStatus
-    MAX_CONCURRENT = 3
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+    logger.info(f"[BATCH] Starting worker for session {session.id} — {len(image_types)} images, model={image_model}")
 
-    async def gen_one(image_type):
-        async with semaphore:
-            try:
-                # Keepalive ping — reconnect if Supabase pooler reclaimed the connection
+    try:
+        MAX_CONCURRENT = 3
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+
+        async def gen_one(image_type):
+            async with semaphore:
+                logger.info(f"[BATCH] Generating {image_type.value} for session {session.id}")
                 try:
-                    service.db.execute(sa_text("SELECT 1"))
-                except Exception:
-                    pass  # SQLAlchemy pool will reconnect on next real query
-                return await service.generate_single_image(
-                    session, image_type, model_override=image_model,
-                )
-            except Exception as e:
-                logger.error(f"[BATCH] {image_type.value} failed: {e}")
-                for img in session.images:
-                    if img.image_type == image_type:
-                        img.status = DBStatus.FAILED
-                        img.error_message = str(e)[:500]
-                        break
-                service.db.commit()
-                return ImageResult(
-                    image_type=image_type.value,
-                    status="failed",
-                    error_message=str(e),
-                )
+                    # Keepalive ping — reconnect if Supabase pooler reclaimed the connection
+                    try:
+                        service.db.execute(sa_text("SELECT 1"))
+                    except Exception:
+                        pass  # SQLAlchemy pool will reconnect on next real query
+                    result = await service.generate_single_image(
+                        session, image_type, model_override=image_model,
+                    )
+                    logger.info(f"[BATCH] {image_type.value} completed: {getattr(result, 'status', 'unknown')}")
+                    return result
+                except Exception as e:
+                    logger.error(f"[BATCH] {image_type.value} failed: {e}", exc_info=True)
+                    for img in session.images:
+                        if img.image_type == image_type:
+                            img.status = DBStatus.FAILED
+                            img.error_message = str(e)[:500]
+                            break
+                    try:
+                        service.db.commit()
+                    except Exception:
+                        logger.error(f"[BATCH] Failed to commit error status for {image_type.value}")
+                    return ImageResult(
+                        image_type=image_type.value,
+                        status="failed",
+                        error_message=str(e),
+                    )
 
-    results = await asyncio.gather(*[gen_one(it) for it in image_types])
-    service._update_session_status(session)
+        results = await asyncio.gather(*[gen_one(it) for it in image_types])
+        service._update_session_status(session)
 
-    completed = sum(1 for r in results if getattr(r, 'status', '') == 'complete')
-    if completed > 0:
-        model = image_model or "gemini-3-pro-image-preview"
-        cost = credits.get_credit_cost("listing_image", model, completed)
-        credits.deduct_credits(user_id, cost, "listing_image", email=user_email)
-    if completed < len(image_types):
-        logger.warning(f"[BATCH] {completed}/{len(image_types)} images completed for session {session.id}")
+        completed = sum(1 for r in results if getattr(r, 'status', '') == 'complete')
+        logger.info(f"[BATCH] Session {session.id} finished: {completed}/{len(image_types)} completed")
+        if completed > 0:
+            model = image_model or "gemini-3-pro-image-preview"
+            cost = credits.get_credit_cost("listing_image", model, completed)
+            credits.deduct_credits(user_id, cost, "listing_image", email=user_email)
+        if completed < len(image_types):
+            logger.warning(f"[BATCH] {completed}/{len(image_types)} images completed for session {session.id}")
+    except Exception as e:
+        logger.error(f"[BATCH] Worker crashed for session {session.id}: {e}", exc_info=True)
+        # Mark session as failed so polling can detect it
+        try:
+            session.status = DBStatus.FAILED
+            service.db.commit()
+        except Exception:
+            logger.error(f"[BATCH] Could not mark session as failed")
 
 
 @router.post("/batch", response_model=BatchGenerateResponse)
@@ -1348,20 +1366,24 @@ async def generate_with_framework(
                 )
 
         # STEP 1: Generate 5 detailed image prompts for this framework
-        logger.info(f"Generating 5 image prompts for framework: {framework.get('framework_name')}")
-
-        generation_prompts = await vision.generate_image_prompts(
-            framework=framework,
-            product_name=request.product_title,
-            product_description=request.product_title,
-            features=request.features,
-            target_audience=request.target_audience,
-            global_note=request.global_note,  # AI Designer interprets for each image
-            has_style_reference=bool(request.style_reference_path),  # Tell AI Designer about style ref
-            brand_name=request.brand_name,
-        )
-
-        logger.info(f"Generated {len(generation_prompts)} prompts")
+        # Skip prompt generation when create_only — batch endpoint triggers generation later,
+        # and generate_single_image generates its own prompts if needed.
+        if request.create_only:
+            logger.info(f"create_only mode — skipping prompt generation for framework: {framework.get('framework_name')}")
+            generation_prompts = framework.get('generation_prompts', [])
+        else:
+            logger.info(f"Generating 5 image prompts for framework: {framework.get('framework_name')}")
+            generation_prompts = await vision.generate_image_prompts(
+                framework=framework,
+                product_name=request.product_title,
+                product_description=request.product_title,
+                features=request.features,
+                target_audience=request.target_audience,
+                global_note=request.global_note,  # AI Designer interprets for each image
+                has_style_reference=bool(request.style_reference_path),  # Tell AI Designer about style ref
+                brand_name=request.brand_name,
+            )
+            logger.info(f"Generated {len(generation_prompts)} prompts")
 
         # Add prompts to the framework
         framework['generation_prompts'] = generation_prompts

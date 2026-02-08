@@ -348,10 +348,15 @@ export const HomePage: React.FC = () => {
   const [listingVersions, setListingVersions] = useState<ListingVersionState>({});
 
   // Load project from URL param (?project= or ?session=)
+  // SKIP if we're actively generating — ensureSession sets ?session= which would
+  // trigger a full project reload, killing the generation state.
   useEffect(() => {
     const loadProject = async () => {
       const sessionToLoad = projectParam || sessionParam;
       if (!sessionToLoad) return;
+      // Skip if this session is already loaded (ensureSession sets ?session= which would
+      // otherwise trigger a full project reload, killing the active generation state)
+      if (sessionToLoad === sessionIdRef.current) return;
 
       setIsLoadingProject(true);
       try {
