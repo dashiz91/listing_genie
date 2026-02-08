@@ -25,12 +25,13 @@ from .product_protection import (
 
 
 HERO_LISTING_PROP_STRATEGY = """
-HERO LISTING (IMAGE 1) - CTR-FIRST RULES:
-- Keep the exact product from Image 1 as the dominant hero.
-- Add 2-6 supporting props inferred from the product itself to increase click-through appeal.
-- Infer props from flavor, ingredients, materials, use case, or category context (never random filler).
-- Keep composition clean and premium: bright background (often white), soft contact shadows, no clutter.
-- Product must remain the visual priority (roughly 65-80% of visual weight), centered and tack-sharp.
+HERO LISTING (IMAGE 1) - AMAZON MAIN IMAGE RULES (MANDATORY):
+- PURE WHITE BACKGROUND (#FFFFFF). No colored backgrounds, no gradients, no patterns. White only.
+- The product must fill 95%+ of the frame. Make it BIG — shoppers scroll fast, bigger = more clicks.
+- Keep the exact product from Image 1 as the ONLY subject.
+- ZERO text, ZERO typography, ZERO headlines, ZERO decorative frames or circles.
+- Minimal supporting props ONLY if they clarify the product (e.g. a plant inside a planter). Never random filler.
+- Product centered, tack-sharp, professional studio lighting, soft contact shadows on white.
 - Never add website UI, browser chrome, watermarks, or unrelated decorative elements.
 """
 
@@ -524,9 +525,9 @@ The customer is the HERO. The product is the GUIDE that enables transformation.
 
 **IMAGE 1: INTRIGUE** — "What is this beautiful thing?"
 ''' + HERO_LISTING_PROP_STRATEGY + '''
-Stop the scroll. Create visual magnetism. The product exists with quiet confidence.
-Hasselblad H6D-100c. Keep the background bright and clean, and use product-relevant props to add desire context.
-It simply IS — beautiful, present, mysterious in its perfection.
+Stop the scroll. Product HUGE on pure white. No text. No decorative elements.
+Hasselblad H6D-100c. Pure white (#FFFFFF) background, product fills 95% of the frame.
+It simply IS — beautiful, present, impossible to miss in a search grid.
 The viewer's unconscious thought: "I want to know more."
 
 **IMAGE 2: TRUST (Infographic 1)** — "This is real, this is well-made"
@@ -728,6 +729,8 @@ YOUR TASK:
    - Product colors are SACRED - never apply brand colors to product
    - Use framework colors for atmosphere only
    - Keep the same quality standard
+   - Do NOT include scaffolding labels like "CLIENT DIRECTION", "CLIENT NOTE",
+     "[USER FEEDBACK]", or "REGENERATION INSTRUCTIONS" in the rewritten prompt
 
 OUTPUT:
 {{
@@ -737,6 +740,63 @@ OUTPUT:
 }}
 
 The enhanced_prompt must be COMPLETE and ready to send to the image generator.
+'''
+
+
+# ============================================================================
+# STEP 4: PLAN EDIT INSTRUCTIONS (for image edit API)
+# ============================================================================
+
+PLAN_EDIT_INSTRUCTIONS_PROMPT = '''You are the Principal Designer assisting an IMAGE EDIT operation.
+The user wants to edit an EXISTING generated image.
+
+You will be shown:
+- CURRENT IMAGE TO EDIT (always provided)
+- Optional reference images (PRODUCT_PHOTO, STYLE_REFERENCE, BRAND_LOGO)
+
+Your job is to REASON about the user's intent and return precise EDIT INSTRUCTIONS
+for an image-edit model. Do NOT rewrite a full generation prompt.
+
+YOUR NOTES ABOUT THE PRODUCT:
+{product_analysis}
+
+FRAMEWORK CONTEXT:
+Framework: {framework_name}
+Philosophy: {design_philosophy}
+Palette: {color_palette}
+Typography: {typography}
+Voice: {brand_voice}
+
+IMAGE TYPE:
+Type: {image_type}
+{image_type_context}
+
+PREVIOUS PROMPT CONTEXT (for intent only):
+{original_prompt}
+
+USER FEEDBACK:
+{user_feedback}
+
+STRUCTURAL RULES (Do not violate):
+{structural_context}
+
+YOUR TASK:
+1. Interpret what should change vs stay untouched.
+2. Produce DELTA-style edit instructions only (what to modify, what to preserve).
+3. Keep product identity, compliance, and layout continuity.
+
+IMPORTANT:
+- Assume the source image is provided and should be edited in place.
+- Do NOT regenerate from scratch.
+- Do NOT output scaffold labels like "CLIENT DIRECTION", "USER FEEDBACK", etc.
+- Keep instructions concise and executable.
+
+OUTPUT JSON ONLY:
+{{
+  "interpretation": "What the user really wants changed",
+  "changes_made": ["Change 1", "Change 2"],
+  "edit_instructions": "Concise edit instructions for the image edit model (60-180 words)."
+}}
 '''
 
 
@@ -812,6 +872,7 @@ __all__ = [
     'STYLE_REFERENCE_FRAMEWORK_PROMPT',
     'GENERATE_IMAGE_PROMPTS_PROMPT',
     'ENHANCE_PROMPT_WITH_FEEDBACK_PROMPT',
+    'PLAN_EDIT_INSTRUCTIONS_PROMPT',
     'GLOBAL_NOTE_INSTRUCTIONS',
     'STYLE_REFERENCE_INSTRUCTIONS',
     'STYLE_REFERENCE_PROMPT_PREFIX',

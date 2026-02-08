@@ -952,13 +952,15 @@ def get_structural_context(image_type: str, *, has_canvas: bool = False) -> str:
         )
     if image_type == "aplus_hero":
         return (
-            "PRESERVE VERBATIM: The tall 4:3 format, the split-into-two-halves instruction, "
+            "PRESERVE VERBATIM: The leading '=== REFERENCE IMAGES ===' header block, "
+            "the tall 4:3 format, the split-into-two-halves instruction, "
             "and named image references (PRODUCT_PHOTO, STYLE_REFERENCE). "
             "Only modify creative/visual direction."
         )
     if image_type.startswith("aplus_"):
         return (
-            "PRESERVE VERBATIM: Named image labels (PRODUCT_PHOTO, STYLE_REFERENCE, PREVIOUS_MODULE), "
+            "PRESERVE VERBATIM: The leading '=== REFERENCE IMAGES ===' header block, "
+            "named image labels (PRODUCT_PHOTO, STYLE_REFERENCE, PREVIOUS_MODULE), "
             "1464x600 A+ banner format constraints, and module position/continuity instructions. "
             "Only modify creative/visual scene description."
         )

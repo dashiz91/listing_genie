@@ -60,11 +60,29 @@ from app.prompts.ai_designer import (
     PRINCIPAL_DESIGNER_VISION_PROMPT,
     STYLE_REFERENCE_FRAMEWORK_PROMPT,
     GENERATE_IMAGE_PROMPTS_PROMPT,
+    ENHANCE_PROMPT_WITH_FEEDBACK_PROMPT,
+    PLAN_EDIT_INSTRUCTIONS_PROMPT,
     GLOBAL_NOTE_INSTRUCTIONS,
     STYLE_REFERENCE_INSTRUCTIONS,
 )
 
 logger = logging.getLogger(__name__)
+
+_DISALLOWED_FEEDBACK_MARKERS = (
+    "CLIENT DIRECTION:",
+    "CLIENT NOTE:",
+    "[USER FEEDBACK]:",
+    "=== REGENERATION INSTRUCTIONS ===",
+)
+
+
+def _find_disallowed_feedback_marker(text: str) -> Optional[str]:
+    """Return disallowed raw-feedback marker if present in rewritten prompt."""
+    lowered = text.lower()
+    for marker in _DISALLOWED_FEEDBACK_MARKERS:
+        if marker.lower() in lowered:
+            return marker
+    return None
 
 
 class GeminiVisionService:
@@ -735,6 +753,494 @@ Make each framework's palette distinct but appropriate for the product.
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse prompts JSON: {e}")
             raise ValueError(f"Invalid JSON in prompts response: {e}")
+
+    async def enhance_prompt_with_feedback(
+        self,
+        original_prompt: str,
+        user_feedback: str,
+        image_type: str,
+        framework: Optional[Dict[str, Any]] = None,
+        product_analysis: Optional[str] = None,
+        structural_context: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Enhance/rewrite a prompt based on user feedback.
+
+        Works for both listing images and A+ modules. The structural_context
+        parameter tells the AI Designer which structural elements must remain
+        unchanged.
+        """
+        if not self.client:
+            raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
+
+        listing_number = {
+            "main": 1,
+            "infographic_1": 2,
+            "infographic_2": 3,
+            "lifestyle": 4,
+            "comparison": 5,
+        }
+        if image_type in listing_number:
+            image_type_context = f"Listing image {listing_number[image_type]} of 5"
+        elif image_type == "aplus_hero":
+            image_type_context = "A+ Content hero pair (tall image split into modules 0+1)"
+        elif image_type.startswith("aplus_"):
+            image_type_context = "A+ Content module banner (1464x600, wide format)"
+        else:
+            image_type_context = ""
+
+        framework_name = "Design Framework"
+        design_philosophy = "Professional Amazon listing design"
+        color_palette = "Not specified"
+        typography = "Not specified"
+        brand_voice = "Professional and compelling"
+
+        if framework:
+            framework_name = framework.get("framework_name", framework_name)
+            design_philosophy = framework.get("design_philosophy", design_philosophy)
+            brand_voice = framework.get("brand_voice", brand_voice)
+
+            colors = framework.get("colors", [])
+            if colors:
+                color_lines = []
+                for color in colors:
+                    color_lines.append(
+                        f"- {color.get('role', 'color')}: {color.get('hex', 'N/A')} ({color.get('name', '')})"
+                    )
+                color_palette = "\n".join(color_lines)
+
+            typo = framework.get("typography", {})
+            if typo:
+                typography = (
+                    f"Headline: {typo.get('headline_font', 'N/A')} {typo.get('headline_weight', '')} | "
+                    f"Body: {typo.get('body_font', 'N/A')}"
+                )
+
+        analysis_text = (
+            product_analysis
+            or "No product analysis available - use the original prompt as your guide."
+        )
+
+        prompt = ENHANCE_PROMPT_WITH_FEEDBACK_PROMPT.format(
+            product_analysis=analysis_text,
+            image_type=image_type,
+            image_type_context=image_type_context,
+            framework_name=framework_name,
+            design_philosophy=design_philosophy,
+            color_palette=color_palette,
+            typography=typography,
+            brand_voice=brand_voice,
+            original_prompt=original_prompt,
+            user_feedback=user_feedback,
+            structural_context=structural_context or "No special structural rules.",
+        )
+
+        logger.info(f"[REGENERATION][GEMINI] Enhancing prompt for {image_type}")
+        logger.info(f"[REGENERATION][GEMINI] Has product_analysis: {bool(product_analysis)}")
+        logger.info(f"[REGENERATION][GEMINI] Has framework: {bool(framework)}")
+        logger.info(f"[REGENERATION][GEMINI] User feedback: {user_feedback[:100]}...")
+
+        attempts = [
+            (prompt, 0.7, "primary"),
+            (
+                prompt
+                + "\n\nRETRY MODE: Return ONLY valid JSON with keys "
+                + "\"interpretation\", \"changes_made\", and \"enhanced_prompt\". "
+                + "Do not include markdown, code fences, or any extra text.",
+                0.2,
+                "json_retry",
+            ),
+        ]
+        last_error: Optional[Exception] = None
+
+        for idx, (attempt_prompt, temperature, label) in enumerate(attempts, start=1):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=[
+                        types.Content(
+                            role="user",
+                            parts=[types.Part.from_text(text=attempt_prompt)],
+                        )
+                    ],
+                    config=types.GenerateContentConfig(
+                        temperature=temperature,
+                        max_output_tokens=3000,
+                    ),
+                )
+
+                content = response.text or ""
+                result = self._parse_enhancement_response(content)
+
+                enhanced_prompt = (result.get("enhanced_prompt") or "").strip()
+                if not enhanced_prompt:
+                    raise ValueError("enhanced_prompt is empty")
+
+                disallowed_marker = _find_disallowed_feedback_marker(enhanced_prompt)
+                if disallowed_marker:
+                    raise ValueError(
+                        f"enhanced_prompt contains disallowed marker: {disallowed_marker}"
+                    )
+
+                result["enhanced_prompt"] = enhanced_prompt
+                logger.info(
+                    f"[REGENERATION][GEMINI] Successfully enhanced prompt on attempt {idx} ({label}). "
+                    f"Changes: {result.get('changes_made', [])}"
+                )
+                return result
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    f"[REGENERATION][GEMINI] Prompt enhancement attempt {idx} ({label}) failed: {e}"
+                )
+
+        raise RuntimeError(
+            "AI Designer could not rewrite feedback into a clean generation prompt."
+        ) from last_error
+
+    def _parse_enhancement_response(self, response: str) -> Dict[str, Any]:
+        """Parse prompt-enhancement response JSON."""
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+
+            if json_start == -1 or json_end == 0:
+                raise ValueError("No JSON found in response")
+
+            json_str = response[json_start:json_end]
+            data = json.loads(json_str)
+
+            if "enhanced_prompt" not in data:
+                raise ValueError("Response missing 'enhanced_prompt' key")
+
+            return {
+                "interpretation": data.get("interpretation", "Feedback processed"),
+                "changes_made": data.get("changes_made", []),
+                "enhanced_prompt": data["enhanced_prompt"],
+            }
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse enhancement JSON: {e}")
+            raise ValueError(f"Invalid JSON in enhancement response: {e}")
+
+    async def plan_edit_instructions(
+        self,
+        source_image_path: str,
+        user_feedback: str,
+        image_type: str,
+        original_prompt: Optional[str] = None,
+        framework: Optional[Dict[str, Any]] = None,
+        product_analysis: Optional[str] = None,
+        reference_image_paths: Optional[List[str]] = None,
+        structural_context: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate concise edit instructions from feedback for image editing API calls.
+
+        Unlike regeneration prompt rewriting, this returns DELTA edit instructions
+        to apply on the existing source image.
+        """
+        if not self.client:
+            raise ValueError("Gemini client not initialized - check GEMINI_API_KEY")
+
+        if not _image_path_exists(source_image_path):
+            raise ValueError(f"Source image not found for edit planning: {source_image_path}")
+
+        listing_number = {
+            "main": 1,
+            "infographic_1": 2,
+            "infographic_2": 3,
+            "lifestyle": 4,
+            "comparison": 5,
+        }
+        if image_type in listing_number:
+            image_type_context = f"Listing image {listing_number[image_type]} of 5"
+        elif image_type == "aplus_hero":
+            image_type_context = "A+ Content hero pair (tall image split into modules 0+1)"
+        elif image_type.startswith("aplus_"):
+            image_type_context = "A+ Content module banner (1464x600, wide format)"
+        else:
+            image_type_context = ""
+
+        framework_name = "Design Framework"
+        design_philosophy = "Professional Amazon listing design"
+        color_palette = "Not specified"
+        typography = "Not specified"
+        brand_voice = "Professional and compelling"
+
+        if framework:
+            framework_name = framework.get("framework_name", framework_name)
+            design_philosophy = framework.get("design_philosophy", design_philosophy)
+            brand_voice = framework.get("brand_voice", brand_voice)
+
+            colors = framework.get("colors", [])
+            if colors:
+                color_lines = []
+                for color in colors:
+                    color_lines.append(
+                        f"- {color.get('role', 'color')}: {color.get('hex', 'N/A')} ({color.get('name', '')})"
+                    )
+                color_palette = "\n".join(color_lines)
+
+            typo = framework.get("typography", {})
+            if typo:
+                typography = (
+                    f"Headline: {typo.get('headline_font', 'N/A')} {typo.get('headline_weight', '')} | "
+                    f"Body: {typo.get('body_font', 'N/A')}"
+                )
+
+        analysis_text = (
+            product_analysis
+            or "No product analysis available - use the current image and feedback as primary context."
+        )
+
+        prompt = PLAN_EDIT_INSTRUCTIONS_PROMPT.format(
+            product_analysis=analysis_text,
+            image_type=image_type,
+            image_type_context=image_type_context,
+            framework_name=framework_name,
+            design_philosophy=design_philosophy,
+            color_palette=color_palette,
+            typography=typography,
+            brand_voice=brand_voice,
+            original_prompt=original_prompt or "No prior prompt context available.",
+            user_feedback=user_feedback,
+            structural_context=structural_context or "No special structural rules.",
+        )
+
+        source_image_bytes = self._load_image_bytes(source_image_path)
+        source_image_mime = self._get_image_mime_type(source_image_path)
+
+        loaded_refs: List[tuple[str, bytes, str]] = []
+        for idx, ref_path in enumerate(reference_image_paths or []):
+            if not _image_path_exists(ref_path):
+                logger.warning(f"[EDIT][GEMINI] Reference image not found, skipping: {ref_path}")
+                continue
+            try:
+                loaded_refs.append(
+                    (
+                        f"REFERENCE_IMAGE_{idx + 1}",
+                        self._load_image_bytes(ref_path),
+                        self._get_image_mime_type(ref_path),
+                    )
+                )
+            except Exception as e:
+                logger.warning(f"[EDIT][GEMINI] Failed loading reference image {ref_path}: {e}")
+
+        def _build_parts(prompt_text: str) -> List[types.Part]:
+            parts: List[types.Part] = [
+                types.Part.from_text(text=prompt_text),
+                types.Part.from_text(text="CURRENT_IMAGE_TO_EDIT:"),
+                types.Part.from_bytes(data=source_image_bytes, mime_type=source_image_mime),
+            ]
+            for label, ref_bytes, ref_mime in loaded_refs:
+                parts.append(types.Part.from_text(text=f"{label}:"))
+                parts.append(types.Part.from_bytes(data=ref_bytes, mime_type=ref_mime))
+            return parts
+
+        logger.info(f"[EDIT][GEMINI] Planning edit instructions for {image_type}")
+        logger.info(f"[EDIT][GEMINI] Source image: {source_image_path}")
+        logger.info(f"[EDIT][GEMINI] Reference images: {len(loaded_refs)}")
+        logger.info(f"[EDIT][GEMINI] User feedback: {user_feedback[:120]}...")
+
+        attempts = [
+            (prompt, 0.5, "primary"),
+            (
+                prompt
+                + "\n\nRETRY MODE: Return ONLY valid JSON with keys "
+                + "\"interpretation\", \"changes_made\", and \"edit_instructions\". "
+                + "Do not include markdown, code fences, or extra text.",
+                0.2,
+                "json_retry",
+            ),
+        ]
+        last_error: Optional[Exception] = None
+
+        for idx, (attempt_prompt, temperature, label) in enumerate(attempts, start=1):
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=[
+                        types.Content(
+                            role="user",
+                            parts=_build_parts(attempt_prompt),
+                        )
+                    ],
+                    config=types.GenerateContentConfig(
+                        temperature=temperature,
+                        max_output_tokens=1200,
+                    ),
+                )
+
+                content = response.text or ""
+                result = self._parse_edit_plan_response(content)
+
+                edit_instructions = (result.get("edit_instructions") or "").strip()
+                if not edit_instructions:
+                    raise ValueError("edit_instructions is empty")
+
+                disallowed_marker = _find_disallowed_feedback_marker(edit_instructions)
+                if disallowed_marker:
+                    raise ValueError(
+                        f"edit_instructions contains disallowed marker: {disallowed_marker}"
+                    )
+
+                result["edit_instructions"] = edit_instructions
+                logger.info(
+                    f"[EDIT][GEMINI] Planned edit instructions on attempt {idx} ({label}). "
+                    f"Changes: {result.get('changes_made', [])}"
+                )
+                return result
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    f"[EDIT][GEMINI] Edit planning attempt {idx} ({label}) failed: {e}"
+                )
+
+        raise RuntimeError(
+            "AI Designer could not plan clean edit instructions."
+        ) from last_error
+
+    def _parse_edit_plan_response(self, response: str) -> Dict[str, Any]:
+        """Parse edit-instructions planning response JSON."""
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+
+            if json_start == -1 or json_end == 0:
+                raise ValueError("No JSON found in response")
+
+            json_str = response[json_start:json_end]
+            data = json.loads(json_str)
+
+            if "edit_instructions" not in data:
+                raise ValueError("Response missing 'edit_instructions' key")
+
+            return {
+                "interpretation": data.get("interpretation", "Feedback processed"),
+                "changes_made": data.get("changes_made", []),
+                "edit_instructions": data["edit_instructions"],
+            }
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse edit planning JSON: {e}")
+            raise ValueError(f"Invalid JSON in edit planning response: {e}")
+
+    def framework_to_prompt(self, framework: Dict[str, Any], image_type: str) -> str:
+        """
+        Convert a design framework to a complete prompt for image generation.
+
+        This is model-agnostic and does not call any external API.
+        """
+        image_copy = None
+        image_number = {
+            "main": 1,
+            "infographic_1": 2,
+            "infographic_2": 3,
+            "lifestyle": 4,
+            "comparison": 5,
+        }.get(image_type, 1)
+
+        for copy in framework.get("image_copy", []):
+            if copy.get("image_number") == image_number:
+                image_copy = copy
+                break
+
+        colors = framework.get("colors", [])
+        color_section = "[COLOR PALETTE - EXACT VALUES]\n"
+        for color in colors:
+            color_section += (
+                f"- {color['role'].upper()}: {color['hex']} ({color['name']}) - "
+                f"{color['usage']}\n"
+            )
+
+        typo = framework.get("typography", {})
+        typo_section = f"""[TYPOGRAPHY - EXACT SPECIFICATIONS]
+Headlines: {typo.get('headline_font', 'Montserrat')} {typo.get('headline_weight', 'Bold')}, {typo.get('headline_size', '48px')}
+Subheads: {typo.get('subhead_font', 'Montserrat')} {typo.get('subhead_weight', 'Regular')}, {typo.get('subhead_size', '24px')}
+Body: {typo.get('body_font', 'Inter')} {typo.get('body_weight', 'Regular')}, {typo.get('body_size', '16px')}
+Letter Spacing: {typo.get('letter_spacing', '0px')}
+"""
+
+        story = framework.get("story_arc", {})
+        chapter_keys = ["hook", "reveal", "proof", "dream", "close"]
+        current_chapter = chapter_keys[image_number - 1] if image_number <= 5 else "hook"
+        story_section = f"""[STORY ARC - THIS IS IMAGE {image_number} OF 5]
+Overall Theme: {story.get('theme', '')}
+This Image's Chapter: {current_chapter.upper()}
+This Image's Role: {story.get(current_chapter, '')}
+"""
+
+        copy_section = "[COPY FOR THIS IMAGE]\n"
+        if image_copy:
+            if image_copy.get("headline"):
+                copy_section += f'HEADLINE: "{image_copy["headline"]}"\n'
+            if image_copy.get("subhead"):
+                copy_section += f'SUBHEAD: "{image_copy["subhead"]}"\n'
+            if image_copy.get("feature_callouts"):
+                copy_section += "FEATURE CALLOUTS:\n"
+                for i, callout in enumerate(image_copy["feature_callouts"], 1):
+                    copy_section += f"  {i}. {callout}\n"
+            if image_copy.get("cta"):
+                copy_section += f'CTA: "{image_copy["cta"]}"\n'
+        elif image_type == "main":
+            copy_section += "No text - pure product hero shot on white background\n"
+
+        layout = framework.get("layout", {})
+        layout_section = f"""[LAYOUT SPECIFICATIONS]
+Composition: {layout.get('composition_style', 'centered')}
+Whitespace: {layout.get('whitespace_philosophy', 'balanced')}
+Product Prominence: {layout.get('product_prominence', 'hero focus')}
+Text Placement: {layout.get('text_placement', 'as appropriate')}
+Visual Flow: {layout.get('visual_flow', 'natural reading order')}
+"""
+
+        visual = framework.get("visual_treatment", {})
+        visual_section = f"""[VISUAL TREATMENT]
+Lighting: {visual.get('lighting_style', 'soft studio lighting')}
+Shadows: {visual.get('shadow_spec', 'subtle drop shadows')}
+Background: {visual.get('background_treatment', 'clean and appropriate')}
+Texture: {visual.get('texture', 'clean')}
+Mood: {', '.join(visual.get('mood_keywords', ['professional', 'appealing']))}
+"""
+
+        prompt = f"""[CREATIVE BRIEF: {framework.get('framework_name', 'Design Framework')}]
+{framework.get('design_philosophy', '')}
+
+Brand Voice: {framework.get('brand_voice', 'Professional and appealing')}
+
+{color_section}
+
+{typo_section}
+
+{story_section}
+
+{copy_section}
+
+{layout_section}
+
+{visual_section}
+
+[AMAZON REQUIREMENTS]
+- Image {image_number} of 5 in listing set
+- {'Pure white background (#FFFFFF) required by Amazon' if image_type == 'main' else 'Background per design brief above'}
+- 1500x1500px minimum, 1:1 aspect ratio
+- Must be cohesive with other images in set
+- Thumbnail must be clear at 100px
+- Mobile-optimized (70% of shoppers are on mobile)
+
+[COHESION REQUIREMENT - CRITICAL]
+All 5 images in this set MUST share:
+- The exact color palette specified above
+- The typography specifications above
+- The visual treatment above
+- The brand voice above
+The customer should INSTANTLY recognize these images belong together.
+
+[REFERENCE IMAGE]
+Use the provided product photo as the source of truth.
+Enhance and stage the product, do not alter the product itself.
+"""
+
+        return prompt
 
     async def generate_alt_text(
         self,

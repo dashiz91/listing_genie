@@ -19,6 +19,7 @@ from app.prompts.ai_designer import (
     PRINCIPAL_DESIGNER_VISION_PROMPT,
     GENERATE_IMAGE_PROMPTS_PROMPT,
     ENHANCE_PROMPT_WITH_FEEDBACK_PROMPT,
+    PLAN_EDIT_INSTRUCTIONS_PROMPT,
     GLOBAL_NOTE_INSTRUCTIONS,
     STYLE_REFERENCE_INSTRUCTIONS,
 )
@@ -30,6 +31,12 @@ logger = logging.getLogger(__name__)
 
 # Storage service singleton for loading images from Supabase
 _storage_service: Optional["SupabaseStorageService"] = None
+_DISALLOWED_FEEDBACK_MARKERS = (
+    "CLIENT DIRECTION:",
+    "CLIENT NOTE:",
+    "[USER FEEDBACK]:",
+    "=== REGENERATION INSTRUCTIONS ===",
+)
 
 
 def _get_storage_service() -> "SupabaseStorageService":
@@ -65,6 +72,15 @@ def _load_image_bytes(image_path: str) -> bytes:
         # Local file path (for backwards compatibility)
         with open(image_path, "rb") as f:
             return f.read()
+
+
+def _find_disallowed_feedback_marker(text: str) -> Optional[str]:
+    """Return disallowed raw-feedback marker if present in rewritten prompt."""
+    lowered = text.lower()
+    for marker in _DISALLOWED_FEEDBACK_MARKERS:
+        if marker.lower() in lowered:
+            return marker
+    return None
 
 # NOTE: All AI Designer prompts live in app/prompts/ai_designer.py
 # Dead copies that used to live here have been removed (they shadowed imports).
@@ -651,34 +667,61 @@ Make each framework's palette distinct but appropriate for the product.
         logger.info(f"[REGENERATION] Has framework: {bool(framework)}")
         logger.info(f"[REGENERATION] User feedback: {user_feedback[:100]}...")
 
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ],
-                max_tokens=3000,
-                temperature=0.7,
-            )
+        attempts = [
+            (prompt, 0.7, "primary"),
+            (
+                prompt
+                + "\n\nRETRY MODE: Return ONLY valid JSON with keys "
+                + "\"interpretation\", \"changes_made\", and \"enhanced_prompt\". "
+                + "Do not include markdown, code fences, or any extra text.",
+                0.2,
+                "json_retry",
+            ),
+        ]
+        last_error: Optional[Exception] = None
 
-            # Extract and parse response
-            content = response.choices[0].message.content
-            result = self._parse_enhancement_response(content)
+        for idx, (attempt_prompt, temperature, label) in enumerate(attempts, start=1):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": attempt_prompt,
+                        }
+                    ],
+                    max_tokens=3000,
+                    temperature=temperature,
+                )
 
-            logger.info(f"Successfully enhanced prompt. Changes: {result.get('changes_made', [])}")
-            return result
+                content = response.choices[0].message.content or ""
+                result = self._parse_enhancement_response(content)
 
-        except Exception as e:
-            logger.error(f"Failed to enhance prompt: {e}")
-            # Fallback: just append the feedback
-            return {
-                "interpretation": f"Direct append (AI enhancement failed: {e})",
-                "changes_made": ["Appended user feedback to original prompt"],
-                "enhanced_prompt": f"{original_prompt}\n\n[USER FEEDBACK]: {user_feedback}",
-            }
+                enhanced_prompt = (result.get("enhanced_prompt") or "").strip()
+                if not enhanced_prompt:
+                    raise ValueError("enhanced_prompt is empty")
+
+                disallowed_marker = _find_disallowed_feedback_marker(enhanced_prompt)
+                if disallowed_marker:
+                    raise ValueError(
+                        f"enhanced_prompt contains disallowed marker: {disallowed_marker}"
+                    )
+
+                result["enhanced_prompt"] = enhanced_prompt
+                logger.info(
+                    f"Successfully enhanced prompt on attempt {idx} ({label}). "
+                    f"Changes: {result.get('changes_made', [])}"
+                )
+                return result
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    f"Prompt enhancement attempt {idx} ({label}) failed: {e}"
+                )
+
+        raise RuntimeError(
+            "AI Designer could not rewrite feedback into a clean generation prompt."
+        ) from last_error
 
     def _parse_enhancement_response(self, response: str) -> Dict[str, Any]:
         """Parse the enhancement response"""
@@ -705,6 +748,204 @@ Make each framework's palette distinct but appropriate for the product.
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse enhancement JSON: {e}")
             raise ValueError(f"Invalid JSON in enhancement response: {e}")
+
+    async def plan_edit_instructions(
+        self,
+        source_image_path: str,
+        user_feedback: str,
+        image_type: str,
+        original_prompt: Optional[str] = None,
+        framework: Optional[Dict[str, Any]] = None,
+        product_analysis: Optional[str] = None,
+        reference_image_paths: Optional[List[str]] = None,
+        structural_context: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Generate concise edit instructions from feedback for image editing API calls.
+
+        Unlike regeneration prompt rewriting, this returns DELTA edit instructions
+        to apply on the existing source image.
+        """
+        if not self.client:
+            raise ValueError("OpenAI client not initialized - check OPENAI_API_KEY")
+        if not _image_path_exists(source_image_path):
+            raise ValueError(f"Source image not found for edit planning: {source_image_path}")
+
+        listing_number = {
+            "main": 1,
+            "infographic_1": 2,
+            "infographic_2": 3,
+            "lifestyle": 4,
+            "comparison": 5,
+        }
+        if image_type in listing_number:
+            image_type_context = f"Listing image {listing_number[image_type]} of 5"
+        elif image_type == "aplus_hero":
+            image_type_context = "A+ Content hero pair (tall image split into modules 0+1)"
+        elif image_type.startswith("aplus_"):
+            image_type_context = "A+ Content module banner (1464x600, wide format)"
+        else:
+            image_type_context = ""
+
+        framework_name = "Design Framework"
+        design_philosophy = "Professional Amazon listing design"
+        color_palette = "Not specified"
+        typography = "Not specified"
+        brand_voice = "Professional and compelling"
+
+        if framework:
+            framework_name = framework.get("framework_name", framework_name)
+            design_philosophy = framework.get("design_philosophy", design_philosophy)
+            brand_voice = framework.get("brand_voice", brand_voice)
+
+            colors = framework.get("colors", [])
+            if colors:
+                color_lines = []
+                for color in colors:
+                    color_lines.append(
+                        f"- {color.get('role', 'color')}: {color.get('hex', 'N/A')} ({color.get('name', '')})"
+                    )
+                color_palette = "\n".join(color_lines)
+
+            typo = framework.get("typography", {})
+            if typo:
+                typography = (
+                    f"Headline: {typo.get('headline_font', 'N/A')} {typo.get('headline_weight', '')} | "
+                    f"Body: {typo.get('body_font', 'N/A')}"
+                )
+
+        analysis_text = (
+            product_analysis
+            or "No product analysis available - use the current image and feedback as primary context."
+        )
+
+        prompt = PLAN_EDIT_INSTRUCTIONS_PROMPT.format(
+            product_analysis=analysis_text,
+            image_type=image_type,
+            image_type_context=image_type_context,
+            framework_name=framework_name,
+            design_philosophy=design_philosophy,
+            color_palette=color_palette,
+            typography=typography,
+            brand_voice=brand_voice,
+            original_prompt=original_prompt or "No prior prompt context available.",
+            user_feedback=user_feedback,
+            structural_context=structural_context or "No special structural rules.",
+        )
+
+        source_media = self._get_image_media_type(source_image_path)
+        source_b64 = self._encode_image(source_image_path)
+
+        ref_parts = []
+        for idx, ref_path in enumerate(reference_image_paths or []):
+            if not _image_path_exists(ref_path):
+                logger.warning(f"[EDIT][OPENAI] Reference image not found, skipping: {ref_path}")
+                continue
+            try:
+                ref_parts.extend(
+                    [
+                        {"type": "text", "text": f"REFERENCE_IMAGE_{idx + 1}:"},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:{self._get_image_media_type(ref_path)};base64,{self._encode_image(ref_path)}"
+                            },
+                        },
+                    ]
+                )
+            except Exception as e:
+                logger.warning(f"[EDIT][OPENAI] Failed loading reference image {ref_path}: {e}")
+
+        attempts = [
+            (prompt, 0.5, "primary"),
+            (
+                prompt
+                + "\n\nRETRY MODE: Return ONLY valid JSON with keys "
+                + "\"interpretation\", \"changes_made\", and \"edit_instructions\". "
+                + "Do not include markdown, code fences, or extra text.",
+                0.2,
+                "json_retry",
+            ),
+        ]
+        last_error: Optional[Exception] = None
+
+        logger.info(f"[EDIT][OPENAI] Planning edit instructions for {image_type}")
+        logger.info(f"[EDIT][OPENAI] Source image: {source_image_path}")
+        logger.info(f"[EDIT][OPENAI] User feedback: {user_feedback[:120]}...")
+
+        for idx, (attempt_prompt, temperature, label) in enumerate(attempts, start=1):
+            try:
+                content = [
+                    {"type": "text", "text": attempt_prompt},
+                    {"type": "text", "text": "CURRENT_IMAGE_TO_EDIT:"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{source_media};base64,{source_b64}"},
+                    },
+                    *ref_parts,
+                ]
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": content,
+                        }
+                    ],
+                    max_tokens=1200,
+                    temperature=temperature,
+                )
+
+                result = self._parse_edit_plan_response(
+                    response.choices[0].message.content or ""
+                )
+                edit_instructions = (result.get("edit_instructions") or "").strip()
+                if not edit_instructions:
+                    raise ValueError("edit_instructions is empty")
+
+                disallowed_marker = _find_disallowed_feedback_marker(edit_instructions)
+                if disallowed_marker:
+                    raise ValueError(
+                        f"edit_instructions contains disallowed marker: {disallowed_marker}"
+                    )
+
+                result["edit_instructions"] = edit_instructions
+                logger.info(
+                    f"[EDIT][OPENAI] Planned edit instructions on attempt {idx} ({label}). "
+                    f"Changes: {result.get('changes_made', [])}"
+                )
+                return result
+            except Exception as e:
+                last_error = e
+                logger.warning(
+                    f"[EDIT][OPENAI] Edit planning attempt {idx} ({label}) failed: {e}"
+                )
+
+        raise RuntimeError("AI Designer could not plan clean edit instructions.") from last_error
+
+    def _parse_edit_plan_response(self, response: str) -> Dict[str, Any]:
+        """Parse edit-instructions planning response."""
+        try:
+            json_start = response.find('{')
+            json_end = response.rfind('}') + 1
+
+            if json_start == -1 or json_end == 0:
+                raise ValueError("No JSON found in response")
+
+            json_str = response[json_start:json_end]
+            data = json.loads(json_str)
+
+            if "edit_instructions" not in data:
+                raise ValueError("Response missing 'edit_instructions' key")
+
+            return {
+                "interpretation": data.get("interpretation", "Feedback processed"),
+                "changes_made": data.get("changes_made", []),
+                "edit_instructions": data["edit_instructions"],
+            }
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse edit planning JSON: {e}")
+            raise ValueError(f"Invalid JSON in edit planning response: {e}")
 
     def framework_to_prompt(self, framework: Dict[str, Any], image_type: str) -> str:
         """

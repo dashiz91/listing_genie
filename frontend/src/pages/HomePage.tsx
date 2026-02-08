@@ -81,6 +81,23 @@ const extractErrorMessage = (err: any, fallback: string): string => {
   return fallback;
 };
 
+// Transport-level failures that can occur even when backend work continues.
+const isTransientGenerationTransportError = (err: any): boolean => {
+  const code = err?.code;
+  const status = err?.response?.status;
+
+  return (
+    code === 'ECONNABORTED' ||
+    code === 'ETIMEDOUT' ||
+    code === 'ERR_NETWORK' ||
+    status === 408 ||
+    status === 429 ||
+    status === 502 ||
+    status === 503 ||
+    status === 504
+  );
+};
+
 // Initial form data
 const initialFormData: WorkshopFormData = {
   productTitle: '',
@@ -101,6 +118,19 @@ const initialFormData: WorkshopFormData = {
   styleCount: 4, // Default to 4 style options
   imageModel: 'gemini-2.5-flash-image', // Default to Flash model (cheapest)
 };
+
+const createInitialAplusModules = (): AplusModule[] =>
+  Array.from({ length: 6 }, (_, i) => ({
+    id: `aplus-${i + 1}`,
+    type: 'full_image' as const,
+    index: i,
+    status: 'ready' as SlotStatus,
+    versions: [] as ImageVersion[],
+    activeVersionIndex: 0,
+    mobileVersions: [] as ImageVersion[],
+    mobileActiveVersionIndex: 0,
+    mobileStatus: 'ready' as SlotStatus,
+  }));
 
 export const HomePage: React.FC = () => {
   // URL params for project loading
@@ -220,25 +250,70 @@ export const HomePage: React.FC = () => {
     }
   }, []);
 
+  const appendListingVersion = useCallback((sid: string, imageType: string) => {
+    setListingVersions((prev) => {
+      const current = prev[imageType] || { versions: [], activeIndex: 0 };
+      const newVersions = [
+        ...current.versions,
+        {
+          imageUrl: apiClient.withCacheBust(apiClient.getImageUrl(sid, imageType)),
+          timestamp: Date.now(),
+        },
+      ];
+      return {
+        ...prev,
+        [imageType]: { versions: newVersions, activeIndex: newVersions.length - 1 },
+      };
+    });
+  }, []);
+
+  const waitForSingleImageTerminalState = useCallback(
+    async (sid: string, imageType: string): Promise<SessionImage | null> => {
+      const MAX_ATTEMPTS = 120; // 4 minutes @ 2s polling
+      const INTERVAL_MS = 2000;
+
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        try {
+          const response = await apiClient.getSessionImages(sid);
+          const serverImage = response.images.find((img) => img.type === imageType);
+
+          if (serverImage) {
+            setImages((prev) =>
+              prev.map((img) =>
+                img.type === imageType
+                  ? {
+                      ...img,
+                      status: serverImage.status,
+                      url: serverImage.url ?? img.url,
+                      error: serverImage.error,
+                    }
+                  : img
+              )
+            );
+
+            if (serverImage.status === 'complete' || serverImage.status === 'failed') {
+              return serverImage;
+            }
+          }
+        } catch (pollErr) {
+          console.warn(`[${imageType}] Status polling failed (attempt ${attempt + 1})`, pollErr);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, INTERVAL_MS));
+      }
+
+      return null;
+    },
+    []
+  );
+
   // Uploaded paths (for API calls)
   const [logoPath, setLogoPath] = useState<string | null>(null);
   const [originalStyleRefPath, setOriginalStyleRefPath] = useState<string | null>(null);
   const [useOriginalStyleRef, setUseOriginalStyleRef] = useState(true); // Default ON - use exact style reference
 
   // A+ Content modules state — default 6x full-width banners (1464x600)
-  const [aplusModules, setAplusModules] = useState<AplusModule[]>(() => {
-    return Array.from({ length: 6 }, (_, i) => ({
-      id: `aplus-${i + 1}`,
-      type: 'full_image' as const,
-      index: i,
-      status: 'ready' as SlotStatus,
-      versions: [] as ImageVersion[],
-      activeVersionIndex: 0,
-      mobileVersions: [] as ImageVersion[],
-      mobileActiveVersionIndex: 0,
-      mobileStatus: 'ready' as SlotStatus,
-    }));
-  });
+  const [aplusModules, setAplusModules] = useState<AplusModule[]>(createInitialAplusModules);
 
   // A+ Art Director visual script state
   const [aplusVisualScript, setAplusVisualScript] = useState<AplusVisualScript | null>(null);
@@ -254,12 +329,12 @@ export const HomePage: React.FC = () => {
   // Load project from URL param (?project= or ?session=)
   useEffect(() => {
     const loadProject = async () => {
-      const sessionParam = projectParam || searchParams.get('session');
-      if (!sessionParam) return;
+      const sessionToLoad = projectParam || sessionParam;
+      if (!sessionToLoad) return;
 
       setIsLoadingProject(true);
       try {
-        const project = await apiClient.getProjectDetail(sessionParam);
+        const project = await apiClient.getProjectDetail(sessionToLoad);
 
         // 1. Restore form data
         // Determine the best style reference preview to show:
@@ -287,7 +362,9 @@ export const HomePage: React.FC = () => {
           logoPreview: project.logo_path ? apiClient.getFileUrl(project.logo_path) : null,
           styleReferenceFile: null,
           // Use versioned style reference URL if available, otherwise fallback to path
-          styleReferencePreview: project.style_reference_url || (styleRefPath ? apiClient.getFileUrl(styleRefPath) : null),
+          styleReferencePreview: project.style_reference_url
+            ? apiClient.decorateImageUrl(project.style_reference_url)
+            : (styleRefPath ? apiClient.getFileUrl(styleRefPath) : null),
         }));
 
         // Debug: log what style reference URL is being used
@@ -359,7 +436,7 @@ export const HomePage: React.FC = () => {
           type: img.image_type,
           status: img.status as 'complete' | 'processing' | 'failed' | 'pending',
           label: getImageLabel(img.image_type),
-          url: img.image_url || undefined,
+          url: img.image_url ? apiClient.decorateImageUrl(img.image_url) : undefined,
           error: img.error_message || undefined,
         }));
         setImages(sessionImages);
@@ -371,12 +448,12 @@ export const HomePage: React.FC = () => {
             console.log(`[VERSION DEBUG] ${img.image_type}: versions from API =`, img.versions);
             if (img.versions && img.versions.length > 0) {
               restoredVersions[img.image_type] = {
-                versions: img.versions.map(v => ({ imageUrl: v.image_url, timestamp: Date.now() })),
+                versions: img.versions.map(v => ({ imageUrl: apiClient.decorateImageUrl(v.image_url), timestamp: Date.now() })),
                 activeIndex: img.versions.length - 1,
               };
             } else {
               restoredVersions[img.image_type] = {
-                versions: [{ imageUrl: img.image_url, timestamp: Date.now() }],
+                versions: [{ imageUrl: apiClient.decorateImageUrl(img.image_url), timestamp: Date.now() }],
                 activeIndex: 0,
               };
             }
@@ -397,17 +474,17 @@ export const HomePage: React.FC = () => {
               index: m.module_index,
               status: (m.image_url ? 'complete' : 'ready') as SlotStatus,
               versions: m.versions && m.versions.length > 0
-                ? m.versions.map(v => ({ imageUrl: v.image_url, imagePath: v.image_path }))
+                ? m.versions.map(v => ({ imageUrl: apiClient.decorateImageUrl(v.image_url), imagePath: v.image_path }))
                 : m.image_url && m.image_path
-                  ? [{ imageUrl: m.image_url, imagePath: m.image_path }]
+                  ? [{ imageUrl: apiClient.decorateImageUrl(m.image_url), imagePath: m.image_path }]
                   : [],
               activeVersionIndex: m.versions && m.versions.length > 0
                 ? m.versions.length - 1
                 : 0,
               mobileVersions: m.mobile_versions && m.mobile_versions.length > 0
-                ? m.mobile_versions.map(v => ({ imageUrl: v.image_url, imagePath: v.image_path }))
+                ? m.mobile_versions.map(v => ({ imageUrl: apiClient.decorateImageUrl(v.image_url), imagePath: v.image_path }))
                 : m.mobile_image_url && m.mobile_image_path
-                  ? [{ imageUrl: m.mobile_image_url, imagePath: m.mobile_image_path }]
+                  ? [{ imageUrl: apiClient.decorateImageUrl(m.mobile_image_url), imagePath: m.mobile_image_path }]
                   : [],
               mobileActiveVersionIndex: m.mobile_versions && m.mobile_versions.length > 0
                 ? m.mobile_versions.length - 1
@@ -437,7 +514,7 @@ export const HomePage: React.FC = () => {
     };
 
     loadProject();
-  }, [projectParam]);
+  }, [projectParam, sessionParam, setSearchParams, updateGenerationStatus, updateSessionId]);
 
   // Health check on mount
   useEffect(() => {
@@ -481,7 +558,7 @@ export const HomePage: React.FC = () => {
             setListingVersions(prev => {
               if (prev[img.type]?.versions.length) return prev; // already captured
               return { ...prev, [img.type]: {
-                versions: [{ imageUrl: apiClient.getImageUrl(sessionId, img.type) + `?t=${Date.now()}`, timestamp: Date.now() }],
+                versions: [{ imageUrl: apiClient.withCacheBust(apiClient.getImageUrl(sessionId, img.type)), timestamp: Date.now() }],
                 activeIndex: 0,
               }};
             });
@@ -526,7 +603,7 @@ export const HomePage: React.FC = () => {
       }
       setActiveStep(null);
     }
-  }, [isAnalyzing, frameworks.length]);
+  }, [isAnalyzing, activeStep, frameworks.length]);
 
   // Sync workflow stepper with isGenerating
   useEffect(() => {
@@ -539,7 +616,7 @@ export const HomePage: React.FC = () => {
       }
       setActiveStep(null);
     }
-  }, [isGenerating]);
+  }, [isGenerating, activeStep, images]);
 
   // Sync workflow stepper with A+ generation
   const anyAplusGenerating = useMemo(
@@ -556,7 +633,7 @@ export const HomePage: React.FC = () => {
       }
       setActiveStep(null);
     }
-  }, [anyAplusGenerating, isGeneratingScript]);
+  }, [anyAplusGenerating, isGeneratingScript, activeStep, aplusModules]);
 
   // Can analyze?
   const canAnalyze = uploads.length > 0 && formData.productTitle.trim().length > 0 && !isAnalyzing;
@@ -825,7 +902,7 @@ export const HomePage: React.FC = () => {
               // First generation — create version 1
               if (!existing || existing.versions.length === 0) {
                 return { ...prev, [imageType]: {
-                  versions: [{ imageUrl: apiClient.getImageUrl(sid, imageType) + `?t=${Date.now()}`, timestamp: Date.now() }],
+                  versions: [{ imageUrl: apiClient.withCacheBust(apiClient.getImageUrl(sid, imageType)), timestamp: Date.now() }],
                   activeIndex: 0,
                 }};
               }
@@ -840,17 +917,68 @@ export const HomePage: React.FC = () => {
         if (creditError.isCreditsError) {
           setOutOfCreditsRequired(creditError.required);
           setOutOfCreditsOpen(true);
+          setImages((prev) =>
+            prev.map((img) =>
+              img.type === imageType
+                ? { ...img, status: 'failed' as const, error: 'Insufficient credits' }
+                : img
+            )
+          );
+          return;
         }
+
+        const sid = sessionIdRef.current;
+        if (sid && isTransientGenerationTransportError(err)) {
+          console.warn(`[${imageType}] Transport error during generate; polling for terminal server status.`);
+          const finalImage = await waitForSingleImageTerminalState(sid, imageType);
+
+          if (finalImage?.status === 'complete') {
+            setListingVersions(prev => {
+              const existing = prev[imageType];
+              // First generation — create version 1
+              if (!existing || existing.versions.length === 0) {
+                return { ...prev, [imageType]: {
+                  versions: [{ imageUrl: apiClient.withCacheBust(apiClient.getImageUrl(sid, imageType)), timestamp: Date.now() }],
+                  activeIndex: 0,
+                }};
+              }
+              return prev;
+            });
+            return;
+          }
+
+          if (finalImage?.status === 'failed') {
+            setImages((prev) =>
+              prev.map((img) =>
+                img.type === imageType
+                  ? { ...img, status: 'failed' as const, error: finalImage.error || 'Generation failed' }
+                  : img
+              )
+            );
+            return;
+          }
+
+          // Polling exhausted without terminal state — mark failed so user can retry.
+          setImages((prev) =>
+            prev.map((img) =>
+              img.type === imageType
+                ? { ...img, status: 'failed' as const, error: 'Generation timed out — please retry' }
+                : img
+            )
+          );
+          return;
+        }
+
         setImages((prev) =>
           prev.map((img) =>
             img.type === imageType
-              ? { ...img, status: 'failed' as const, error: creditError.isCreditsError ? 'Insufficient credits' : (err.message || 'Generation failed') }
+              ? { ...img, status: 'failed' as const, error: err.message || 'Generation failed' }
               : img
           )
         );
       }
     },
-    [uploads, selectedFramework, ensureSession, formData.imageModel]
+    [uploads, selectedFramework, ensureSession, formData.imageModel, waitForSingleImageTerminalState]
   );
 
   // Generate all 5 images - triggers 5 individual generations (same code path as clicking slots)
@@ -968,14 +1096,7 @@ export const HomePage: React.FC = () => {
 
         // Append new version on success
         if (result.status === 'complete' && sessionId) {
-          setListingVersions(prev => {
-            const current = prev[imageType] || { versions: [], activeIndex: 0 };
-            const newVersions = [...current.versions, {
-              imageUrl: apiClient.getImageUrl(sessionId, imageType) + `?t=${Date.now()}`,
-              timestamp: Date.now(),
-            }];
-            return { ...prev, [imageType]: { versions: newVersions, activeIndex: newVersions.length - 1 } };
-          });
+          appendListingVersion(sessionId, imageType);
         }
       } catch (err: any) {
         console.error('Single image regeneration failed:', err);
@@ -984,17 +1105,57 @@ export const HomePage: React.FC = () => {
         if (creditError.isCreditsError) {
           setOutOfCreditsRequired(creditError.required);
           setOutOfCreditsOpen(true);
+          setImages((prev) =>
+            prev.map((img) =>
+              img.type === imageType
+                ? { ...img, status: 'failed' as const, error: 'Insufficient credits' }
+                : img
+            )
+          );
+          return;
         }
+
+        if (isTransientGenerationTransportError(err)) {
+          console.warn(`[${imageType}] Transport error during regenerate; polling for terminal server status.`);
+          const finalImage = await waitForSingleImageTerminalState(sessionId, imageType);
+
+          if (finalImage?.status === 'complete') {
+            appendListingVersion(sessionId, imageType);
+            return;
+          }
+
+          if (finalImage?.status === 'failed') {
+            setImages((prev) =>
+              prev.map((img) =>
+                img.type === imageType
+                  ? { ...img, status: 'failed' as const, error: finalImage.error || 'Regeneration failed' }
+                  : img
+              )
+            );
+            return;
+          }
+
+          // Polling exhausted without terminal state — mark failed so user can retry.
+          setImages((prev) =>
+            prev.map((img) =>
+              img.type === imageType
+                ? { ...img, status: 'failed' as const, error: 'Generation timed out — please retry' }
+                : img
+            )
+          );
+          return;
+        }
+
         setImages((prev) =>
           prev.map((img) =>
             img.type === imageType
-              ? { ...img, status: 'failed' as const, error: creditError.isCreditsError ? 'Insufficient credits' : (err.message || 'Regeneration failed') }
+              ? { ...img, status: 'failed' as const, error: err.message || 'Regeneration failed' }
               : img
           )
         );
       }
     },
-    [sessionId, formData.imageModel]
+    [sessionId, formData.imageModel, appendListingVersion, waitForSingleImageTerminalState]
   );
 
   // Handle cancel generation (client-side only — reverts status)
@@ -1038,14 +1199,7 @@ export const HomePage: React.FC = () => {
 
         // Append new version on success
         if (result.status === 'complete' && sessionId) {
-          setListingVersions(prev => {
-            const current = prev[imageType] || { versions: [], activeIndex: 0 };
-            const newVersions = [...current.versions, {
-              imageUrl: apiClient.getImageUrl(sessionId, imageType) + `?t=${Date.now()}`,
-              timestamp: Date.now(),
-            }];
-            return { ...prev, [imageType]: { versions: newVersions, activeIndex: newVersions.length - 1 } };
-          });
+          appendListingVersion(sessionId, imageType);
         }
       } catch (err: any) {
         console.error('Image edit failed:', err);
@@ -1054,17 +1208,57 @@ export const HomePage: React.FC = () => {
         if (creditError.isCreditsError) {
           setOutOfCreditsRequired(creditError.required);
           setOutOfCreditsOpen(true);
+          setImages((prev) =>
+            prev.map((img) =>
+              img.type === imageType
+                ? { ...img, status: 'failed' as const, error: 'Insufficient credits' }
+                : img
+            )
+          );
+          return;
         }
+
+        if (isTransientGenerationTransportError(err)) {
+          console.warn(`[${imageType}] Transport error during edit; polling for terminal server status.`);
+          const finalImage = await waitForSingleImageTerminalState(sessionId, imageType);
+
+          if (finalImage?.status === 'complete') {
+            appendListingVersion(sessionId, imageType);
+            return;
+          }
+
+          if (finalImage?.status === 'failed') {
+            setImages((prev) =>
+              prev.map((img) =>
+                img.type === imageType
+                  ? { ...img, status: 'failed' as const, error: finalImage.error || 'Edit failed' }
+                  : img
+              )
+            );
+            return;
+          }
+
+          // Polling exhausted without terminal state — mark failed so user can retry.
+          setImages((prev) =>
+            prev.map((img) =>
+              img.type === imageType
+                ? { ...img, status: 'failed' as const, error: 'Generation timed out — please retry' }
+                : img
+            )
+          );
+          return;
+        }
+
         setImages((prev) =>
           prev.map((img) =>
             img.type === imageType
-              ? { ...img, status: 'failed' as const, error: creditError.isCreditsError ? 'Insufficient credits' : (err.message || 'Edit failed') }
+              ? { ...img, status: 'failed' as const, error: err.message || 'Edit failed' }
               : img
           )
         );
       }
     },
-    [sessionId, formData.imageModel]
+    [sessionId, formData.imageModel, appendListingVersion, waitForSingleImageTerminalState]
   );
 
   // Ensure visual script exists (auto-generate if missing)
@@ -1198,7 +1392,7 @@ export const HomePage: React.FC = () => {
           prev.map((m, idx) => {
             if (idx === 0) {
               const newVersions = [...m.versions, {
-                imageUrl: result.module_0.image_url,
+                imageUrl: apiClient.decorateImageUrl(result.module_0.image_url),
                 imagePath: result.module_0.image_path,
                 promptText: result.module_0.prompt_text,
               }];
@@ -1211,7 +1405,7 @@ export const HomePage: React.FC = () => {
             }
             if (idx === 1) {
               const newVersions = [...m.versions, {
-                imageUrl: result.module_1.image_url,
+                imageUrl: apiClient.decorateImageUrl(result.module_1.image_url),
                 imagePath: result.module_1.image_path,
                 promptText: result.module_1.prompt_text,
               }];
@@ -1288,7 +1482,7 @@ export const HomePage: React.FC = () => {
           prev.map((m, idx) => {
             if (idx === moduleIndex) {
               const newVersions = [...m.versions, {
-                imageUrl: result.image_url,
+                imageUrl: apiClient.decorateImageUrl(result.image_url),
                 imagePath: result.image_path,
                 promptText: result.prompt_text,
               }];
@@ -1305,7 +1499,7 @@ export const HomePage: React.FC = () => {
               const updatedVersions = [...m.versions];
               updatedVersions[m.activeVersionIndex] = {
                 ...updatedVersions[m.activeVersionIndex],
-                imageUrl: refined.image_url + `?t=${Date.now()}`,
+                imageUrl: apiClient.withCacheBust(apiClient.decorateImageUrl(refined.image_url)),
                 imagePath: refined.image_path,
               };
               return { ...m, versions: updatedVersions };
@@ -1360,7 +1554,7 @@ export const HomePage: React.FC = () => {
           prev.map((m, idx) => {
             if (idx === 0) {
               const newVersions = [...m.versions, {
-                imageUrl: heroPairResult.module_0.image_url,
+                imageUrl: apiClient.decorateImageUrl(heroPairResult.module_0.image_url),
                 imagePath: heroPairResult.module_0.image_path,
                 promptText: heroPairResult.module_0.prompt_text,
               }];
@@ -1368,7 +1562,7 @@ export const HomePage: React.FC = () => {
             }
             if (idx === 1) {
               const newVersions = [...m.versions, {
-                imageUrl: heroPairResult.module_1.image_url,
+                imageUrl: apiClient.decorateImageUrl(heroPairResult.module_1.image_url),
                 imagePath: heroPairResult.module_1.image_path,
                 promptText: heroPairResult.module_1.prompt_text,
               }];
@@ -1414,7 +1608,7 @@ export const HomePage: React.FC = () => {
             prev.map((m, idx) => {
               if (idx === i) {
                 const newVersions = [...m.versions, {
-                  imageUrl: result.image_url,
+                  imageUrl: apiClient.decorateImageUrl(result.image_url),
                   imagePath: result.image_path,
                   promptText: result.prompt_text,
                 }];
@@ -1425,7 +1619,7 @@ export const HomePage: React.FC = () => {
                 const updatedVersions = [...m.versions];
                 updatedVersions[m.activeVersionIndex] = {
                   ...updatedVersions[m.activeVersionIndex],
-                  imageUrl: refined.image_url + `?t=${Date.now()}`,
+                  imageUrl: apiClient.withCacheBust(apiClient.decorateImageUrl(refined.image_url)),
                   imagePath: refined.image_path,
                 };
                 return { ...m, versions: updatedVersions };
@@ -1534,7 +1728,7 @@ export const HomePage: React.FC = () => {
             if (i !== moduleIndex) return m;
             const newVersion: ImageVersion = {
               imageUrl: result.storage_path
-                ? apiClient.getFileUrl(result.storage_path) + `&t=${Date.now()}`
+                ? apiClient.withCacheBust(apiClient.getFileUrl(result.storage_path))
                 : m.versions[m.activeVersionIndex]?.imageUrl || '',
               imagePath: result.storage_path,
               timestamp: Date.now(),
@@ -1586,7 +1780,7 @@ export const HomePage: React.FC = () => {
           prev.map((m, i) => {
             if (i !== moduleIndex) return m;
             const newVersion: ImageVersion = {
-              imageUrl: result.image_url,
+              imageUrl: apiClient.decorateImageUrl(result.image_url),
               imagePath: result.image_path,
               timestamp: Date.now(),
             };
@@ -1642,7 +1836,7 @@ export const HomePage: React.FC = () => {
           prev.map((mod, idx) => {
             if (idx !== i) return mod;
             const newVersion: ImageVersion = {
-              imageUrl: result.image_url,
+              imageUrl: apiClient.decorateImageUrl(result.image_url),
               imagePath: result.image_path,
               timestamp: Date.now(),
             };
@@ -1692,7 +1886,7 @@ export const HomePage: React.FC = () => {
           prev.map((m, i) => {
             if (i !== moduleIndex) return m;
             const newVersion: ImageVersion = {
-              imageUrl: result.image_url,
+              imageUrl: apiClient.decorateImageUrl(result.image_url),
               imagePath: result.image_path,
               timestamp: Date.now(),
             };
@@ -1741,7 +1935,7 @@ export const HomePage: React.FC = () => {
           prev.map((m, i) => {
             if (i !== moduleIndex) return m;
             const newVersion: ImageVersion = {
-              imageUrl: result.image_url,
+              imageUrl: apiClient.decorateImageUrl(result.image_url),
               imagePath: result.image_path,
               timestamp: Date.now(),
             };
@@ -1827,7 +2021,7 @@ export const HomePage: React.FC = () => {
     setIsGenerating(false);
     setLogoPath(null);
     setOriginalStyleRefPath(null);
-    setUseOriginalStyleRef(false);
+    setUseOriginalStyleRef(true);
     setError(null);
     setView('create');
     // Clear session from URL
@@ -1837,24 +2031,12 @@ export const HomePage: React.FC = () => {
     // Reset A+ modules and visual script
     setAplusVisualScript(null);
     setIsGeneratingScript(false);
-    setAplusModules(
-      Array.from({ length: 6 }, (_, i) => ({
-        id: `aplus-${i + 1}`,
-        type: 'full_image' as const,
-        index: i,
-        status: 'ready' as SlotStatus,
-        versions: [],
-        activeVersionIndex: 0,
-        mobileVersions: [],
-        mobileActiveVersionIndex: 0,
-        mobileStatus: 'ready' as SlotStatus,
-      }))
-    );
+    setAplusModules(createInitialAplusModules());
     setAplusViewportMode('desktop');
     // Reset workflow stepper
     setCompletedSteps(new Set());
     setActiveStep(null);
-  }, []);
+  }, [setSearchParams, updateGenerationStatus, updateSessionId]);
 
   const isGeminiConfigured = health?.dependencies?.gemini === 'configured';
 
@@ -2024,6 +2206,7 @@ function getImageLabel(type: string): string {
     infographic_1: 'Infographic 1',
     infographic_2: 'Infographic 2',
     lifestyle: 'Lifestyle',
+    transformation: 'Transformation',
     comparison: 'Comparison',
   };
   return labels[type] || type;
