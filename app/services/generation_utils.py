@@ -133,17 +133,30 @@ def build_reference_images_for_history(
     """
     refs = []
     if include_canvas and canvas_path:
-        refs.append({"type": "gradient_canvas", "path": canvas_path})
+        refs.append({
+            "type": "gradient_canvas",
+            "path": canvas_path,
+            "label": "CANVAS_TO_COMPLETE",
+        })
 
     if session.upload_path:
-        refs.append({"type": "primary", "path": session.upload_path})
+        refs.append({
+            "type": "primary",
+            "path": session.upload_path,
+            "label": "PRODUCT_PHOTO",
+        })
     if session.style_reference_path:
-        refs.append({"type": "style_reference", "path": session.style_reference_path})
+        refs.append({
+            "type": "style_reference",
+            "path": session.style_reference_path,
+            "label": "STYLE_REFERENCE",
+        })
 
     if include_previous and previous_module_path and previous_module_index is not None:
         refs.append({
             "type": f"previous_module_{previous_module_index}",
             "path": previous_module_path,
+            "label": "PREVIOUS_MODULE",
         })
     return refs
 
@@ -189,51 +202,71 @@ def assemble_reference_images(
     - Mobile transform: source desktop only (handled externally)
     """
     from app.prompts.templates.aplus_modules import (
-        IMAGE_LABEL_PRODUCT, IMAGE_LABEL_STYLE,
+        IMAGE_LABEL_PRODUCT, IMAGE_LABEL_STYLE, get_module_config,
     )
 
     result = ReferenceImageSet()
     is_aplus = image_type.startswith("aplus_")
 
-    # Brand bookend rule: only hero (0-1) and last module get logo
-    is_middle_aplus = (
+    # Brand bookend rule driven by ModuleConfig
+    skip_logo_for_module = (
         is_aplus
         and module_index is not None
-        and 2 <= module_index < module_count - 1
+        and not get_module_config(module_index, module_count).send_logo
     )
 
     # ── Structural images (canvas for canvas extension) ──
     if canvas_image is not None:
         result.named_images.append(("CANVAS_TO_COMPLETE", canvas_image))
         if canvas_debug_path:
-            result.history_meta.append({"type": "gradient_canvas", "path": canvas_debug_path})
+            result.history_meta.append({
+                "type": "gradient_canvas",
+                "path": canvas_debug_path,
+                "label": "CANVAS_TO_COMPLETE",
+            })
 
     # ── Content images: product photo + style reference ──
     if session.upload_path:
         if use_named:
             result.named_images.append((IMAGE_LABEL_PRODUCT, session.upload_path))
         result.unnamed_paths.append(session.upload_path)
-        result.history_meta.append({"type": "primary", "path": session.upload_path})
+        result.history_meta.append({
+            "type": "primary",
+            "path": session.upload_path,
+            "label": IMAGE_LABEL_PRODUCT,
+        })
 
     # Additional product photos (listing images only, not A+)
     if not is_aplus and session.additional_upload_paths:
         for i, path in enumerate(session.additional_upload_paths):
             result.unnamed_paths.append(path)
-            result.history_meta.append({"type": f"additional_product_{i+1}", "path": path})
+            result.history_meta.append({
+                "type": f"additional_product_{i+1}",
+                "path": path,
+                "label": f"ADDITIONAL_PRODUCT_{i+1}",
+            })
 
     # Style reference (all types)
     if session.style_reference_path:
         if use_named:
             result.named_images.append((IMAGE_LABEL_STYLE, session.style_reference_path))
         result.unnamed_paths.append(session.style_reference_path)
-        result.history_meta.append({"type": "style_reference", "path": session.style_reference_path})
+        result.history_meta.append({
+            "type": "style_reference",
+            "path": session.style_reference_path,
+            "label": IMAGE_LABEL_STYLE,
+        })
 
-    # Logo: listing non-main + A+ bookend modules only (skip middle A+ modules)
-    if image_type != "main" and session.logo_path and not is_middle_aplus:
+    # Logo: listing non-main + A+ bookend modules only (skip non-logo modules)
+    if image_type != "main" and session.logo_path and not skip_logo_for_module:
         if is_aplus and use_named:
             result.named_images.append(("BRAND_LOGO", session.logo_path))
         result.unnamed_paths.append(session.logo_path)
-        result.history_meta.append({"type": "logo", "path": session.logo_path})
+        result.history_meta.append({
+            "type": "logo",
+            "path": session.logo_path,
+            "label": "BRAND_LOGO",
+        })
 
     return result
 

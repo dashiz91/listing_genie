@@ -5,8 +5,42 @@ Philosophy: The Visual Script does the thinking (scene descriptions).
 Per-module delivery just wraps them lightly — same architecture as listing images.
 """
 import json
+import logging
 import re
+from dataclasses import dataclass
 from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# MODULE CONFIG — single source of truth for per-module behavior
+# ============================================================================
+
+@dataclass(frozen=True)
+class ModuleConfig:
+    """Per-module behavior: role, brand text rules, logo inclusion."""
+    role: str
+    brand_text: bool
+    send_logo: bool
+
+
+_MODULE_DEFAULTS = {
+    0: ModuleConfig(role="hero",      brand_text=True,  send_logo=True),
+    1: ModuleConfig(role="hero",      brand_text=True,  send_logo=True),
+    2: ModuleConfig(role="quality",   brand_text=False, send_logo=False),
+    3: ModuleConfig(role="authority", brand_text=False, send_logo=False),
+    4: ModuleConfig(role="lifestyle", brand_text=False, send_logo=False),
+    5: ModuleConfig(role="closing",   brand_text=True,  send_logo=True),
+}
+
+
+def get_module_config(index: int, total: int = 6) -> ModuleConfig:
+    """Get the ModuleConfig for a given module index."""
+    if index in _MODULE_DEFAULTS:
+        return _MODULE_DEFAULTS[index]
+    is_last = (index == total - 1)
+    return ModuleConfig(role="content", brand_text=is_last, send_logo=is_last)
 
 
 # ============================================================================
@@ -15,8 +49,8 @@ from typing import Optional
 
 APLUS_FULL_IMAGE_BASE = """Sotheby's catalog. Campaign imagery. Cinematic.
 
-You're creating a premium A+ Content banner for {product_title}.
-Brand "{brand_name}" needs a wide frame that makes them FEEL something.
+You're creating premium A+ creative for {product_title}.
+Brand "{brand_name}" needs an editorial composition that makes them FEEL something.
 
 The audience — {target_audience} — should feel drawn in instantly.
 This isn't a product photo. This is a moment they want to live in.
@@ -43,7 +77,7 @@ CREATE FEELING, NOT INFORMATION:
 - Make them imagine reaching for it
 
 FORMAT:
-Wide cinematic banner (2.4:1). Editorial, not catalog.
+Cinematic editorial composition. Not catalog.
 
 ABSOLUTE RULES:
 - Render SHORT bold text baked into the image (headlines 2-5 words max)
@@ -129,9 +163,9 @@ def get_aplus_prompt(
 # ART DIRECTOR VISUAL SCRIPT SYSTEM
 # ============================================================================
 
-VISUAL_SCRIPT_PROMPT = """You are an Art Director writing generation prompts for {module_count} Amazon A+ Content banners.
+VISUAL_SCRIPT_PROMPT = """You are an Art Director writing generation prompts for {module_count} ecommerce content modules.
 
-These banners stack below the listing images as one emotional buyer journey.
+These modules stack below the listing images as one emotional buyer journey.
 By the time shoppers reach A+ content, they've already seen the listing images and are interested.
 A+ deepens desire into certainty. Each module has a specific JOB in the conversion funnel.
 
@@ -204,7 +238,7 @@ WRITING YOUR SCENE DESCRIPTIONS:
 - At least 2 modules must include a real person with face visible, genuine emotion
 - Each module should look visually DIFFERENT (variety of compositions, angles, environments)
 - Specify lighting direction (never flat), camera angle, and background for each
-- Do NOT include delivery boilerplate like "Amazon A+ Content banner", "Wide 2.4:1 format", margin-safe-zone notes, or browser/UI exclusion rules
+- Do NOT include delivery boilerplate (format lines, margin-safe-zone notes, or browser/UI exclusion rules)
 
 DON'T REPEAT LISTING CONTENT:
 - Listings already showed product beauty, features, lifestyle, transformation
@@ -638,19 +672,21 @@ def build_aplus_module_prompt(
         scene_prompt = strip_brand_name_text_when_missing(scene_prompt)
 
     # Strip CSS-like specs that image models render as garbled text.
-    # Catches patterns like "headline_size 42px", "letter_spacing 0.5px",
-    # "headline_weight Bold", "subhead_font Inter" from older visual scripts.
-    scene_prompt = _strip_css_specs(scene_prompt)
+    # Log a warning if it actually modifies the text — if it never fires,
+    # the function can be deleted (Phase 3 audit).
+    stripped = _strip_css_specs(scene_prompt)
+    if stripped != scene_prompt:
+        logger.warning("_strip_css_specs modified module %d prompt — CSS specs still leaking from visual script", module_index)
+    scene_prompt = stripped
 
-    # Brand bookend rule: only hero (0-1) and last module get brand text.
-    # Middle modules (2 through second-to-last) should have no brand name.
-    is_middle_module = 2 <= module_index < module_count - 1
-    if is_middle_module and resolved_brand:
+    # Brand bookend rule driven by ModuleConfig
+    config = get_module_config(module_index, module_count)
+    if not config.brand_text and resolved_brand:
         scene_prompt = _strip_brand_text_from_prompt(scene_prompt, resolved_brand)
 
     # Build the clean prompt: header + scene description
-    # Suppress logo reference for middle modules (no branding needed)
-    effective_has_logo = has_logo and not is_middle_module
+    # Suppress logo reference for modules that don't get branding
+    effective_has_logo = has_logo and config.send_logo
     header = APLUS_MODULE_HEADER.format(
         reference_images_desc=_ref_desc(
             has_style_ref, effective_has_logo,

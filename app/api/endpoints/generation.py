@@ -20,7 +20,6 @@ from app.db.session import get_db
 from app.services.gemini_service import (
     GeminiService,
     _load_image_from_path,
-    append_lighting_override_once,
     get_gemini_service,
 )
 from app.services.supabase_storage_service import SupabaseStorageService
@@ -54,10 +53,10 @@ from app.models.database import (
     ColorModeEnum, UserSettings,
 )
 from app.prompts.templates.aplus_modules import (
-    get_aplus_prompt, build_aplus_module_prompt,
-    build_canvas_inpainting_prompt, build_hero_pair_prompt,
     get_visual_script_prompt, strip_aplus_banner_boilerplate,
-    APLUS_MODULE_HEADER, APLUS_HERO_HEADER,
+)
+from app.services.aplus_compiler import (
+    compile_aplus_module, compile_aplus_hero,
 )
 
 logger = logging.getLogger(__name__)
@@ -175,51 +174,6 @@ def _resolve_effective_brand_name(
         return session_brand
 
     return ""
-
-
-def _has_legacy_aplus_boilerplate(text: str) -> bool:
-    """Detect the legacy A+ banner boilerplate block in a normalization-tolerant way."""
-    if not text:
-        return False
-    normalized = re.sub(r"\s+", " ", text.lower())
-    return (
-        "amazon a+ content banner" in normalized
-        and ("wide 2.4:1 format" in normalized or "wide 2.4 : 1 format" in normalized)
-        and "amazon navigation" in normalized
-        and "browser chrome" in normalized
-    )
-
-
-def _build_aplus_reference_images_desc(
-    *,
-    has_product_ref: bool,
-    has_style_ref: bool,
-    has_logo: bool,
-) -> str:
-    """Build A+ reference image description header lines."""
-    lines = []
-    if has_product_ref:
-        lines.append("- PRODUCT_PHOTO: The actual product - honor its materials, proportions, character")
-    if has_style_ref:
-        lines.append("- STYLE_REFERENCE: Match this visual style, mood, and color treatment")
-    if has_logo:
-        lines.append("- BRAND_LOGO: Reproduce this logo where appropriate")
-    if not lines:
-        lines.append("- Use the supplied reference images exactly as provided")
-    return "\n".join(lines)
-
-
-def _ensure_reference_images_header(prompt: str, header_template: str) -> str:
-    """
-    Ensure prompt includes the leading '=== REFERENCE IMAGES ===' block.
-
-    AI rewrites can sometimes drop this block on regeneration. We force it back
-    to keep named image ingestion consistent between first generation and regen.
-    """
-    prompt_text = (prompt or "").lstrip()
-    if prompt_text.startswith("=== REFERENCE IMAGES ==="):
-        return prompt_text
-    return f"{header_template}{prompt_text}"
 
 
 def get_generation_service(
@@ -1447,130 +1401,37 @@ async def generate_aplus_hero_pair(
 
     try:
         session = _get_owned_session(service, request.session_id, user)
-        effective_brand_name = _resolve_effective_brand_name(
-            session, db, user.id
-        )
-        has_product_ref = bool(session.upload_path)
-        has_style_ref = bool(session.style_reference_path)
-        has_logo_ref = bool(session.logo_path)
+        effective_brand_name = _resolve_effective_brand_name(session, db, user.id)
+        design_context = db.query(DesignContext).filter(
+            DesignContext.session_id == request.session_id
+        ).first() if request.custom_instructions else None
 
-        # Auto-generate visual script if missing
-        visual_script = session.aplus_visual_script
-        if not visual_script:
-            logger.info("No visual script found, generating one for hero pair...")
-            features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
-            framework = session.design_framework_json or {}
-            # Get listing prompts so A+ knows what NOT to repeat
-            listing_prompts = framework.get("generation_prompts", [])
-            script_prompt = get_visual_script_prompt(
-                product_title=session.product_title,
-                brand_name=effective_brand_name,
-                features=features,
-                target_audience=session.target_audience or "",
-                framework=framework,
-                module_count=6,
-                listing_prompts=listing_prompts,
-            )
-            image_paths = []
-            if session.upload_path:
-                image_paths.append(session.upload_path)
-            if session.additional_upload_paths:
-                image_paths.extend(session.additional_upload_paths)
-
-            raw_text = await gemini.generate_text_with_images(
-                prompt=script_prompt,
-                image_paths=image_paths,
-                max_tokens=5000,
-                temperature=0.7,
-            )
-            visual_script = _sanitize_aplus_visual_script(
-                json_module.loads(strip_json_fences(raw_text))
-            )
-            session.aplus_visual_script = visual_script
-            db.commit()
-
-        # Build the hero pair prompt
-        prompt = build_hero_pair_prompt(
-            visual_script=visual_script,
-            product_title=session.product_title,
+        # === Compile (ALL prompt logic lives in compiler) ===
+        compiled = await compile_aplus_hero(
+            session=session,
+            visual_script=session.aplus_visual_script,
+            custom_instructions=request.custom_instructions,
             brand_name=effective_brand_name,
-            custom_instructions="",  # handled by AI enhancement below
-            has_style_ref=has_style_ref,
-            has_logo=has_logo_ref,
-            has_product_ref=has_product_ref,
+            design_context=design_context,
+            vision_service=vision,
+            gemini_service=gemini,
+            db=db,
+            image_model=request.image_model,
         )
 
-        # AI-enhanced prompt rewriting when user provides feedback
-        hero_change_summary = None
-        if request.custom_instructions:
-            design_context = db.query(DesignContext).filter(
-                DesignContext.session_id == request.session_id
-            ).first()
-            structural_ctx = get_structural_context("aplus_hero")
-            fw_dict, analysis_text = get_enhancement_context(session, design_context)
-            try:
-                enhancement = await vision.enhance_prompt_with_feedback(
-                    original_prompt=prompt,
-                    user_feedback=request.custom_instructions,
-                    image_type="aplus_hero",
-                    framework=fw_dict,
-                    product_analysis=analysis_text,
-                    structural_context=structural_ctx,
-                )
-                prompt = enhancement["enhanced_prompt"]
-                hero_change_summary = enhancement.get("interpretation", "AI-enhanced based on feedback")
-                logger.info(f"AI Designer enhanced hero pair prompt: {hero_change_summary[:100]}")
-            except Exception as e:
-                logger.error(f"AI enhancement failed for hero pair rewrite: {e}")
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="AI Designer could not rewrite hero feedback into a valid prompt. Please retry.",
-                )
-
-        hero_header = APLUS_HERO_HEADER.format(
-            reference_images_desc=_build_aplus_reference_images_desc(
-                has_product_ref=has_product_ref,
-                has_style_ref=has_style_ref,
-                has_logo=has_logo_ref,
-            )
-        )
-        prompt = _ensure_reference_images_header(prompt, hero_header)
-
-        # Final guardrail: strip known A+ boilerplate before sending to Gemini
-        prompt = strip_aplus_banner_boilerplate(prompt)
-        if _has_legacy_aplus_boilerplate(prompt):
-            prompt = strip_aplus_banner_boilerplate(prompt)
-        if _has_legacy_aplus_boilerplate(prompt):
-            raise HTTPException(
-                status_code=500,
-                detail="Legacy A+ boilerplate leak detected before Gemini call. Please retry after backend restart.",
-            )
-
-        # Append lighting override (prevents amateur lighting bleed from reference photos)
-        prompt = append_lighting_override_once(prompt)
-
-        # Assemble reference images and execute via unified pipeline
-        ref_images = assemble_reference_images(
-            session, "aplus_hero",
-            module_index=0,
-        )
+        # === Execute ===
         ctx = GenerationContext.for_aplus_hero(
             session=session,
-            prompt=prompt,
-            reference_images=ref_images,
+            prompt=compiled.prompt,
+            reference_images=compiled.reference_images,
         )
-
-        # Store feedback metadata for prompt history
         if request.custom_instructions:
             ctx.user_feedback = request.custom_instructions
-            ctx.change_summary = hero_change_summary
-
-        # Apply model override if specified
+            ctx.change_summary = compiled.change_summary
         if request.image_model:
             ctx.model_override = request.image_model
 
-        logger.info(f"Generating hero pair with {len(ref_images.named_images)} named images, prompt={len(prompt)} chars")
-
+        logger.info(f"Generating hero pair with {len(compiled.reference_images.named_images)} named images, prompt={len(compiled.prompt)} chars")
         result = await service.execute(ctx)
 
         generation_time_ms = int((time.time() - start_time) * 1000)
@@ -1590,16 +1451,19 @@ async def generate_aplus_hero_pair(
             module_0=HeroPairModuleResult(
                 image_path=top_path,
                 image_url=top_url,
-                prompt_text=prompt,
+                prompt_text=compiled.prompt,
             ),
             module_1=HeroPairModuleResult(
                 image_path=bottom_path,
                 image_url=bottom_url,
-                prompt_text=prompt,
+                prompt_text=compiled.prompt,
             ),
             generation_time_ms=generation_time_ms,
         )
 
+    except ValueError as e:
+        # Compiler raises ValueError for boilerplate leaks
+        raise HTTPException(status_code=500, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
@@ -1638,186 +1502,41 @@ async def generate_aplus_module(
 
     try:
         session = _get_owned_session(service, request.session_id, user)
+        effective_brand_name = _resolve_effective_brand_name(session, db, user.id)
+        visual_script = session.aplus_visual_script
+        module_count = len(visual_script.get("modules", [])) if visual_script else 6
 
         design_context = db.query(DesignContext).filter(
             DesignContext.session_id == request.session_id
         ).first()
 
-        features = [f for f in [session.feature_1, session.feature_2, session.feature_3] if f]
-        effective_brand_name = _resolve_effective_brand_name(
-            session, db, user.id
+        # === Compile (ALL prompt logic lives in compiler) ===
+        compiled = await compile_aplus_module(
+            session=session,
+            module_index=request.module_index,
+            module_count=module_count,
+            module_type_value=request.module_type.value,
+            visual_script=visual_script,
+            custom_instructions=request.custom_instructions,
+            brand_name=effective_brand_name,
+            design_context=design_context,
+            vision_service=vision,
+            image_model=request.image_model,
         )
-        framework = session.design_framework_json or {}
-        visual_script = session.aplus_visual_script
-        has_product_ref = bool(session.upload_path)
-        has_style_ref = bool(session.style_reference_path)
-        has_logo_ref = bool(session.logo_path)
-        module_count = len(visual_script.get("modules", [])) if visual_script else 6
 
-        # === Build prompt ===
-        prompt = None
-        use_named_images = False
+        # === Execute ===
+        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index})")
 
-        # Build prompt from visual script scene description (clean header + scene)
-        if visual_script:
-            prompt = build_aplus_module_prompt(
-                product_title=session.product_title,
-                brand_name=effective_brand_name,
-                features=features,
-                target_audience=session.target_audience or "",
-                framework=framework,
-                visual_script=visual_script,
-                module_index=request.module_index,
-                module_count=len(visual_script.get("modules", [])),
-                custom_instructions="",  # handled by AI enhancement below
-                has_style_ref=has_style_ref,
-                has_logo=has_logo_ref,
-                has_product_ref=has_product_ref,
-            )
-            if prompt:
-                use_named_images = True
-                logger.info(f"Using visual script prompt for module {request.module_index}, {len(prompt)} chars")
-
-        # Tier 3: No visual script fallback
-        if not prompt:
-            if request.module_index == 0:
-                position = "first"
-            elif request.module_index > 0:
-                position = "middle"
-            else:
-                position = "only"
-
-            framework_name = "Professional"
-            framework_style = "Clean and modern premium design"
-            framework_mood = "Professional and engaging"
-            primary_color = "#C85A35"
-            color_palette = [primary_color]
-
-            if framework:
-                framework_name = framework.get('framework_name', framework_name)
-                framework_style = framework.get('design_philosophy', framework_style)
-                framework_mood = framework.get('brand_voice', framework_mood)
-                colors = framework.get('colors', [])
-                if colors:
-                    color_palette = [c.get('hex', '#C85A35') for c in colors if c.get('hex')]
-                    primary_color = next(
-                        (c.get('hex') for c in colors if c.get('role') == 'primary'),
-                        colors[0].get('hex', '#C85A35') if colors else '#C85A35'
-                    )
-
-            if design_context:
-                if design_context.selected_framework_name:
-                    framework_name = design_context.selected_framework_name
-                if design_context.locked_colors:
-                    color_palette = design_context.locked_colors
-                    primary_color = design_context.locked_colors[0]
-
-            prompt = get_aplus_prompt(
-                module_type=request.module_type.value,
-                position=position,
-                product_title=session.product_title,
-                brand_name=effective_brand_name,
-                features=features,
-                target_audience=session.target_audience or "",
-                framework_name=framework_name,
-                framework_style=framework_style,
-                primary_color=primary_color,
-                color_palette=color_palette,
-                framework_mood=framework_mood,
-                custom_instructions="",  # handled by AI enhancement below
-            )
-
-        # === Canvas extension DISABLED ===
-        # Was causing all modules to look like variations of the same image
-        # Each module is now generated independently for more variety
-        use_canvas_extension = False
-        canvas_image = None
-        debug_canvas_path = None
-
-        # === AI-enhanced prompt rewriting when user provides feedback ===
-        ai_change_summary = None
-        if request.custom_instructions:
-            image_type_key = f"aplus_{request.module_index}"
-            structural_ctx = get_structural_context(image_type_key, has_canvas=use_canvas_extension)
-            fw_dict, analysis_text = get_enhancement_context(session, design_context)
-            try:
-                enhancement = await vision.enhance_prompt_with_feedback(
-                    original_prompt=prompt,
-                    user_feedback=request.custom_instructions,
-                    image_type=image_type_key,
-                    framework=fw_dict,
-                    product_analysis=analysis_text,
-                    structural_context=structural_ctx,
-                )
-                prompt = enhancement["enhanced_prompt"]
-                ai_change_summary = enhancement.get("interpretation", "AI-enhanced based on feedback")
-                logger.info(f"AI Designer enhanced module {request.module_index} prompt: {ai_change_summary[:100]}")
-            except Exception as e:
-                logger.error(f"AI enhancement failed for module {request.module_index} rewrite: {e}")
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="AI Designer could not rewrite module feedback into a valid prompt. Please retry.",
-                )
-
-        is_middle_module = 2 <= request.module_index < module_count - 1
-        module_header = APLUS_MODULE_HEADER.format(
-            reference_images_desc=_build_aplus_reference_images_desc(
-                has_product_ref=has_product_ref,
-                has_style_ref=has_style_ref,
-                has_logo=(has_logo_ref and not is_middle_module),
-            )
+        ctx = GenerationContext.for_aplus_module(
+            session=session,
+            module_index=request.module_index,
+            prompt=compiled.prompt,
+            reference_images=compiled.reference_images,
+            module_type=request.module_type.value,
         )
-        prompt = _ensure_reference_images_header(prompt, module_header)
-
-        # Final guardrail: strip known A+ boilerplate before sending to Gemini
-        prompt = strip_aplus_banner_boilerplate(prompt)
-        if _has_legacy_aplus_boilerplate(prompt):
-            prompt = strip_aplus_banner_boilerplate(prompt)
-        if _has_legacy_aplus_boilerplate(prompt):
-            raise HTTPException(
-                status_code=500,
-                detail="Legacy A+ boilerplate leak detected before Gemini call. Please retry after backend restart.",
-            )
-
-        # Append lighting override (prevents amateur lighting bleed from reference photos)
-        prompt = append_lighting_override_once(prompt)
-
-        # === Build GenerationContext and execute ===
-        logger.info(f"Generating A+ {request.module_type.value} module (index={request.module_index}, canvas_ext={use_canvas_extension})")
-
-        if use_canvas_extension:
-            ref_images = assemble_reference_images(
-                session, f"aplus_{request.module_index}",
-                canvas_image=canvas_image, canvas_debug_path=debug_canvas_path,
-                module_index=request.module_index, module_count=module_count,
-            )
-            ctx = GenerationContext.for_canvas_extension(
-                session=session,
-                module_index=request.module_index,
-                prompt=prompt,
-                reference_images=ref_images,
-                canvas_image=canvas_image,
-            )
-        else:
-            ref_images = assemble_reference_images(
-                session, f"aplus_{request.module_index}",
-                use_named=use_named_images,
-                module_index=request.module_index, module_count=module_count,
-            )
-            ctx = GenerationContext.for_aplus_module(
-                session=session,
-                module_index=request.module_index,
-                prompt=prompt,
-                reference_images=ref_images,
-                module_type=request.module_type.value,
-            )
-
-        # Store feedback metadata for prompt history
         if request.custom_instructions:
             ctx.user_feedback = request.custom_instructions
-            ctx.change_summary = ai_change_summary
-
-        # Apply model override if specified
+            ctx.change_summary = compiled.change_summary
         if request.image_model:
             ctx.model_override = request.image_model
 
@@ -1853,10 +1572,13 @@ async def generate_aplus_module(
             height=target_height,
             is_chained=False,
             generation_time_ms=generation_time_ms,
-            prompt_text=prompt,
+            prompt_text=compiled.prompt,
             refined_previous=refined_previous_info,
         )
 
+    except ValueError as e:
+        # Compiler raises ValueError for boilerplate leaks
+        raise HTTPException(status_code=500, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
