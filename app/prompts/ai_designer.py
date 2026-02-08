@@ -21,8 +21,18 @@ from .vocabulary import (
 from .product_protection import (
     PRODUCT_PROTECTION_DIRECTIVE,
     PRODUCT_REFERENCE_INSTRUCTION,
-    AMAZON_MAIN_IMAGE_REQUIREMENTS,
 )
+
+
+HERO_LISTING_PROP_STRATEGY = """
+HERO LISTING (IMAGE 1) - CTR-FIRST RULES:
+- Keep the exact product from Image 1 as the dominant hero.
+- Add 2-6 supporting props inferred from the product itself to increase click-through appeal.
+- Infer props from flavor, ingredients, materials, use case, or category context (never random filler).
+- Keep composition clean and premium: bright background (often white), soft contact shadows, no clutter.
+- Product must remain the visual priority (roughly 65-80% of visual weight), centered and tack-sharp.
+- Never add website UI, browser chrome, watermarks, or unrelated decorative elements.
+"""
 
 
 # ============================================================================
@@ -513,9 +523,9 @@ from "What is this?" to "I need this NOW."
 The customer is the HERO. The product is the GUIDE that enables transformation.
 
 **IMAGE 1: INTRIGUE** — "What is this beautiful thing?"
-''' + AMAZON_MAIN_IMAGE_REQUIREMENTS + '''
+''' + HERO_LISTING_PROP_STRATEGY + '''
 Stop the scroll. Create visual magnetism. The product exists with quiet confidence.
-Hasselblad H6D-100c. Pure white background. The product doesn't need to explain itself.
+Hasselblad H6D-100c. Keep the background bright and clean, and use product-relevant props to add desire context.
 It simply IS — beautiful, present, mysterious in its perfection.
 The viewer's unconscious thought: "I want to know more."
 
@@ -744,7 +754,7 @@ The user has additional guidance for ALL 5 images:
 "{global_note}"
 
 Interpret this intelligently across all images. Adapt the spirit to each context:
-- Main image: Keep pure (product only on white)
+- Main image: Keep product dominant and add product-relevant props inferred from flavor/material/use-case to boost CTR
 - Infographics: Apply to visual elements, icons, colors
 - Lifestyle: Apply to environment, props, styling
 - Comparison: Apply to layout and presentation
