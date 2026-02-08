@@ -1013,6 +1013,7 @@ export const HomePage: React.FC = () => {
   const handleGenerate = useCallback(async () => {
     if (uploads.length === 0 || !selectedFramework) return;
 
+    console.log('[handleGenerate] Starting batch generation...');
     setError(null);
     setIsGenerating(true);
     updateGenerationStatus('processing');
@@ -1022,10 +1023,14 @@ export const HomePage: React.FC = () => {
     setImages(imageTypes.map(type => ({ type, status: 'pending' as const, label: getImageLabel(type) })));
 
     try {
+      console.log('[handleGenerate] Creating session (ensureSession)...');
       const sid = await ensureSession();
+      console.log('[handleGenerate] Session created:', sid);
+      console.log('[handleGenerate] Calling generateBatch...');
       await apiClient.generateBatch(sid, imageTypes, formData.imageModel);
-      // Polling handles everything from here — no direct state updates needed
+      console.log('[handleGenerate] Batch queued successfully — polling will track progress');
     } catch (err: any) {
+      console.error('[handleGenerate] FAILED:', err?.response?.status, err?.response?.data || err?.message);
       handleError(err, 'Failed to start generation');
       setIsGenerating(false);
       updateGenerationStatus('failed');
@@ -2165,6 +2170,8 @@ export const HomePage: React.FC = () => {
           onOpenAdvancedSettings={() => setAdvancedSettingsOpen(true)}
           onStartOver={handleStartOver}
           workflowSteps={workflowSteps}
+          error={error}
+          onDismissError={() => setError(null)}
         />
       )}
 

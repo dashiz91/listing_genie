@@ -72,6 +72,10 @@ interface ResultsViewProps {
 
   // Workflow stepper
   workflowSteps?: WorkflowStep[];
+
+  // Error state
+  error?: string | null;
+  onDismissError?: () => void;
 }
 
 export const ResultsView: React.FC<ResultsViewProps> = ({
@@ -118,6 +122,8 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
   onOpenAdvancedSettings,
   onStartOver,
   workflowSteps,
+  error,
+  onDismissError,
 }) => {
   // Unified viewport mode
   const [unifiedViewportMode, setUnifiedViewportMode] = useState<'desktop' | 'mobile'>('desktop');
@@ -229,6 +235,27 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
       {/* Generation progress bar */}
       <GenerationProgressBar images={images} isGenerating={isGenerating} />
 
+      {/* Error banner */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-4">
+          <div className="bg-red-900/40 border border-red-500/50 rounded-lg p-4 flex items-start gap-3">
+            <svg className="w-5 h-5 text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <div className="flex-1">
+              <p className="text-red-200 text-sm">{error}</p>
+            </div>
+            {onDismissError && (
+              <button onClick={onDismissError} className="text-red-400 hover:text-red-200 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Celebration overlay */}
       <CelebrationOverlay
         isVisible={showGenerationCelebration}
@@ -307,7 +334,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 <PushToAmazonButton
                   sessionId={sessionId!}
                   label="Push This Version"
-                  className="px-4 py-2 text-sm bg-[#FF9900]/25 border-[#FF9900]/50 hover:bg-[#FF9900]/35"
+                  className="px-5 py-2.5 text-sm font-semibold !text-slate-950 !bg-[#FFD27A] !border-[#FFDFA6] hover:!bg-[#FFBF4D] shadow-[0_10px_24px_rgba(0,0,0,0.32)]"
                 />
                 <button
                   onClick={() => setShowPushNudge(false)}
